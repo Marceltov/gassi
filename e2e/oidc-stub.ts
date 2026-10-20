@@ -1,6 +1,7 @@
 // A minimal OIDC issuer for the e2e tests, on 127.0.0.1:3199 (plain http is allowed on loopback). /authorize signs in
 // whoever the `stub_user` cookie (or `?user=`) names, without asking, and redirects straight back with a code; /token
-// answers that code with an unsigned id_token. Stateless: the code carries the user and the nonce.
+// answers that code with an unsigned id_token. Stateless: the code carries the user and the nonce. For trying the app
+// by hand (`npm run oidc-stub`), /as?user=bille sets that cookie, so the next sign-in is bille.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 export const STUB_PORT = 3199;
@@ -40,12 +41,19 @@ async function token(req: IncomingMessage, res: ServerResponse) {
   res.end(JSON.stringify({ access_token: "stub", token_type: "Bearer", id_token: `${b64({ alg: "none" })}.${b64(claims)}.` }));
 }
 
+function signInAs(res: ServerResponse, url: URL) {
+  const user = url.searchParams.get("user") ?? "marcel";
+  res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "set-cookie": `stub_user=${encodeURIComponent(user)}; Path=/` });
+  res.end(`The next sign-in is ${user}.`);
+}
+
 export function startOidcStub(): Promise<Server> {
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", STUB_ISSUER);
     if (url.pathname === "/.well-known/openid-configuration") return discovery(res);
     if (url.pathname === "/authorize") return authorize(req, res, url);
     if (url.pathname === "/token" && req.method === "POST") return void token(req, res);
+    if (url.pathname === "/as") return signInAs(res, url);
     res.writeHead(404).end();
   });
   return new Promise((resolve) => server.listen(STUB_PORT, "127.0.0.1", () => resolve(server)));
