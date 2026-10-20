@@ -2,7 +2,21 @@
 // of what goes in and what comes back. The client is built from it and the server's router validates against it, so
 // the two can't drift apart. Path params (":id") are filled from the input; the rest of a GET or DELETE input goes
 // into the query string, of a POST or PATCH into the JSON body.
-import { commandSchema, ENTRY_TYPES, FOOD_KINDS, type newEntryInput } from "@gassi/domain";
+import {
+  commandSchema,
+  ENTRY_MESSAGES,
+  ENTRY_TYPES,
+  entryCreateInput,
+  entryEditInput,
+  FOOD_KINDS,
+  type FieldMessages,
+  RESTOCK_MESSAGES,
+  restockInput,
+  STOCK_COUNT_MESSAGES,
+  stockCountInput,
+  WEIGHT_MESSAGES,
+  weightInput,
+} from "@gassi/domain";
 import { z } from "zod";
 
 export type Method = "GET" | "POST" | "PATCH" | "DELETE";
@@ -13,9 +27,11 @@ export type Endpoint<I extends z.ZodType = z.ZodType, O extends z.ZodType = z.Zo
   auth: A;
   input: I;
   output: O;
+  /** German messages per input field, for an input that doesn't fit (client and server answer with the same one). */
+  messages?: FieldMessages;
 };
 
-export function endpoint<I extends z.ZodType, O extends z.ZodType, A extends boolean = true>(e: { method: Method; path: string; auth?: A; input: I; output: O }): Endpoint<I, O, A> {
+export function endpoint<I extends z.ZodType, O extends z.ZodType, A extends boolean = true>(e: { method: Method; path: string; auth?: A; input: I; output: O; messages?: FieldMessages }): Endpoint<I, O, A> {
   return { ...e, auth: (e.auth ?? true) as A };
 }
 
@@ -25,14 +41,6 @@ const id = z.coerce.number().int().positive();
 export const personSchema = z.object({ id: z.string(), name: z.string() });
 export const deviceKinds = ["phone", "watch", "web", "script"] as const;
 export const deviceSchema = z.object({ id: z.number(), kind: z.enum(deviceKinds), name: z.string() });
-
-// Entries are checked by the server's use cases (with German messages per field); the contract only types them.
-type EntryWrite = Omit<z.input<typeof newEntryInput>, "at"> & { at?: string };
-const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-const entryWrite = z.custom<EntryWrite>(isObject);
-const entryEdit = z
-  .custom<Omit<EntryWrite, "type"> & { id: number | string }>((v) => isObject(v) && /^[1-9]\d*$/.test(String(v.id)))
-  .transform((v) => ({ ...v, id: Number(v.id) }));
 
 export const dogSchema = z.object({ id: z.number(), name: z.string(), color: z.string(), archived: z.boolean() });
 
@@ -128,11 +136,6 @@ const weekSchema = z.object({
   exerciseCounts: z.array(z.object({ name: z.string(), count: z.number() })),
   treats: z.number(),
 });
-// Checked by the server's use cases with German messages, like entries.
-const restockInput = z.custom<{ foodKind: "wet"; cans: number; unitG: number } | { foodKind: "dry"; grams: number }>(isObject);
-const correctInput = z.custom<{ foodKind: "wet"; cans: number } | { foodKind: "dry"; grams: number }>(isObject);
-const weightInput = z.custom<{ kg: number | string; at?: string; dogIds?: number[] }>(isObject);
-
 export const linkKinds = ["setup", "person", "device", "watch", "magic"] as const;
 const openLink = z.object({ id: z.number(), kind: z.enum(linkKinds), createdAt: z.string(), expiresAt: z.string() });
 
@@ -186,8 +189,8 @@ export const contract = {
     input: z.object({ type: z.string().optional(), by: z.string().optional(), day: z.string().optional(), dog: z.string().optional(), offset: z.coerce.number().int().min(0).optional() }),
     output: z.object({ entries: z.array(entryViewSchema), more: z.boolean() }),
   }),
-  logEntry: endpoint({ method: "POST", path: "/api/entries", input: entryWrite, output: entryViewSchema }),
-  editEntry: endpoint({ method: "PATCH", path: "/api/entries/:id", input: entryEdit, output: entryViewSchema }),
+  logEntry: endpoint({ method: "POST", path: "/api/entries", input: entryCreateInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),
+  editEntry: endpoint({ method: "PATCH", path: "/api/entries/:id", input: entryEditInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),
   deleteEntry: endpoint({ method: "DELETE", path: "/api/entries/:id", input: z.object({ id }), output: z.object({ deleted: z.literal(true) }) }),
   uploadTrack: endpoint({
     method: "POST",
@@ -213,11 +216,11 @@ export const contract = {
     output: z.object({ updated: z.literal(true) }),
   }),
   stock: endpoint({ method: "GET", path: "/api/stock", input: none, output: stockSchema }),
-  restock: endpoint({ method: "POST", path: "/api/stock/restock", input: restockInput, output: entryViewSchema }),
-  correctStock: endpoint({ method: "POST", path: "/api/stock/correct", input: correctInput, output: entryViewSchema }),
+  restock: endpoint({ method: "POST", path: "/api/stock/restock", input: restockInput, output: entryViewSchema, messages: RESTOCK_MESSAGES }),
+  correctStock: endpoint({ method: "POST", path: "/api/stock/correct", input: stockCountInput, output: entryViewSchema, messages: STOCK_COUNT_MESSAGES }),
   lastFood: endpoint({ method: "GET", path: "/api/food/last", input: none, output: z.object({ wet: z.number().nullable(), dry: z.number().nullable() }) }),
   weights: endpoint({ method: "GET", path: "/api/weight", input: none, output: z.object({ weights: z.array(entryViewSchema) }) }),
-  logWeight: endpoint({ method: "POST", path: "/api/weight", input: weightInput, output: entryViewSchema }),
+  logWeight: endpoint({ method: "POST", path: "/api/weight", input: weightInput, output: entryViewSchema, messages: WEIGHT_MESSAGES }),
   week: endpoint({ method: "GET", path: "/api/week", input: z.object({ w: z.string().optional() }), output: weekSchema }),
   updateMe: endpoint({
     method: "PATCH",

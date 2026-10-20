@@ -3,7 +3,7 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, dayBounds, dogRule, type Entry, entryFields, type EntryType, FOOD_KINDS, type FoodKind, isEntryType, mondayOf, newEntryInput, type Stock, weekBounds, type WeekInput, type WeekView, weekView } from "@gassi/domain";
+import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryFields, type EntryType, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, RESTOCK_MESSAGES, restockInput, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
@@ -25,48 +25,16 @@ export const HISTORY_PAGE = 50;
 
 export { InputError };
 
-const MESSAGES: Record<string, string> = {
-  at: "Die Zeit fehlt oder stimmt nicht.",
-  endedAt: "Das Ende fehlt, stimmt nicht oder liegt vor dem Anfang.",
-  amountG: "Die Menge muss eine ganze Zahl Gramm sein.",
-  foodKind: "Diese Futterart gibt es nicht.",
-  unitG: "Die Dosengröße muss eine ganze Zahl Gramm sein (1 bis 10000).",
-  note: "Die Notiz ist zu lang (höchstens 1000 Zeichen).",
-  type: "Diese Art von Eintrag gibt es nicht.",
-};
-
-function parse<S extends z.ZodType>(schema: S, input: unknown): z.output<S> {
+/** Checks `input` with `schema`; a problem becomes an InputError with the field's German message. */
+function parse<S extends z.ZodType>(schema: S, input: unknown, messages: FieldMessages): z.output<S> {
   const result = schema.safeParse(input);
   if (result.success) return result.data;
-  const field = String(result.error.issues[0]?.path[0] ?? "");
-  throw new InputError(MESSAGES[field] ?? "Die Eingabe stimmt nicht.");
+  throw new InputError(messageFor(messages, result.error));
 }
-
-const restockInput = z.union([
-  z.object({ foodKind: z.literal("wet"), cans: z.coerce.number().int().min(1).max(1000), unitG: z.coerce.number().int().min(1).max(10_000) }),
-  z.object({ foodKind: z.literal("dry"), grams: z.coerce.number().int().min(1).max(1_000_000) }),
-]);
-
-const stockInput = z.union([
-  z.object({ foodKind: z.literal("wet"), cans: z.coerce.number().min(0).max(1000) }),
-  z.object({ foodKind: z.literal("dry"), grams: z.coerce.number().int().min(0).max(1_000_000) }),
-]);
-
-const weightInput = z.object({
-  kg: z.preprocess((v) => (typeof v === "string" ? (v.trim() ? Number(v.trim().replace(",", ".")) : NaN) : v), z.number().min(0.5).max(100)),
-  at: z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString()),
-  dogIds: z.array(z.number().int().positive()).optional(),
-});
 
 // Food, restocks and stock counts belong to one kind: without it they would count for neither stock.
 const needsKind = (type: EntryType, kind: FoodKind | null) => {
   if (!kind && (type === "food" || type === "restock" || type === "stockcheck")) throw new InputError("Welche Futterart?");
-};
-
-const foodKindOf = (input: unknown): FoodKind => {
-  const kind = (input as { foodKind?: unknown } | null)?.foodKind;
-  if (!FOOD_KINDS.includes(kind as FoodKind)) throw new InputError("Diese Futterart gibt es nicht.");
-  return kind as FoodKind;
 };
 
 export type DiaryDeps = { db: DB; names: Names; timeZone: string; now: () => Date };
@@ -93,13 +61,13 @@ export class Diary {
   }
 
   async log(user: Person, input: unknown): Promise<EntryView> {
-    const fields = parse(newEntryInput, input);
+    const fields = parse(newEntryInput, input, ENTRY_MESSAGES);
     needsKind(fields.type, fields.foodKind);
     return this.view1(await this.entries.create({ ...fields, dogIds: await this.dogsFor(fields.type, fields.dogIds), loggedBy: user.id }));
   }
 
   async edit(id: number, input: unknown): Promise<EntryView | null> {
-    const fields = parse(entryFields, input);
+    const fields = parse(entryFields, input, ENTRY_MESSAGES);
     const before = await this.entries.get(id);
     if (before) needsKind(before.type, fields.foodKind);
     if (before && fields.dogIds) fields.dogIds = await this.dogsFor(before.type, fields.dogIds, before.dogIds);
@@ -122,33 +90,29 @@ export class Diary {
 
   /** Bought food: wet as cans × grams per can, dry in grams. */
   async restock(user: Person, input: unknown): Promise<EntryView> {
-    const kind = foodKindOf(input);
-    const r = restockInput.safeParse(input);
-    if (!r.success) throw new InputError(kind === "wet" ? "Wie viele Dosen, und wie viel Gramm hat eine Dose?" : "Wie viel Gramm hast du gekauft?");
-    const amount = r.data.foodKind === "wet" ? { amountG: r.data.cans * r.data.unitG, unitG: r.data.unitG } : { amountG: r.data.grams, unitG: null };
-    return this.create(user, { type: "restock", foodKind: kind, ...amount });
+    const r = parse(restockInput, input, RESTOCK_MESSAGES);
+    const amount = r.foodKind === "wet" ? { amountG: r.cans * r.unitG, unitG: r.unitG } : { amountG: r.grams, unitG: null };
+    return this.create(user, { type: "restock", foodKind: r.foodKind, ...amount });
   }
 
   /** What is there now, counted by hand: wet in cans (of the last can size bought), dry in grams. */
   async correctStock(user: Person, input: unknown): Promise<EntryView> {
-    const kind = foodKindOf(input);
-    const r = stockInput.safeParse(input);
-    if (!r.success) throw new InputError(kind === "wet" ? "Wie viele Dosen sind noch da?" : "Wie viel Gramm sind noch da?");
+    const r = parse(stockCountInput, input, STOCK_COUNT_MESSAGES);
     let grams: number;
-    if (r.data.foodKind === "wet") {
+    if (r.foodKind === "wet") {
       const canSizeG = (await this.stock()).wet.canSizeG;
       if (!canSizeG) throw new InputError("Trag erst einen Einkauf mit Dosengröße ein.");
-      grams = Math.round(r.data.cans * canSizeG);
-    } else grams = r.data.grams;
-    return this.create(user, { type: "stockcheck", foodKind: kind, amountG: grams, unitG: null });
+      grams = Math.round(r.cans * canSizeG);
+    } else grams = r.grams;
+    return this.create(user, { type: "stockcheck", foodKind: r.foodKind, amountG: grams, unitG: null });
   }
 
-  /** Toffee's weight in kg (one decimal), stored as grams. */
+  /** A dog's weight in kg (one decimal), stored as grams; the time defaults to now. */
   async logWeight(user: Person, input: unknown): Promise<EntryView> {
-    const r = weightInput.safeParse(input);
-    if (!r.success) throw new InputError(r.error.issues[0]?.path[0] === "at" ? MESSAGES.at : "Das Gewicht muss zwischen 0,5 und 100 kg liegen.");
-    const amountG = Math.round(r.data.kg * 10) * 100;
-    return this.view1(await this.entries.create({ type: "weight", at: r.data.at, endedAt: null, amountG, foodKind: null, unitG: null, note: null, dogIds: await this.dogsFor("weight", r.data.dogIds), loggedBy: user.id }));
+    const r = parse(weightInput, input, WEIGHT_MESSAGES);
+    const amountG = Math.round(r.kg * 10) * 100;
+    const at = r.at ?? this.deps.now().toISOString();
+    return this.view1(await this.entries.create({ type: "weight", at, endedAt: null, amountG, foodKind: null, unitG: null, note: null, dogIds: await this.dogsFor("weight", r.dogIds), loggedBy: user.id }));
   }
 
   async stock(): Promise<Stock> {

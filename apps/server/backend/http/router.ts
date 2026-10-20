@@ -2,6 +2,7 @@
 // the endpoint is public, parses the input with the endpoint's schema, runs its implementation and checks the answer
 // with the output schema. `Implementations` has a key per endpoint, so a missing one doesn't compile.
 import { contract, type Contract, type EndpointName, matchPath, type Output, type ParsedInput, sendsBody } from "@gassi/api-client";
+import { messageFor } from "@gassi/domain";
 import type { Auth } from "../auth/devices";
 import { InputError } from "../errors";
 
@@ -24,7 +25,7 @@ export function router<D>(impls: Implementations<D>, deps: D, authenticate: (aut
       if (params) found = { name, params };
     }
     if (!found) return json({ error: "Gibt es nicht." }, 404);
-    const e = contract[found.name];
+    const e: (typeof contract)[EndpointName] = contract[found.name];
     const auth = await authenticate(req.headers.get("authorization"));
     if (e.auth && !auth) return json({ error: "Bitte anmelden." }, 401);
     let raw: Record<string, unknown> = Object.fromEntries(url.searchParams);
@@ -34,7 +35,7 @@ export function router<D>(impls: Implementations<D>, deps: D, authenticate: (aut
       raw = body as Record<string, unknown>;
     }
     const input = e.input.safeParse({ ...raw, ...found.params });
-    if (!input.success) return json({ error: "Die Eingabe stimmt nicht.", issues: input.error.issues.map((i) => i.path.join(".")) }, 400);
+    if (!input.success) return json({ error: messageFor("messages" in e && e.messages ? e.messages : {}, input.error) }, 400);
     try {
       const handler = impls[found.name] as Handler<EndpointName, D>;
       const out = await handler({ input: input.data as never, auth: auth as never, deps });

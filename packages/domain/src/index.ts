@@ -7,6 +7,7 @@ export * from "./dogs";
 export * from "./entry";
 export * from "./entryTypes";
 export * from "./food";
+export * from "./inputs";
 export * from "./result";
 export * from "./sessionProjection";
 export * from "./stock";

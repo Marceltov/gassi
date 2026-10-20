@@ -1,5 +1,6 @@
 // A typed client for the whole API, built from the contract: one method per endpoint, input and answer checked by the
 // same schemas the server uses. `fetch` is injected (tests, React Native, the watch bridge).
+import { messageFor } from "@gassi/domain";
 import { contract, type Contract, type EndpointName, fillPath, type Input, type Output, sendsBody } from "./contract";
 
 export class ApiError extends Error {
@@ -21,8 +22,11 @@ export type ClientOptions = { baseUrl: string; token?: string | null; fetch?: ty
 export function createClient({ baseUrl, token, fetch: fetchFn = (...a) => fetch(...a) }: ClientOptions): Client {
   const base = baseUrl.replace(/\/+$/, "");
   const call = async (name: EndpointName, input: unknown = {}) => {
-    const e = contract[name];
-    const { path, rest } = fillPath(e.path, e.input.parse(input) as Record<string, unknown>);
+    const e: (typeof contract)[EndpointName] = contract[name];
+    // checked here first, with the server's messages: a wrong input never leaves the phone
+    const checked = e.input.safeParse(input);
+    if (!checked.success) throw new ApiError(400, messageFor("messages" in e && e.messages ? e.messages : {}, checked.error));
+    const { path, rest } = fillPath(e.path, checked.data as Record<string, unknown>);
     const query = !sendsBody(e.method) && Object.keys(rest).length ? `?${new URLSearchParams(Object.entries(rest).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]))}` : "";
     const res = await fetchFn(`${base}${path}${query}`, {
       method: e.method,
