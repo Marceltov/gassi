@@ -1,26 +1,46 @@
-// Everyone who has signed in, by username, with the display name authentik gave at their last sign-in. authentik
-// decides who may sign in; this only remembers names, so entries and filters can show them.
+// The people of the household, by an id the server makes up, with the name others see and an optional e-mail address
+// (for magic links) and OIDC subject (for sign-in through the household's provider).
+import { randomBytes } from "node:crypto";
 import type { DB } from "./db/open";
 
-export type Person = { username: string; name: string };
+export type Person = { id: string; name: string };
 
-/** username → display name. */
+/** person id → name. */
 export type Names = ReadonlyMap<string, string>;
 
-export class PeopleRepository {
-  constructor(private readonly db: DB) {}
+export const newPersonId = (): string => randomBytes(9).toString("base64url");
 
-  /** Adds someone or updates their name. */
-  async remember(p: Person, now = new Date()): Promise<void> {
-    await this.db
-      .insertInto("person")
-      .values({ username: p.username, name: p.name, updated_at: now.toISOString() })
-      .onConflict((oc) => oc.column("username").doUpdateSet({ name: p.name, updated_at: now.toISOString() }))
-      .execute();
+export class PeopleRepository {
+  constructor(
+    private readonly db: DB,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
+
+  async add(p: { name: string; email?: string | null; oidcSubject?: string | null; id?: string }): Promise<Person> {
+    const row = { id: p.id ?? newPersonId(), name: p.name, email: p.email ?? null, oidc_subject: p.oidcSubject ?? null, created_at: this.now().toISOString() };
+    await this.db.insertInto("person").values(row).execute();
+    return { id: row.id, name: row.name };
+  }
+
+  /** The person the household's OIDC provider signed in, found by subject or added; their name follows the provider. */
+  async signInOidc({ subject, name }: { subject: string; name: string }): Promise<Person> {
+    const known = await this.db.selectFrom("person").select("id").where("oidc_subject", "=", subject).executeTakeFirst();
+    if (!known) return this.add({ name, oidcSubject: subject });
+    await this.db.updateTable("person").set({ name }).where("id", "=", known.id).execute();
+    return { id: known.id, name };
+  }
+
+  async get(id: string): Promise<Person | undefined> {
+    return this.db.selectFrom("person").select(["id", "name"]).where("id", "=", id).executeTakeFirst();
+  }
+
+  async count(): Promise<number> {
+    const r = await this.db.selectFrom("person").select((eb) => eb.fn.countAll<number>().as("n")).executeTakeFirstOrThrow();
+    return Number(r.n);
   }
 
   async names(): Promise<Names> {
-    const rows = await this.db.selectFrom("person").select(["username", "name"]).orderBy("name").execute();
-    return new Map(rows.map((r) => [r.username, r.name]));
+    const rows = await this.db.selectFrom("person").select(["id", "name"]).orderBy("name").execute();
+    return new Map(rows.map((r) => [r.id, r.name]));
   }
 }

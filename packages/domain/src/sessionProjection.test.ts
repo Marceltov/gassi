@@ -2,8 +2,8 @@ import { expect, test } from "vitest";
 import type { Command } from "./commands";
 import { project, type SessionsView } from "./sessionProjection";
 
-const HIRSCH = { username: "marcel", name: "Hirsch" };
-const HERZII = { username: "bille", name: "Herzii" };
+const HIRSCH = { id: "marcel", name: "Hirsch" };
+const HERZII = { id: "bille", name: "Herzii" };
 const walking: SessionsView = { walk: { key: "w", startedAt: "2026-10-20T09:00:00.000Z", walkers: [HIRSCH], pauses: [], paused: false }, training: null };
 const c = (at: string, body: object) => ({ id: at, at: `2026-10-20T09:${at}:00.000Z`, ...body }) as Command;
 

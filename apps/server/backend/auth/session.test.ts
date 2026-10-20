@@ -3,8 +3,8 @@ import { setEnv, withEnv } from "../testing/env";
 import { endSessionCookie, sessionCookie, sessionUser } from "./session";
 
 withEnv();
-const HIRSCH = { username: "marcel", name: "Hirsch" };
-const HERZII = { username: "bille", name: "Herzii" };
+const HIRSCH = { id: "marcel", name: "Hirsch" };
+const HERZII = { id: "bille", name: "Herzii" };
 const NOW = 1_800_000_000_000;
 const valueOf = (setCookie: string) => setCookie.split(";")[0].split("=").slice(1).join("=");
 
@@ -19,7 +19,7 @@ describe("the session cookie", () => {
   });
 
   test("names its user and their display name", () => {
-    expect(sessionUser(valueOf(sessionCookie(HERZII, NOW)), NOW)).toEqual({ username: "bille", name: "Herzii" });
+    expect(sessionUser(valueOf(sessionCookie(HERZII, NOW)), NOW)).toEqual({ id: "bille", name: "Herzii" });
   });
 
   test("expires after 30 days", () => {

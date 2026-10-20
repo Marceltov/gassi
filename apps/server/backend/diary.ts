@@ -3,11 +3,11 @@
 // validated here (zod); a problem is an InputError with a German message the screen can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { computeStock, dayBounds, type Entry, entryFields, type EntryType, FOOD_KINDS, type FoodKind, isEntryType, latestByType, mondayOf, newEntryInput, type Stock, TILE_TYPES, weekBounds, type WeekInput, weekView, type WeekView } from "@gassi/domain";
+import { computeStock, dayBounds, dogRule, type Entry, entryFields, type EntryType, FOOD_KINDS, type FoodKind, isEntryType, latestByType, mondayOf, newEntryInput, type Stock, TILE_TYPES, weekBounds, type WeekInput, type WeekView, weekView } from "@gassi/domain";
 import type { User } from "./auth/session";
 import { config } from "./config";
 import { database, type DB } from "./db/open";
-import { currentDog, type Dog } from "./dogs";
+import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
 import { InputError } from "./errors";
 import { type Names, PeopleRepository } from "./people";
@@ -19,7 +19,6 @@ import { dryTreats } from "./stock";
 export type EntryView = Entry & { byName: string; walkers: string[]; pauseMin: number | null; exercises: string[]; treats: number | null };
 
 export type TodayView = {
-  dogName: string;
   timeZone: string;
   now: string;
   tiles: Record<(typeof TILE_TYPES)[number], EntryView | null>;
@@ -79,7 +78,7 @@ const foodKindOf = (input: unknown): FoodKind => {
   return kind as FoodKind;
 };
 
-export type DiaryDeps = { db: DB; dog: Dog; names: Names; timeZone: string; now: () => Date };
+export type DiaryDeps = { db: DB; names: Names; timeZone: string; now: () => Date };
 
 export class Diary {
   private readonly entries: EntryRepository;
@@ -88,17 +87,13 @@ export class Diary {
     this.entries = new EntryRepository(deps.db, deps.now);
   }
 
-  get dogName(): string {
-    return this.deps.dog.name;
-  }
-
   get timeZone(): string {
     return this.deps.timeZone;
   }
 
   /** Everyone who has signed in, for the person filter. */
-  people(): { username: string; name: string }[] {
-    return [...this.deps.names].map(([username, name]) => ({ username, name }));
+  people(): { id: string; name: string }[] {
+    return [...this.deps.names].map(([id, name]) => ({ id, name }));
   }
 
   /** The history filter from untrusted values (search params, an action's argument): anything unknown is left out. */
@@ -113,14 +108,14 @@ export class Diary {
   async log(user: User, input: unknown): Promise<EntryView> {
     const fields = parse(newEntryInput, input);
     needsKind(fields.type, fields.foodKind);
-    return this.view1(await this.entries.create({ ...fields, dogId: this.deps.dog.id, loggedBy: user.username }));
+    return this.view1(await this.entries.create({ ...fields, dogIds: fields.dogIds ?? (await this.defaultDogs(fields.type)), loggedBy: user.id }));
   }
 
   /** Logs on behalf of `loggedBy` (the API): someone who has signed in at least once. */
   async logAs(loggedBy: string, input: unknown): Promise<EntryView> {
     const name = this.deps.names.get(loggedBy);
     if (!name) throw new InputError("Diese Person gibt es nicht.");
-    return this.log({ username: loggedBy, name }, input);
+    return this.log({ id: loggedBy, name }, input);
   }
 
   async edit(id: number, input: unknown): Promise<EntryView | null> {
@@ -140,16 +135,16 @@ export class Diary {
   async today(): Promise<TodayView> {
     const now = this.deps.now();
     const { start, end } = dayBounds(now.getTime(), this.deps.timeZone);
-    const entries = await this.views(await this.entries.list({ dogId: this.deps.dog.id, since: iso(start), until: iso(end) }));
+    const entries = await this.views(await this.entries.list({ since: iso(start), until: iso(end) }));
     const latest = latestByType(entries);
     const tiles = Object.fromEntries(TILE_TYPES.map((t) => [t, (latest[t] as EntryView | undefined) ?? null])) as TodayView["tiles"];
     const [sessions, lastFood] = await Promise.all([new Sessions(this.deps).current(), this.lastFoodAmounts()]);
-    return { dogName: this.deps.dog.name, timeZone: this.deps.timeZone, now: now.toISOString(), tiles, entries, sessions, lastFood };
+    return { timeZone: this.deps.timeZone, now: now.toISOString(), tiles, entries, sessions, lastFood };
   }
 
   /** The amount of the newest feeding of each kind, offered as the usual portion. */
   async lastFoodAmounts(): Promise<Record<FoodKind, number | null>> {
-    const food = await this.entries.list({ dogId: this.deps.dog.id, type: "food" });
+    const food = await this.entries.list({ type: "food" });
     const last = (kind: FoodKind) => food.find((e) => e.foodKind === kind)?.amountG ?? null;
     return { wet: last("wet"), dry: last("dry") };
   }
@@ -182,22 +177,22 @@ export class Diary {
     const r = weightInput.safeParse(input);
     if (!r.success) throw new InputError(r.error.issues[0]?.path[0] === "at" ? MESSAGES.at : "Das Gewicht muss zwischen 0,5 und 100 kg liegen.");
     const amountG = Math.round(r.data.kg * 10) * 100;
-    return this.view1(await this.entries.create({ type: "weight", at: r.data.at, endedAt: null, amountG, foodKind: null, unitG: null, note: null, dogId: this.deps.dog.id, loggedBy: user.username }));
+    return this.view1(await this.entries.create({ type: "weight", at: r.data.at, endedAt: null, amountG, foodKind: null, unitG: null, note: null, dogIds: await this.defaultDogs("weight"), loggedBy: user.id }));
   }
 
   async stock(): Promise<Stock> {
-    const [entries, treats] = await Promise.all([this.entries.list({ dogId: this.deps.dog.id }), dryTreats(this.deps.db)]);
+    const [entries, treats] = await Promise.all([this.entries.list({}), dryTreats(this.deps.db)]);
     return computeStock({ entries, treats, now: this.deps.now().getTime() });
   }
 
   private async create(user: User, e: { type: EntryType; foodKind: FoodKind; amountG: number; unitG: number | null }): Promise<EntryView> {
     const at = this.deps.now().toISOString();
-    return this.view1(await this.entries.create({ ...e, at, endedAt: null, note: null, dogId: this.deps.dog.id, loggedBy: user.username }));
+    return this.view1(await this.entries.create({ ...e, at, endedAt: null, note: null, dogIds: [], loggedBy: user.id }));
   }
 
   async history(filter: HistoryFilter, offset = 0): Promise<HistoryPage> {
     const day = filter.day ? dayBounds(Date.parse(`${filter.day}T12:00:00Z`), this.deps.timeZone) : null;
-    const rows = await this.entries.list({ dogId: this.deps.dog.id, type: filter.type, loggedBy: filter.by, ...(day ? { since: iso(day.start), until: iso(day.end), overlapping: true } : {}), offset, limit: HISTORY_PAGE + 1 });
+    const rows = await this.entries.list({ type: filter.type, loggedBy: filter.by, ...(day ? { since: iso(day.start), until: iso(day.end), overlapping: true } : {}), offset, limit: HISTORY_PAGE + 1 });
     return { entries: await this.views(rows.slice(0, HISTORY_PAGE)), more: rows.length > HISTORY_PAGE };
   }
 
@@ -208,16 +203,16 @@ export class Diary {
     const monday = isDay(day) ? mondayOf(Date.parse(`${day}T12:00:00Z`), timeZone) : mondayOf(now, timeZone);
     const { start, end } = weekBounds(monday, timeZone);
     // with walks that began before Monday and went on into the week
-    const entries = await this.entries.list({ dogId: this.deps.dog.id, since: iso(start), until: iso(end), overlapping: true });
+    const entries = await this.entries.list({ since: iso(start), until: iso(end), overlapping: true });
     const ids = (type: EntryType) => entries.filter((e) => e.type === type).map((e) => e.id);
     const [walkIds, trainingIds] = [ids("walk"), ids("training")];
     const [walkerRows, exerciseRows, treatRows] = await Promise.all([
-      walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "username"]).where("entry_id", "in", walkIds).execute() : [],
+      walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "person_id"]).where("entry_id", "in", walkIds).execute() : [],
       trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name"]).where("entry_id", "in", trainingIds).execute() : [],
       trainingIds.length ? db.selectFrom("training_treat").select(["entry_id", "count"]).where("entry_id", "in", trainingIds).execute() : [],
     ]);
     const walkers: WeekInput["walkers"] = {};
-    for (const r of walkerRows) (walkers[r.entry_id] ??= []).push(r.username);
+    for (const r of walkerRows) (walkers[r.entry_id] ??= []).push(r.person_id);
     const trainings: WeekInput["trainings"] = Object.fromEntries(trainingIds.map((id) => [id, { exercises: [] as string[], treats: 0 }]));
     for (const r of exerciseRows) trainings[r.entry_id].exercises.push(r.name);
     for (const r of treatRows) trainings[r.entry_id].treats += r.count;
@@ -225,7 +220,15 @@ export class Diary {
   }
 
   async all(query: { type?: EntryType; since?: string } = {}): Promise<EntryView[]> {
-    return this.views(await this.entries.list({ dogId: this.deps.dog.id, ...query }));
+    return this.views(await this.entries.list({ ...query }));
+  }
+
+  // Until entries name their dogs (step 1, task 7): every active dog, or the first for one-dog types.
+  private async defaultDogs(type: EntryType): Promise<number[]> {
+    const rule = dogRule(type);
+    if (rule === "none") return [];
+    const ids = await new DogRepository(this.deps.db).activeIds();
+    return rule === "one" ? ids.slice(0, 1) : ids;
   }
 
   private async view1(e: Entry): Promise<EntryView> {
@@ -238,7 +241,7 @@ export class Diary {
     const ids = (type: EntryType) => entries.filter((e) => e.type === type).map((e) => e.id);
     const [walkIds, trainingIds] = [ids("walk"), ids("training")];
     const [walkers, pauses, exercises, treats] = await Promise.all([
-      walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "username"]).where("entry_id", "in", walkIds).orderBy(sql`rowid`).execute() : [],
+      walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "person_id"]).where("entry_id", "in", walkIds).orderBy(sql`rowid`).execute() : [],
       walkIds.length ? db.selectFrom("walk_pause").select(["entry_id", "started_at", "ended_at"]).where("entry_id", "in", walkIds).execute() : [],
       trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute() : [],
       trainingIds.length ? db.selectFrom("training_treat").select(["entry_id", "count"]).where("entry_id", "in", trainingIds).execute() : [],
@@ -254,7 +257,7 @@ export class Diary {
       return {
         ...e,
         byName: names.get(e.loggedBy) ?? e.loggedBy,
-        walkers: walkers.filter((w) => w.entry_id === e.id).map((w) => names.get(w.username) ?? w.username),
+        walkers: walkers.filter((w) => w.entry_id === e.id).map((w) => names.get(w.person_id) ?? w.person_id),
         pauseMin: isWalk && pauses.some((p) => p.entry_id === e.id) ? Math.round(pauseMs / 60_000) : isWalk && e.clientKey ? 0 : null,
         exercises: exercises.filter((x) => x.entry_id === e.id).map((x) => x.name),
         treats: e.type === "training" ? treats.filter((t) => t.entry_id === e.id).reduce((n, t) => n + t.count, 0) : null,
@@ -271,6 +274,6 @@ const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2
 /** The diary for one request, on the configured database and dog, with the names as they are now. */
 export async function diary(): Promise<Diary> {
   const db = await database();
-  const [dog, names] = await Promise.all([currentDog(db), new PeopleRepository(db).names()]);
-  return new Diary({ db, dog, names, timeZone: config().timeZone, now: () => new Date() });
+  const names = await new PeopleRepository(db).names();
+  return new Diary({ db, names, timeZone: config().timeZone, now: () => new Date() });
 }

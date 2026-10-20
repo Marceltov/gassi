@@ -1,6 +1,5 @@
 // The backend's boundary: the only module the frontend (app/, components/, proxy.ts) may import from backend/
 // (enforced in eslint.config.mjs). Pages and actions call the use cases here; route handlers are mounted as they are.
-import { apiEntriesRoute } from "./http/api";
 import { commandsRoute } from "./http/commands";
 import { exportRoute } from "./http/export";
 import { healthRoute } from "./http/health";
@@ -18,7 +17,6 @@ export const oidcStart = logged((req) => oidcStartRoute(req));
 export const oidcCallback = logged((req) => oidcCallbackRoute(req));
 export const logout = logged(() => logoutRoute());
 export const exportCsv = logged((req) => exportRoute(req));
-export const apiEntries = logged((req) => apiEntriesRoute(req));
 export const commands = logged((req) => commandsRoute(req));
 
 // The use cases (backend/diary.ts) and what they hand out.

@@ -8,8 +8,8 @@ import { commandsRoute } from "./commands";
 withEnv();
 const { db } = freshDatabase();
 const NOW = Date.parse("2026-10-20T10:00:00Z");
-const open = async () => new Sessions({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"]]), now: () => new Date(NOW) });
-const signedIn = () => ({ cookie: sessionCookie({ username: "marcel", name: "Hirsch" }, NOW).split(";")[0] });
+const open = async () => new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"]]), now: () => new Date(NOW) });
+const signedIn = () => ({ cookie: sessionCookie({ id: "marcel", name: "Hirsch" }, NOW).split(";")[0] });
 const post = (body: unknown, headers: Record<string, string> = signedIn()) =>
   commandsRoute(new Request("https://gassi.example/api/commands", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) }), open, NOW);
 
@@ -38,6 +38,6 @@ test("applies the commands and answers with what it did and the view", async () 
   expect(await res.json()).toEqual({
     applied: ["c1"],
     dropped: ["c2"],
-    view: { walk: { key: "w", startedAt: "2026-10-20T09:00:00.000Z", walkers: [{ username: "marcel", name: "Hirsch" }], pauses: [], paused: false }, training: null },
+    view: { walk: { key: "w", startedAt: "2026-10-20T09:00:00.000Z", walkers: [{ id: "marcel", name: "Hirsch" }], pauses: [], paused: false }, training: null },
   });
 });

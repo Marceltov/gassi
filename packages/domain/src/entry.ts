@@ -6,7 +6,7 @@ import { ENTRY_TYPES, type EntryType, FOOD_KINDS, type FoodKind, minutesBetween 
 
 export type Entry = {
   id: number;
-  dogId: number;
+  dogIds: number[]; // the dogs it is about (none for restocks, stock counts and notes)
   type: EntryType;
   at: string; // ISO 8601 UTC
   endedAt: string | null; // ISO 8601 UTC
@@ -16,7 +16,7 @@ export type Entry = {
   unitG: number | null; // grams per can, on wet-food restocks
   clientKey: string | null; // the key a walk or training was started with
   note: string | null;
-  loggedBy: string; // username
+  loggedBy: string; // person id
   createdAt: string;
   updatedAt: string;
 };
@@ -26,6 +26,7 @@ const blankToNull = (v: unknown) => (v === "" || v === undefined ? null : v);
 const instant = z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString());
 
 const fieldShape = {
+  dogIds: z.array(z.number().int().positive()).max(20).optional(),
   at: instant,
   endedAt: z.preprocess(blankToNull, instant.nullable()),
   amountG: z.preprocess(blankToNull, z.coerce.number().int().min(0).max(1_000_000).nullable()), // 0: a stock counted empty
@@ -44,7 +45,7 @@ export const newEntryInput = z.object({ ...fieldShape, type: z.enum(ENTRY_TYPES)
 
 export type EntryFields = z.output<typeof entryFields>;
 export type NewEntryInput = z.output<typeof newEntryInput>;
-export type NewEntry = NewEntryInput & { dogId: number; loggedBy: string; clientKey?: string | null };
+export type NewEntry = Omit<NewEntryInput, "dogIds"> & { dogIds: number[]; loggedBy: string; clientKey?: string | null };
 
 export const durationOf = (e: { at: string; endedAt: string | null }) => minutesBetween(e.at, e.endedAt);
 

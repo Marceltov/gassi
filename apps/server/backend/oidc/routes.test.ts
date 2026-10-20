@@ -21,7 +21,7 @@ async function start(next?: string, o: StubOptions = {}) {
 }
 
 let remember: ReturnType<typeof vi.fn<OidcDeps["remember"]>>;
-beforeEach(() => void (remember = vi.fn<OidcDeps["remember"]>(async () => {})));
+beforeEach(() => void (remember = vi.fn<OidcDeps["remember"]>(async (c) => ({ id: `p-${c.subject}`, name: c.name }))));
 
 function callback(flight: string | undefined, query: Record<string, string>, nonce: string, o: StubOptions = {}) {
   const deps: OidcDeps = { fetch: stubIssuer(nonce, o), now: () => NOW, remember };
@@ -51,9 +51,9 @@ describe("callback", () => {
     const res = await callback(flight, { state, code: "c" }, nonce);
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/verlauf?type=walk");
-    expect(sessionUser(cookieValue(res, "gassi_session"), NOW)).toEqual({ username: "marcel", name: "Hirsch" });
+    expect(sessionUser(cookieValue(res, "gassi_session"), NOW)).toEqual({ id: "p-marcel", name: "Hirsch" });
     expect(cookieValue(res, "gassi_oidc")).toBe("");
-    expect(remember).toHaveBeenCalledWith({ username: "marcel", name: "Hirsch" });
+    expect(remember).toHaveBeenCalledWith({ subject: "marcel", name: "Hirsch" });
   });
 
   test("a state that doesn't match the flight fails", async () => {
@@ -83,8 +83,8 @@ describe("callback", () => {
   test("anyone authentik signs in gets a session, under their own name", async () => {
     const { flight, state, nonce } = await start();
     const res = await callback(flight, { state, code: "c" }, nonce, { claims: (n) => goodClaims(n, { preferred_username: "gast", name: "Gast" }) });
-    expect(sessionUser(cookieValue(res, "gassi_session"), NOW)).toEqual({ username: "gast", name: "Gast" });
-    expect(remember).toHaveBeenCalledWith({ username: "gast", name: "Gast" });
+    expect(sessionUser(cookieValue(res, "gassi_session"), NOW)).toEqual({ id: "p-gast", name: "Gast" });
+    expect(remember).toHaveBeenCalledWith({ subject: "gast", name: "Gast" });
   });
 
   test.each(["//evil.example", "https://evil.example/", "/\\evil.example"])("an open redirect in next (%j) goes home instead", async (next) => {

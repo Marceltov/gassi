@@ -5,9 +5,9 @@ import { Catalog } from "./catalog";
 import { Sessions } from "./sessions";
 
 const { db } = freshDatabase();
-const HIRSCH = { username: "marcel", name: "Hirsch" };
+const HIRSCH = { id: "marcel", name: "Hirsch" };
 let clock = new Date("2026-10-20T10:00:00Z");
-const diary = () => new Diary({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), timeZone: "Europe/Berlin", now: () => clock });
+const diary = () => new Diary({ db: db(), names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), timeZone: "Europe/Berlin", now: () => clock });
 
 describe("log", () => {
   test("logs for the signed-in user and shows their display name", async () => {
@@ -44,12 +44,12 @@ describe("today", () => {
     const today = await d.today();
     expect(today.entries.map((e) => e.id)).toEqual([pee2.id, pee1.id]);
     expect(today.tiles).toEqual({ walk: null, food: null, pee: pee2, poop: null });
-    expect(today).toMatchObject({ dogName: "Toffee", timeZone: "Europe/Berlin", now: clock.toISOString() });
+    expect(today).toMatchObject({ timeZone: "Europe/Berlin", now: clock.toISOString() });
   });
 
   test("shows the walk that runs now", async () => {
     clock = new Date("2026-10-20T10:00:00Z");
-    await new Sessions({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"]]), now: () => clock }).apply(HIRSCH, [{ id: "c1", at: "2026-10-20T09:40:00.000Z", kind: "walk.start", walkKey: "w" }]);
+    await new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"]]), now: () => clock }).apply(HIRSCH, [{ id: "c1", at: "2026-10-20T09:40:00.000Z", kind: "walk.start", walkKey: "w" }]);
     const today = await diary().today();
     expect(today.sessions).toEqual({ walk: { key: "w", startedAt: "2026-10-20T09:40:00.000Z", walkers: [HIRSCH], pauses: [], paused: false }, training: null });
   });
@@ -85,11 +85,6 @@ test("filter keeps only known types and people", () => {
   expect(d.filter({ type: ["walk"], by: 1 })).toEqual({});
 });
 
-test("an entry by someone without a remembered name shows their username", async () => {
-  const d = diary();
-  await d.log({ username: "gast", name: "Gast" }, { type: "pee", at: "2026-10-20T09:00:00Z" });
-  expect((await d.all())[0].byName).toBe("gast");
-});
 
 describe("food and stock", () => {
   test("suggests the last amount per food kind", async () => {
@@ -156,11 +151,11 @@ describe("day filter and week", () => {
 
   test("the week has the walkers of joint walks and what trainings practised", async () => {
     clock = new Date("2026-10-22T12:00:00Z");
-    const s = new Sessions({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), now: () => clock });
+    const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), now: () => clock });
     const sitz = await new Catalog(db()).addExercise("Sitz");
     const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
     await s.apply(HIRSCH, [{ id: "1", at: "2026-10-21T08:00:00.000Z", kind: "walk.start", walkKey: "w" }]);
-    await s.apply({ username: "bille", name: "Herzii" }, [
+    await s.apply({ id: "bille", name: "Herzii" }, [
       { id: "2", at: "2026-10-21T08:01:00.000Z", kind: "walk.join", walkKey: "w" },
       { id: "3", at: "2026-10-21T08:10:00.000Z", kind: "training.start", trainingKey: "t", walkKey: "w" },
       { id: "4", at: "2026-10-21T08:11:00.000Z", kind: "training.exercise", trainingKey: "t", exerciseId: sitz.id, on: true },
@@ -170,8 +165,8 @@ describe("day filter and week", () => {
     const w = await diary().week("2026-10-19");
     expect(w.monday).toBe("2026-10-19");
     expect(w.walkMinByPerson).toEqual([
-      { username: "bille", name: "Herzii", min: 40 },
-      { username: "marcel", name: "Hirsch", min: 40 },
+      { id: "bille", name: "Herzii", min: 40 },
+      { id: "marcel", name: "Hirsch", min: 40 },
     ]);
     expect(w.exerciseCounts).toEqual([{ name: "Sitz", count: 1 }]);
     expect(w.treats).toBe(1);
@@ -183,7 +178,7 @@ describe("day filter and week", () => {
 describe("entries carry their walk and training details", () => {
   test("walkers and pause of a walk, exercises and treats of a training", async () => {
     clock = new Date("2026-10-20T12:00:00Z");
-    const s = new Sessions({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), now: () => clock });
+    const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), now: () => clock });
     const sitz = await new Catalog(db()).addExercise("Sitz");
     const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
     await s.apply(HIRSCH, [
@@ -191,7 +186,7 @@ describe("entries carry their walk and training details", () => {
       { id: "2", at: "2026-10-20T08:10:00.000Z", kind: "walk.pause", walkKey: "w" },
       { id: "3", at: "2026-10-20T08:18:00.000Z", kind: "walk.resume", walkKey: "w" },
     ]);
-    await s.apply({ username: "bille", name: "Herzii" }, [
+    await s.apply({ id: "bille", name: "Herzii" }, [
       { id: "4", at: "2026-10-20T08:20:00.000Z", kind: "walk.join", walkKey: "w" },
       { id: "5", at: "2026-10-20T08:52:00.000Z", kind: "walk.stop", walkKey: "w" },
       { id: "6", at: "2026-10-20T09:00:00.000Z", kind: "training.start", trainingKey: "t" },
@@ -210,7 +205,7 @@ describe("entries carry their walk and training details", () => {
 describe("editing a walk's end", () => {
   const startWalk = async () => {
     clock = new Date("2026-10-20T12:00:00Z");
-    const s = new Sessions({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"]]), now: () => clock });
+    const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"]]), now: () => clock });
     await s.apply(HIRSCH, [
       { id: "1", at: "2026-10-20T09:00:00.000Z", kind: "walk.start", walkKey: "w" },
       { id: "2", at: "2026-10-20T09:30:00.000Z", kind: "walk.pause", walkKey: "w" },

@@ -33,7 +33,7 @@ test("keeps 14", async () => {
 });
 
 test("the copy opens and has the entries", async () => {
-  await new EntryRepository(db()).create({ dogId: 1, type: "pee", at: "2026-10-20T09:00:00.000Z", endedAt: null, amountG: null, foodKind: null, unitG: null, note: "im Backup", loggedBy: "marcel" });
+  await new EntryRepository(db()).create({ dogIds: [1], type: "pee", at: "2026-10-20T09:00:00.000Z", endedAt: null, amountG: null, foodKind: null, unitG: null, note: "im Backup", loggedBy: "marcel" });
   const d = join(dir(), "backups"); // created when missing
   const path = (await backupIfDue(db(), d, Date.parse("2026-10-20T10:00:00Z"), TZ))!;
   expect(existsSync(path)).toBe(true);

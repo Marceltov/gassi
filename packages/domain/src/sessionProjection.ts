@@ -3,7 +3,7 @@
 // answering without reception). It applies the commands the way backend/sessions.ts does, simplified for display.
 import type { Command } from "./commands";
 
-export type Person = { username: string; name: string };
+export type Person = { id: string; name: string };
 export type WalkView = { key: string; startedAt: string; walkers: Person[]; pauses: { startedAt: string; endedAt: string | null }[]; paused: boolean };
 export type TrainingView = { key: string; startedAt: string; walkKey: string | null; exercises: number[]; treats: Record<number, number> };
 export type SessionsView = { walk: WalkView | null; training: TrainingView | null };
@@ -19,7 +19,7 @@ function step(v: SessionsView, c: Command, user: Person): SessionsView {
       // A start from this phone lends its key: the server joins it to the walk that really runs, and if the shown walk
       // is an old one (a page cached by the service worker), the taps still reach the walk just started.
       const keyed = c.kind === "walk.start" ? { ...walk, key: c.walkKey } : walk;
-      return walk.walkers.some((w) => w.username === user.username) ? { ...v, walk: keyed } : { ...v, walk: { ...keyed, walkers: [...walk.walkers, user] } };
+      return walk.walkers.some((w) => w.id === user.id) ? { ...v, walk: keyed } : { ...v, walk: { ...keyed, walkers: [...walk.walkers, user] } };
     }
     case "walk.pause":
       return !walk || walk.paused ? v : { ...v, walk: { ...walk, paused: true, pauses: [...walk.pauses, { startedAt: c.at, endedAt: null }] } };

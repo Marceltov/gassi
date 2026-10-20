@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest";
 import { dayBounds, type Entry, latestByType, type NewEntry } from "@gassi/domain";
-import { currentDog } from "../dogs";
 import { freshDatabase } from "../db/testing";
 import { openDatabase } from "../db/open";
 import { EntryRepository } from "./repository";
@@ -8,16 +7,14 @@ import { EntryRepository } from "./repository";
 const { db, dataDir } = freshDatabase();
 const NOW = new Date("2026-10-20T10:00:00Z");
 const repo = () => new EntryRepository(db(), () => NOW);
-const entryAt = (at: string, more: Partial<NewEntry> = {}): NewEntry => ({ dogId: 1, type: "walk", at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: null, loggedBy: "marcel", ...more });
+const entryAt = (at: string, more: Partial<NewEntry> = {}): NewEntry => ({ dogIds: [1], type: "walk", at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: null, loggedBy: "marcel", ...more });
 
 describe("the database", () => {
-  test("starts with the configured dog", async () => {
-    expect(await currentDog(db())).toEqual({ id: 1, name: "Toffee" });
-  });
-
-  test("reopening keeps the dog and adds no second one", async () => {
+  test("reopening keeps what is there", async () => {
+    await repo().create(entryAt("2026-10-20T09:00:00.000Z"));
     await db().destroy();
-    const again = await openDatabase(dataDir(), "Other");
+    const again = await openDatabase(dataDir());
+    expect(await again.selectFrom("entry").selectAll().execute()).toHaveLength(1);
     expect(await again.selectFrom("dog").selectAll().execute()).toHaveLength(1);
     await again.destroy();
   });
@@ -26,8 +23,21 @@ describe("the database", () => {
 describe("EntryRepository", () => {
   test("creates an entry with its timestamps", async () => {
     const e = await repo().create(entryAt("2026-10-20T09:30:00.000Z", { endedAt: "2026-10-20T10:00:00.000Z", note: "Park" }));
-    expect(e).toEqual<Entry>({ id: 1, dogId: 1, type: "walk", at: "2026-10-20T09:30:00.000Z", endedAt: "2026-10-20T10:00:00.000Z", durationMin: 30, amountG: null, foodKind: null, unitG: null, clientKey: null, note: "Park", loggedBy: "marcel", createdAt: NOW.toISOString(), updatedAt: NOW.toISOString() });
+    expect(e).toEqual<Entry>({ id: 1, dogIds: [1], type: "walk", at: "2026-10-20T09:30:00.000Z", endedAt: "2026-10-20T10:00:00.000Z", durationMin: 30, amountG: null, foodKind: null, unitG: null, clientKey: null, note: "Park", loggedBy: "marcel", createdAt: NOW.toISOString(), updatedAt: NOW.toISOString() });
     expect(await repo().get(e.id)).toEqual(e);
+  });
+
+  test("an entry keeps its dogs; the list filters by dog", async () => {
+    const bruno = (await db().insertInto("dog").values({ name: "Bruno", color: "#3a6fc0", created_at: NOW.toISOString() }).returning("id").executeTakeFirstOrThrow()).id;
+    const both = await repo().create(entryAt("2026-10-20T07:00:00.000Z", { dogIds: [bruno, 1, bruno] }));
+    await repo().create(entryAt("2026-10-20T08:00:00.000Z", { type: "pee", dogIds: [1] }));
+    await repo().create(entryAt("2026-10-20T09:00:00.000Z", { type: "restock", dogIds: [] }));
+    expect(both.dogIds).toEqual([1, bruno]);
+    expect((await repo().get(both.id))!.dogIds).toEqual([1, bruno]);
+    expect((await repo().list({ dogId: bruno })).map((e) => e.id)).toEqual([both.id]);
+    expect(await repo().list({})).toHaveLength(3);
+    const edited = await repo().update(both.id, { at: both.at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: null, dogIds: [bruno] });
+    expect(edited!.dogIds).toEqual([bruno]);
   });
 
   test("lists newest first, filtered by type and person", async () => {
@@ -36,10 +46,10 @@ describe("EntryRepository", () => {
     await r.create(entryAt("2026-10-20T08:00:00.000Z", { type: "food", amountG: 200, loggedBy: "bille" }));
     await r.create(entryAt("2026-10-20T09:00:00.000Z", { loggedBy: "bille" }));
     const ats = (es: Entry[]) => es.map((e) => e.at.slice(11, 13));
-    expect(ats(await r.list({ dogId: 1 }))).toEqual(["09", "08", "07"]);
-    expect(ats(await r.list({ dogId: 1, type: "walk" }))).toEqual(["09", "07"]);
-    expect(ats(await r.list({ dogId: 1, loggedBy: "bille" }))).toEqual(["09", "08"]);
-    expect(ats(await r.list({ dogId: 1, limit: 2, offset: 1 }))).toEqual(["08", "07"]);
+    expect(ats(await r.list({}))).toEqual(["09", "08", "07"]);
+    expect(ats(await r.list({ type: "walk" }))).toEqual(["09", "07"]);
+    expect(ats(await r.list({ loggedBy: "bille" }))).toEqual(["09", "08"]);
+    expect(ats(await r.list({ limit: 2, offset: 1 }))).toEqual(["08", "07"]);
   });
 
   test("lists today in the time zone, across midnight UTC", async () => {
@@ -49,7 +59,7 @@ describe("EntryRepository", () => {
     await r.create(entryAt("2026-10-20T21:59:00.000Z")); // 23:59 today
     await r.create(entryAt("2026-10-20T22:00:00.000Z")); // 00:00 tomorrow
     const { start, end } = dayBounds(NOW.getTime(), "Europe/Berlin");
-    const today = await r.list({ dogId: 1, since: new Date(start).toISOString(), until: new Date(end).toISOString() });
+    const today = await r.list({ since: new Date(start).toISOString(), until: new Date(end).toISOString() });
     expect(today.map((e) => e.at)).toEqual(["2026-10-20T21:59:00.000Z", "2026-10-19T22:00:00.000Z"]);
   });
 

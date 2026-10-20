@@ -4,12 +4,13 @@ import type { ColumnType, Generated, Insertable, Selectable, Updateable } from "
 export interface DogTable {
   id: Generated<number>;
   name: string;
+  color: string; // #rrggbb
+  archived: Generated<number>;
   created_at: string;
 }
 
 export interface EntryTable {
   id: Generated<number>;
-  dog_id: number;
   type: string;
   at: string;
   ended_at: string | null;
@@ -18,20 +19,64 @@ export interface EntryTable {
   unit_g: number | null;
   client_key: string | null;
   note: string | null;
-  logged_by: string;
+  logged_by: string; // person.id
   created_at: ColumnType<string, string, never>;
   updated_at: string;
 }
 
 export interface PersonTable {
-  username: string;
+  id: string;
   name: string;
-  updated_at: string;
+  email: string | null;
+  oidc_subject: string | null;
+  created_at: string;
+}
+
+export interface DeviceTable {
+  id: Generated<number>;
+  person_id: string;
+  kind: string; // phone | watch | web | script
+  name: string;
+  token_hash: string;
+  created_at: string;
+  last_seen_at: string | null;
+}
+
+export interface LinkTable {
+  id: Generated<number>;
+  token_hash: string;
+  kind: string; // setup | person | device | watch | magic
+  person_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  expires_at: string;
+  used_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface EntryDogTable {
+  entry_id: number;
+  dog_id: number;
 }
 
 export interface WalkWalkerTable {
   entry_id: number;
-  username: string;
+  person_id: string;
+}
+
+export interface TrackTable {
+  id: string; // the recording device's id for it
+  entry_id: number;
+  source: string; // phone | watch
+  device_id: number | null;
+  created_at: string;
+}
+
+export interface TrackBatchTable {
+  track_id: string;
+  seq: number;
+  points: string; // JSON TrackPoint[]
+  received_at: string;
 }
 
 export interface WalkPauseTable {
@@ -82,6 +127,11 @@ export interface Schema {
   dog: DogTable;
   entry: EntryTable;
   person: PersonTable;
+  device: DeviceTable;
+  link: LinkTable;
+  entry_dog: EntryDogTable;
+  track: TrackTable;
+  track_batch: TrackBatchTable;
   walk_walker: WalkWalkerTable;
   walk_pause: WalkPauseTable;
   exercise: ExerciseTable;

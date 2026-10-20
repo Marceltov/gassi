@@ -6,7 +6,7 @@ const TZ = "Europe/Berlin";
 let id = 0;
 const e = (type: Entry["type"], at: string, more: Partial<Entry> = {}): Entry => ({
   id: ++id,
-  dogId: 1,
+  dogIds: [1],
   type,
   at,
   endedAt: null,
@@ -43,7 +43,7 @@ describe("weekView", () => {
   test("a walk from the week before is clipped to Monday", () => {
     const w = view([e("walk", "2026-10-18T21:40:00.000Z", { endedAt: "2026-10-18T22:10:00.000Z" })]);
     expect(w.days[0].bars).toEqual([{ type: "walk", startMin: 0, endMin: 10 }]);
-    expect(w.walkMinByPerson).toEqual([{ username: "marcel", name: "Hirsch", min: 10 }]);
+    expect(w.walkMinByPerson).toEqual([{ id: "marcel", name: "Hirsch", min: 10 }]);
   });
 
   test("a running walk counts up to now", () => {
@@ -64,8 +64,8 @@ describe("weekView", () => {
     const alone = e("walk", "2026-10-22T08:00:00.000Z", { endedAt: "2026-10-22T08:20:00.000Z", loggedBy: "bille" });
     const w = view([walk, alone], { walkers: { [walk.id]: ["marcel", "bille"] } });
     expect(w.walkMinByPerson).toEqual([
-      { username: "bille", name: "Herzii", min: 60 },
-      { username: "marcel", name: "Hirsch", min: 40 },
+      { id: "bille", name: "Herzii", min: 60 },
+      { id: "marcel", name: "Hirsch", min: 40 },
     ]);
     expect(w.days.reduce((s, d) => s + d.walkMin, 0)).toBe(60);
   });
@@ -80,8 +80,8 @@ describe("weekView", () => {
     ]);
     expect(w.treats).toBe(8);
     expect(w.trainingMinByPerson).toEqual([
-      { username: "bille", name: "Herzii", min: 12 },
-      { username: "marcel", name: "Hirsch", min: 5 },
+      { id: "bille", name: "Herzii", min: 12 },
+      { id: "marcel", name: "Hirsch", min: 5 },
     ]);
     expect(w.days[2]).toMatchObject({ trainingMin: 12, bars: [{ type: "training", startMin: 17 * 60, endMin: 17 * 60 + 12 }] });
   });

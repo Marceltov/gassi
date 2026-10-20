@@ -10,7 +10,7 @@ type Names = ReadonlyMap<string, string>;
 export type Bar = { type: "walk" | "training"; startMin: number; endMin: number };
 export type Tick = { type: "food" | "pee" | "poop"; min: number };
 export type WeekDay = { date: string; bars: Bar[]; ticks: Tick[]; walkMin: number; trainingMin: number };
-export type PersonMinutes = { username: string; name: string; min: number };
+export type PersonMinutes = { id: string; name: string; min: number };
 export type WeekView = {
   monday: string;
   days: WeekDay[];
@@ -22,7 +22,7 @@ export type WeekView = {
 
 export type WeekInput = {
   entries: readonly Entry[];
-  walkers: Record<number, string[]>; // walk entry id → usernames
+  walkers: Record<number, string[]>; // walk entry id → person ids
   trainings: Record<number, { exercises: string[]; treats: number }>; // training entry id → what was practised
   names: Names;
   monday: string; // "2026-10-19"
@@ -54,7 +54,7 @@ const minutes = (ms: number) => Math.round(ms / 60_000);
 
 function byPerson(totals: Map<string, number>, names: Names): PersonMinutes[] {
   return [...totals]
-    .map(([username, min]) => ({ username, name: names.get(username) ?? username, min }))
+    .map(([id, min]) => ({ id, name: names.get(id) ?? id, min }))
     .sort((a, b) => a.name.localeCompare(b.name, "de"));
 }
 

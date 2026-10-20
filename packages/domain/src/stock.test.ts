@@ -8,7 +8,7 @@ let id = 0;
 const day = (d: number, h = 8) => new Date(NOW - d * 86_400_000 + (h - 12) * 3_600_000).toISOString();
 const e = (type: Entry["type"], at: string, more: Partial<Entry> = {}): Entry => ({
   id: ++id,
-  dogId: 1,
+  dogIds: [1],
   type,
   at,
   endedAt: null,

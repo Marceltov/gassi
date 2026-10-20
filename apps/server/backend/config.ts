@@ -1,5 +1,5 @@
-// Every environment variable the app reads, parsed and checked once (zod). A missing or invalid variable fails with its
-// name. config() is what the app uses; parseConfig() is the pure part, for tests.
+// Every environment variable the server reads, parsed and checked once (zod). A missing or invalid variable fails with
+// its name. config() is what the app uses; parseConfig() is the pure part, for tests.
 import { z } from "zod";
 import { processState } from "./state";
 
@@ -18,46 +18,53 @@ const validTimeZone = (tz: string) => {
 const optional = <T extends z.ZodType>(s: T) => z.preprocess((v) => (v === "" ? undefined : v), s.optional());
 const required = z.string({ error: "is required" }).trim().min(1, "is required");
 
-const schema = z.object({
-  PUBLIC_URL: required.pipe(z.url({ protocol: /^https?$/ })).transform((u) => u.replace(/\/+$/, "")),
-  SECRET: required.pipe(z.string().min(32, "must be at least 32 characters")),
-  OIDC_ISSUER: required.pipe(z.url()),
-  OIDC_CLIENT_ID: required,
-  OIDC_CLIENT_SECRET: required,
-  DOG_NAME: optional(z.string().trim()).default("Toffee"),
-  DATA_DIR: optional(z.string()).default("./data"),
-  TZ: optional(z.string().refine(validTimeZone, "is not a time zone")).default("Europe/Berlin"),
-  API_TOKEN: optional(z.string().min(16, "must be at least 16 characters")),
-  LOG_LEVEL: optional(z.enum(LOG_LEVELS)).default("info"),
-});
+const schema = z
+  .object({
+    PUBLIC_URL: required.pipe(z.url({ protocol: /^https?$/ })).transform((u) => u.replace(/\/+$/, "")),
+    SECRET: optional(z.string().min(32, "must be at least 32 characters")),
+    OIDC_ISSUER: optional(z.url()),
+    OIDC_CLIENT_ID: optional(z.string().trim().min(1)),
+    OIDC_CLIENT_SECRET: optional(z.string().trim().min(1)),
+    SMTP_URL: optional(z.url({ protocol: /^smtps?$/, error: "must be an smtp:// or smtps:// URL" })),
+    MAIL_FROM: optional(z.string().trim().min(3)),
+    DOG_NAME: optional(z.string().trim()).default("Toffee"),
+    DATA_DIR: optional(z.string()).default("./data"),
+    TZ: optional(z.string().refine(validTimeZone, "is not a time zone")).default("Europe/Berlin"),
+    LOG_LEVEL: optional(z.enum(LOG_LEVELS)).default("info"),
+    LOG_FILE: optional(z.string()),
+  })
+  .refine((c) => !c.OIDC_ISSUER || (c.OIDC_CLIENT_ID && c.OIDC_CLIENT_SECRET), { path: ["OIDC_ISSUER"], message: "OIDC_CLIENT_ID and OIDC_CLIENT_SECRET are needed with OIDC_ISSUER" });
 
+/** Only PUBLIC_URL is required. OIDC (all three variables or none) and mail (SMTP_URL) are optional features. */
 export type Config = {
   publicUrl: string;
-  secret: string;
-  oidc: { issuer: string; clientId: string; clientSecret: string };
-  dogName: string;
+  secret: string | null; // else one is kept in DATA_DIR (secret.ts)
+  oidc: { issuer: string; clientId: string; clientSecret: string } | null;
+  smtp: { url: string; from: string } | null;
+  defaultDogName: string;
   dataDir: string;
   timeZone: string;
-  apiToken: string | undefined;
   logLevel: (typeof LOG_LEVELS)[number];
+  logFile: string | null; // a copy of the log, for the e2e tests to read the setup link
 };
 
 export function parseConfig(env: Record<string, string | undefined>): Config {
   const parsed = schema.safeParse(env);
   if (!parsed.success) {
-    const problems = parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`);
+    const problems = parsed.error.issues.map((i) => (i.message.startsWith("OIDC_") ? i.message : `${i.path.join(".")} ${i.message}`));
     throw new Error(`Invalid configuration: ${problems.join("; ")}`);
   }
   const c = parsed.data;
   return {
     publicUrl: c.PUBLIC_URL,
-    secret: c.SECRET,
-    oidc: { issuer: c.OIDC_ISSUER, clientId: c.OIDC_CLIENT_ID, clientSecret: c.OIDC_CLIENT_SECRET },
-    dogName: c.DOG_NAME,
+    secret: c.SECRET ?? null,
+    oidc: c.OIDC_ISSUER ? { issuer: c.OIDC_ISSUER, clientId: c.OIDC_CLIENT_ID!, clientSecret: c.OIDC_CLIENT_SECRET! } : null,
+    smtp: c.SMTP_URL ? { url: c.SMTP_URL, from: c.MAIL_FROM ?? `gassi@${new URL(c.PUBLIC_URL).hostname}` } : null,
+    defaultDogName: c.DOG_NAME,
     dataDir: c.DATA_DIR,
     timeZone: c.TZ,
-    apiToken: c.API_TOKEN,
     logLevel: c.LOG_LEVEL,
+    logFile: c.LOG_FILE ?? null,
   };
 }
 

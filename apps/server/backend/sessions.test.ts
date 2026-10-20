@@ -6,13 +6,13 @@ import { EntryRepository } from "./entries/repository";
 import { Sessions } from "./sessions";
 
 const { db } = freshDatabase();
-const HIRSCH = { username: "marcel", name: "Hirsch" };
-const HERZII = { username: "bille", name: "Herzii" };
+const HIRSCH = { id: "marcel", name: "Hirsch" };
+const HERZII = { id: "bille", name: "Herzii" };
 const names = new Map([
   ["marcel", "Hirsch"],
   ["bille", "Herzii"],
 ]);
-const sessions = () => new Sessions({ db: db(), dog: { id: 1, name: "Toffee" }, names, now: () => new Date("2026-10-20T12:00:00Z") });
+const sessions = () => new Sessions({ db: db(), names, now: () => new Date("2026-10-20T12:00:00Z") });
 const entries = () => new EntryRepository(db()).list({ dogId: 1 });
 
 let n = 0;
@@ -100,7 +100,7 @@ describe("walks", () => {
   });
 
   test("applied ids older than 30 days are forgotten", async () => {
-    const old = new Sessions({ db: db(), dog: { id: 1, name: "Toffee" }, names, now: () => new Date("2026-09-01T12:00:00Z") });
+    const old = new Sessions({ db: db(), names, now: () => new Date("2026-09-01T12:00:00Z") });
     await old.apply(HIRSCH, [cmd("2026-09-01T09:00:00.000Z", { id: "old", kind: "log", type: "pee" })]);
     await sessions().apply(HIRSCH, [cmd(0, { kind: "log", type: "poop" })]);
     const ids = (await db().selectFrom("applied_command").select("id").execute()).map((r) => r.id);

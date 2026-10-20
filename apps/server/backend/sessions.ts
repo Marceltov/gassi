@@ -14,7 +14,7 @@ import { type Command, type Entry, minutesBetween, type Person, type SessionsVie
 import type { User } from "./auth/session";
 import { database, type DB } from "./db/open";
 import type { Schema } from "./db/schema";
-import { currentDog, type Dog } from "./dogs";
+import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
 import { type Names, PeopleRepository } from "./people";
 
@@ -36,7 +36,7 @@ export type WalkSummary = {
   poop: number;
 };
 
-export type SessionsDeps = { db: DB; dog: Dog; names: Names; now: () => Date };
+export type SessionsDeps = { db: DB; names: Names; now: () => Date };
 
 type Tx = Kysely<Schema>;
 type Outcome = "applied" | "dropped";
@@ -90,7 +90,7 @@ export class Sessions {
     const walk = await repo.get(walkEntryId);
     if (!walk || walk.type !== "walk") throw new Error(`entry ${walkEntryId} is not a walk`);
     const end = walk.endedAt ?? this.deps.now().toISOString();
-    const during = await repo.list({ dogId: walk.dogId, since: walk.at, until: end });
+    const during = await repo.list({ since: walk.at, until: end });
     const { pauses } = await this.pauses(walk.id);
     const pauseMs = pausedWithin(pauses, walk.at, end);
     const trainings = during.filter((e) => e.type === "training").reverse();
@@ -116,8 +116,8 @@ export class Sessions {
   }
 
   private async walkers(entryId: number): Promise<Person[]> {
-    const rows = await this.deps.db.selectFrom("walk_walker").select("username").where("entry_id", "=", entryId).orderBy(sql`rowid`).execute();
-    return rows.map((r) => ({ username: r.username, name: this.deps.names.get(r.username) ?? r.username }));
+    const rows = await this.deps.db.selectFrom("walk_walker").select("person_id").where("entry_id", "=", entryId).orderBy(sql`rowid`).execute();
+    return rows.map((r) => ({ id: r.person_id, name: this.deps.names.get(r.person_id) ?? r.person_id }));
   }
 
   private async pauses(entryId: number): Promise<Pick<WalkView, "pauses" | "paused">> {
@@ -212,8 +212,14 @@ class Step {
     return findByKey(this.tx, key, type);
   }
 
-  private create(type: Entry["type"], at: string, clientKey: string | null): Promise<Entry> {
-    return this.entries.create({ type, at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: null, dogId: this.deps.dog.id, loggedBy: this.user.username, clientKey });
+  // Until commands name their dogs (step 1, task 7): every active dog, or the first for pee and poop.
+  private async defaultDogs(type: Entry["type"]): Promise<number[]> {
+    const ids = await new DogRepository(this.tx).activeIds();
+    return type === "pee" || type === "poop" ? ids.slice(0, 1) : ids;
+  }
+
+  private async create(type: Entry["type"], at: string, clientKey: string | null): Promise<Entry> {
+    return this.entries.create({ type, at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: null, dogIds: await this.defaultDogs(type), loggedBy: this.user.id, clientKey });
   }
 
   // A start joins the walk/training that runs now, or the one that was running at the tap's time (a start queued without
@@ -270,7 +276,7 @@ class Step {
   private async addWalker(entryId: number): Promise<void> {
     await this.tx
       .insertInto("walk_walker")
-      .values({ entry_id: entryId, username: this.user.username })
+      .values({ entry_id: entryId, person_id: this.user.id })
       .onConflict((oc) => oc.doNothing())
       .execute();
   }
@@ -335,6 +341,6 @@ class Step {
 /** The sessions for one request, on the configured database and dog, with the names as they are now. */
 export async function sessions(): Promise<Sessions> {
   const db = await database();
-  const [dog, names] = await Promise.all([currentDog(db), new PeopleRepository(db).names()]);
-  return new Sessions({ db, dog, names, now: () => new Date() });
+  const names = await new PeopleRepository(db).names();
+  return new Sessions({ db, names, now: () => new Date() });
 }

@@ -11,9 +11,9 @@ import { processState } from "./state";
 const state = processState("backups", () => ({ started: false }));
 
 export async function startup(): Promise<void> {
-  const { timeZone, apiToken, dataDir } = config();
+  const { timeZone, dataDir, oidc, smtp } = config();
   const db = await database();
-  logger("startup").info({ timeZone, api: apiToken ? "on" : "off" }, "gassi started");
+  logger("startup").info({ timeZone, oidc: oidc ? "on" : "off", mail: smtp ? "on" : "off" }, "gassi started");
   if (state.started) return;
   state.started = true;
   const log = logger("backup");
