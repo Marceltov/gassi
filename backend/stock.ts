@@ -51,14 +51,14 @@ export function computeStock(input: { entries: readonly Entry[]; treats: readonl
   return { wet: { ...wet, cans, canSizeG }, dry: kindStock(of("dry"), input.treats, input.now) };
 }
 
-/** The treats given from the dry food: per training and kind, count × grams per piece, at the training's start. */
+/** The treats given from the dry food: per training and kind, count × grams per piece (both as when given), at the
+ * training's start. */
 export async function dryTreats(db: DB): Promise<Treat[]> {
   const rows = await db
     .selectFrom("training_treat")
-    .innerJoin("treat_kind", "treat_kind.id", "training_treat.treat_kind_id")
     .innerJoin("entry", "entry.id", "training_treat.entry_id")
-    .select(["entry.at", "training_treat.count", "treat_kind.grams_per_piece"])
-    .where("treat_kind.from_dry", "=", 1)
+    .select(["entry.at", "training_treat.count", "training_treat.grams_per_piece"])
+    .where("training_treat.from_dry", "=", 1)
     .where("training_treat.count", ">", 0)
     .orderBy("entry.at")
     .execute();

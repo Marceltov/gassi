@@ -44,8 +44,14 @@ export type SessionsDeps = { db: DB; dog: Dog; names: Names; now: () => Date };
 type Tx = Kysely<Schema>;
 type Outcome = "applied" | "dropped";
 
+/** Ms paused between `from` and `to` (a walk's start and end); parts of a pause outside them don't count. */
+export function pausedWithin(pauses: readonly { startedAt: string; endedAt: string | null }[], from: string, to: string): number {
+  return pauses.reduce((sum, p) => sum + Math.max(0, Date.parse(earlier(p.endedAt ?? to, to)) - Date.parse(later(p.startedAt, from))), 0);
+}
+
 const isOver = (e: Entry, at: string) => e.endedAt !== null && at >= e.endedAt;
 const later = (a: string, b: string) => (a > b ? a : b);
+const earlier = (a: string, b: string) => (a < b ? a : b);
 const byTime = (a: Command, b: Command) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
 
 export class Sessions {
@@ -64,6 +70,9 @@ export class Sessions {
       });
       result[outcome].push(c.id);
     }
+    // a phone resends within minutes or days, never after a month: older ids need not be remembered
+    const forget = new Date(this.deps.now().getTime() - 30 * 86_400_000).toISOString();
+    await this.deps.db.deleteFrom("applied_command").where("applied_at", "<", forget).execute();
     return result;
   }
 
@@ -86,7 +95,7 @@ export class Sessions {
     const end = walk.endedAt ?? this.deps.now().toISOString();
     const during = await repo.list({ dogId: walk.dogId, since: walk.at, until: end });
     const { pauses } = await this.pauses(walk.id);
-    const pauseMs = pauses.reduce((sum, p) => sum + Math.max(0, Date.parse(p.endedAt ?? end) - Date.parse(later(p.startedAt, walk.at))), 0);
+    const pauseMs = pausedWithin(pauses, walk.at, end);
     const trainings = during.filter((e) => e.type === "training").reverse();
     return {
       id: walk.id,
@@ -217,7 +226,14 @@ class Step {
     if (e && isOver(e, at)) return "dropped";
     if (!e) {
       e = (await this.entries.running(type)) ?? (await this.endedAround(type, at));
-      if (e) await this.tx.insertInto("session_alias").values({ key, entry_id: e.id }).execute();
+      if (e) {
+        await this.tx.insertInto("session_alias").values({ key, entry_id: e.id }).execute();
+        // the other phone tapped first but sent later: the walk began at its tap
+        if (at < e.at) {
+          await this.tx.updateTable("entry").set({ at, updated_at: this.deps.now().toISOString() }).where("id", "=", e.id).execute();
+          e = { ...e, at };
+        }
+      }
       else {
         e = await this.create(type, at, key);
         if (endedAt) await this.end(e, endedAt);
@@ -306,13 +322,13 @@ class Step {
   }
 
   private async treat(t: Entry, treatKindId: number, delta: 1 | -1): Promise<Outcome> {
-    const exists = await this.tx.selectFrom("treat_kind").select("id").where("id", "=", treatKindId).executeTakeFirst();
-    if (!exists) return "dropped";
+    const kind = await this.tx.selectFrom("treat_kind").select(["grams_per_piece", "from_dry"]).where("id", "=", treatKindId).executeTakeFirst();
+    if (!kind) return "dropped";
     const row = await this.tx.selectFrom("training_treat").select("count").where("entry_id", "=", t.id).where("treat_kind_id", "=", treatKindId).executeTakeFirst();
     const count = Math.max(0, (row?.count ?? 0) + delta);
     await this.tx
       .insertInto("training_treat")
-      .values({ entry_id: t.id, treat_kind_id: treatKindId, count })
+      .values({ entry_id: t.id, treat_kind_id: treatKindId, count, grams_per_piece: kind.grams_per_piece, from_dry: kind.from_dry })
       .onConflict((oc) => oc.columns(["entry_id", "treat_kind_id"]).doUpdateSet({ count }))
       .execute();
     return "applied";

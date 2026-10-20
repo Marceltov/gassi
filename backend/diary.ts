@@ -13,7 +13,7 @@ import { type Entry, entryFields, latestByType, newEntryInput } from "./entries/
 import { EntryRepository } from "./entries/repository";
 import { InputError } from "./errors";
 import { type Names, PeopleRepository } from "./people";
-import { Sessions, type SessionsView } from "./sessions";
+import { pausedWithin, Sessions, type SessionsView } from "./sessions";
 import { computeStock, dryTreats, type Stock } from "./stock";
 import { mondayOf, weekBounds, type WeekInput, weekView, type WeekView } from "./week";
 
@@ -71,6 +71,11 @@ const weightInput = z.object({
   at: z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString()),
 });
 
+// Food, restocks and stock counts belong to one kind: without it they would count for neither stock.
+const needsKind = (type: EntryType, kind: FoodKind | null) => {
+  if (!kind && (type === "food" || type === "restock" || type === "stockcheck")) throw new InputError("Welche Futterart?");
+};
+
 const foodKindOf = (input: unknown): FoodKind => {
   const kind = (input as { foodKind?: unknown } | null)?.foodKind;
   if (!FOOD_KINDS.includes(kind as FoodKind)) throw new InputError("Diese Futterart gibt es nicht.");
@@ -110,6 +115,7 @@ export class Diary {
 
   async log(user: User, input: unknown): Promise<EntryView> {
     const fields = parse(newEntryInput, input);
+    needsKind(fields.type, fields.foodKind);
     return this.view1(await this.entries.create({ ...fields, dogId: this.deps.dog.id, loggedBy: user.username }));
   }
 
@@ -121,7 +127,12 @@ export class Diary {
   }
 
   async edit(id: number, input: unknown): Promise<EntryView | null> {
-    const entry = await this.entries.update(id, parse(entryFields, input));
+    const fields = parse(entryFields, input);
+    const before = await this.entries.get(id);
+    if (before) needsKind(before.type, fields.foodKind);
+    // without an end it would run again (it was started on the walk screen); a walk logged afterwards may lose its end
+    if (before?.clientKey && before.endedAt && !fields.endedAt) throw new InputError(before.type === "walk" ? "Eine beendete Runde braucht ein Ende." : "Ein beendetes Training braucht ein Ende.");
+    const entry = await this.entries.update(id, fields);
     return entry ? this.view1(entry) : null;
   }
 
@@ -189,7 +200,7 @@ export class Diary {
 
   async history(filter: HistoryFilter, offset = 0): Promise<HistoryPage> {
     const day = filter.day ? dayBounds(Date.parse(`${filter.day}T12:00:00Z`), this.deps.timeZone) : null;
-    const rows = await this.entries.list({ dogId: this.deps.dog.id, type: filter.type, loggedBy: filter.by, ...(day ? { since: iso(day.start), until: iso(day.end) } : {}), offset, limit: HISTORY_PAGE + 1 });
+    const rows = await this.entries.list({ dogId: this.deps.dog.id, type: filter.type, loggedBy: filter.by, ...(day ? { since: iso(day.start), until: iso(day.end), overlapping: true } : {}), offset, limit: HISTORY_PAGE + 1 });
     return { entries: await this.views(rows.slice(0, HISTORY_PAGE)), more: rows.length > HISTORY_PAGE };
   }
 
@@ -199,8 +210,8 @@ export class Diary {
     const now = this.deps.now().getTime();
     const monday = isDay(day) ? mondayOf(Date.parse(`${day}T12:00:00Z`), timeZone) : mondayOf(now, timeZone);
     const { start, end } = weekBounds(monday, timeZone);
-    // a day earlier too, for walks that began before Monday and went on past midnight
-    const entries = await this.entries.list({ dogId: this.deps.dog.id, since: iso(start - 86_400_000), until: iso(end) });
+    // with walks that began before Monday and went on into the week
+    const entries = await this.entries.list({ dogId: this.deps.dog.id, since: iso(start), until: iso(end), overlapping: true });
     const ids = (type: EntryType) => entries.filter((e) => e.type === type).map((e) => e.id);
     const [walkIds, trainingIds] = [ids("walk"), ids("training")];
     const [walkerRows, exerciseRows, treatRows] = await Promise.all([
@@ -238,7 +249,11 @@ export class Diary {
     const now = this.deps.now().toISOString();
     return entries.map((e) => {
       const isWalk = e.type === "walk";
-      const pauseMs = pauses.filter((p) => p.entry_id === e.id).reduce((sum, p) => sum + Math.max(0, Date.parse(p.ended_at ?? e.endedAt ?? now) - Date.parse(p.started_at)), 0);
+      const pauseMs = pausedWithin(
+        pauses.filter((p) => p.entry_id === e.id).map((p) => ({ startedAt: p.started_at, endedAt: p.ended_at })),
+        e.at,
+        e.endedAt ?? now,
+      );
       return {
         ...e,
         byName: names.get(e.loggedBy) ?? e.loggedBy,

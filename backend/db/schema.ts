@@ -64,6 +64,8 @@ export interface TrainingTreatTable {
   entry_id: number;
   treat_kind_id: number;
   count: number;
+  grams_per_piece: number; // as when given
+  from_dry: number;
 }
 
 export interface AppliedCommandTable {

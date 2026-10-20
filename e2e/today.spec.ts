@@ -40,6 +40,6 @@ test("log food with 200 g through the sheet", async ({ page }, info) => {
   await sheet.getByRole("button", { name: "Eintragen" }).click();
 
   await expect(sheet).toBeHidden();
-  await expect(todayList(page).filter({ hasText: note })).toContainText("Futter, 200 g von Hirsch");
+  await expect(todayList(page).filter({ hasText: note })).toContainText("Futter, Nassfutter, 200 g von Hirsch");
   await expect(page.getByRole("button", { name: /^Futter/ })).toContainText("gerade eben · Hirsch");
 });

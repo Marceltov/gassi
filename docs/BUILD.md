@@ -249,3 +249,10 @@ Built from a local spec and plan (brainstormed on 2026-10-20); the lasting decis
 - **Backups:** `VACUUM INTO ${DATA_DIR}/backups/gassi-YYYY-MM-DD.db` at startup and hourly when today's is missing,
   newest 14 kept; failures are logged, never fatal.
 - **Service worker** cache bumped to `gassi-v2`; `/api/commands` always goes to the network.
+- **After the branch review:** a start queued offline that arrives after the stop joins the walk that was running at
+  its time; an earlier joining start moves the walk's start back; pauses count only inside a walk's (edited)
+  interval; a finished walk/training started on its screen can't lose its end; each treat row keeps the grams per
+  piece and "from dry" it had when given; food, restock and stock entries need a kind; Verlauf `?day=` and the week
+  include walks/trainings that overlap the day/week; the phone's queue re-reads storage (shared by tabs) and drops a
+  batch the server refuses with 400; `applied_command` forgets ids after 30 days; backups are written to a temporary
+  file and renamed.

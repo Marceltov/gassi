@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { Command } from "@/shared/commands";
-import { type CommandAnswer, createCommandQueue } from "./commandQueue";
+import { type CommandAnswer, createCommandQueue, RejectedCommands } from "./commandQueue";
 
 const memory = () => {
   const data = new Map<string, string>();
@@ -85,4 +85,31 @@ test("each person has their own queue under their own key", async () => {
   await q.push(pipi("a"));
   expect(storage.data.has("gassi.commands")).toBe(false);
   expect(JSON.parse(storage.data.get("gassi.commands.bille")!)).toHaveLength(1);
+});
+
+test("commands the server refuses for good (400) leave the queue instead of blocking it", async () => {
+  const q = createCommandQueue({
+    storage: memory(),
+    send: async () => {
+      throw new RejectedCommands();
+    },
+  });
+  await q.push(pipi("a"));
+  expect(q.pending()).toEqual([]);
+});
+
+test("two tabs on the same storage keep each other's commands", async () => {
+  const storage = memory();
+  const offline = async (): Promise<CommandAnswer> => Promise.reject(new Error("offline"));
+  const tab1 = createCommandQueue({ storage, send: offline });
+  const tab2 = createCommandQueue({ storage, send: offline });
+  await tab1.push(pipi("a"));
+  await tab2.push(pipi("b"));
+  expect(JSON.parse(storage.data.get("gassi.commands")!).map((c: Command) => c.id)).toEqual(["a", "b"]);
+  let sent: string[] = [];
+  const online = createCommandQueue({ storage, send: async (cs) => ((sent = cs.map((c) => c.id)), answer(sent)) });
+  await tab1.push(pipi("c")); // tab1 still offline: must not drop "b"
+  await online.flush();
+  expect(sent).toEqual(["a", "b", "c"]);
+  expect(JSON.parse(storage.data.get("gassi.commands")!)).toEqual([]);
 });

@@ -19,7 +19,7 @@ let n = 0;
 /** A command at 09:mm (or a full ISO time) with a fresh id. */
 const at = (t: string | number) => (typeof t === "number" ? `2026-10-20T09:${String(t).padStart(2, "0")}:00.000Z` : t);
 type Body = Command extends infer C ? (C extends Command ? Omit<C, "id" | "at"> : never) : never;
-const cmd = (t: string | number, c: Body) => ({ id: `c${++n}`, at: at(t), ...c }) as Command;
+const cmd = (t: string | number, c: Body & { id?: string }) => ({ id: `c${++n}`, at: at(t), ...c }) as Command;
 
 describe("walks", () => {
   test("start, pause, resume, stop gives 52 min with 8 min pause", async () => {
@@ -82,6 +82,30 @@ describe("walks", () => {
     expect((await entries()).find((e) => e.type === "training")).toMatchObject({ at: at(10), endedAt: at(40) });
     await s.apply(HERZII, [cmd(50, { kind: "training.stop", trainingKey: "t" })]);
     expect((await entries()).find((e) => e.type === "training")).toMatchObject({ endedAt: at(40) });
+  });
+
+  test("a joining start with an earlier time moves the walk's start back", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(2, { kind: "walk.start", walkKey: "w1" })]);
+    await s.apply(HERZII, [cmd(0, { kind: "walk.start", walkKey: "w2" })]); // tapped first, sent later
+    expect((await s.current()).walk).toMatchObject({ key: "w1", startedAt: at(0), walkers: [HIRSCH, HERZII] });
+  });
+
+  test("pauses count only inside the walk, also after its end was edited", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" }), cmd(30, { kind: "walk.pause", walkKey: "w" }), cmd(40, { kind: "walk.resume", walkKey: "w" }), cmd(50, { kind: "walk.stop", walkKey: "w" })]);
+    const walk = (await entries())[0];
+    await new EntryRepository(db()).update(walk.id, { at: walk.at, endedAt: at(35), amountG: null, foodKind: null, unitG: null, note: null });
+    expect(await s.summary(walk.id)).toMatchObject({ totalMin: 35, pauseMin: 5 });
+  });
+
+  test("applied ids older than 30 days are forgotten", async () => {
+    const old = new Sessions({ db: db(), dog: { id: 1, name: "Toffee" }, names, now: () => new Date("2026-09-01T12:00:00Z") });
+    await old.apply(HIRSCH, [cmd("2026-09-01T09:00:00.000Z", { id: "old", kind: "log", type: "pee" })]);
+    await sessions().apply(HIRSCH, [cmd(0, { kind: "log", type: "poop" })]);
+    const ids = (await db().selectFrom("applied_command").select("id").execute()).map((r) => r.id);
+    expect(ids).not.toContain("old");
+    expect(ids).toHaveLength(1);
   });
 
   test("join adds a walker once", async () => {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { type Command, newId } from "@/shared/commands";
 import { type Person, project, type SessionsView } from "@/shared/sessionProjection";
-import { type CommandAnswer, type CommandQueue, createCommandQueue, STORAGE_KEY } from "./commandQueue";
+import { type CommandAnswer, type CommandQueue, createCommandQueue, RejectedCommands, STORAGE_KEY } from "./commandQueue";
 
 // The walk and training as a screen shows them: the server's view with this phone's unsent taps laid over it. One
 // queue per person and browser tab, shared by every screen, so a tap on Heute is still pending on /runde.
@@ -12,6 +12,7 @@ const FLUSH_MS = 15_000;
 
 async function send(commands: Command[]): Promise<CommandAnswer> {
   const res = await fetch("/api/commands", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ commands }) });
+  if (res.status === 400) throw new RejectedCommands(); // they can never apply; keeping them would block the rest
   if (!res.ok) throw new Error(`commands: ${res.status}`);
   return res.json();
 }
@@ -62,12 +63,15 @@ export function useSessions(initial: SessionsView, user: Person, onAnswer?: () =
       }
     });
     const flush = () => void queue.flush();
+    const refresh = (e: StorageEvent) => e.key === `${STORAGE_KEY}.${user.username}` && queue.refresh();
     window.addEventListener("online", flush);
+    window.addEventListener("storage", refresh);
     const id = setInterval(flush, FLUSH_MS);
     flush();
     return () => {
       unsubscribe();
       window.removeEventListener("online", flush);
+      window.removeEventListener("storage", refresh);
       clearInterval(id);
     };
   }, [user.username, onAnswer]);

@@ -1,6 +1,6 @@
 // A daily, consistent copy of the database: ${DATA_DIR}/backups/gassi-YYYY-MM-DD.db (the day in TZ), written with
 // VACUUM INTO while the app runs, the newest 14 kept. Checked at startup and every hour after.
-import { mkdirSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { sql } from "kysely";
 import { dayOf } from "../shared/time";
@@ -15,7 +15,11 @@ export async function backupIfDue(db: DB, dir: string, now: number, timeZone: st
   const existing = readdirSync(dir).filter((f) => NAME.test(f));
   if (existing.includes(name)) return null;
   const path = join(dir, name);
-  await sql`vacuum into ${path}`.execute(db);
+  // written under a temporary name first: a copy cut off halfway never looks like today's backup
+  const temp = join(dir, `.${name}.tmp`);
+  rmSync(temp, { force: true }); // VACUUM INTO refuses an existing file
+  await sql`vacuum into ${temp}`.execute(db);
+  renameSync(temp, path);
   const all = [...existing, name].sort();
   for (const old of all.slice(0, Math.max(0, all.length - keep))) rmSync(join(dir, old), { force: true });
   return path;

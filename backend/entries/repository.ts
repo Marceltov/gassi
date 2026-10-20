@@ -10,6 +10,7 @@ export type EntryQuery = {
   loggedBy?: string;
   since?: string; // inclusive, ISO
   until?: string; // exclusive, ISO
+  overlapping?: boolean; // since/until also take walks and trainings that began earlier and were still on at `since`
   offset?: number;
   limit?: number;
 };
@@ -87,7 +88,11 @@ export class EntryRepository {
     let query = this.db.selectFrom("entry").selectAll().where("dog_id", "=", q.dogId);
     if (q.type) query = query.where("type", "=", q.type);
     if (q.loggedBy) query = query.where("logged_by", "=", q.loggedBy);
-    if (q.since) query = query.where("at", ">=", q.since);
+    if (q.since && q.overlapping) {
+      const since = q.since;
+      // at or after `since`; or begun before and ended after it, or still running (started with a key, no end)
+      query = query.where((eb) => eb.or([eb("at", ">=", since), eb("ended_at", ">", since), eb.and([eb("ended_at", "is", null), eb("client_key", "is not", null)])]));
+    } else if (q.since) query = query.where("at", ">=", q.since);
     if (q.until) query = query.where("at", "<", q.until);
     query = query.orderBy("at", "desc").orderBy("id", "desc");
     if (q.limit !== undefined) query = query.limit(q.limit).offset(q.offset ?? 0);

@@ -59,3 +59,10 @@ test("startBackups checks right away and then every hour, and logs a failure ins
   await tick!();
   expect(errors).toHaveLength(1);
 });
+
+test("writes under a temporary name and renames, so a half-written copy never counts; a leftover one is replaced", async () => {
+  const d = dir();
+  writeFileSync(join(d, ".gassi-2026-10-20.db.tmp"), "half a database");
+  expect(await backupIfDue(db(), d, Date.parse("2026-10-20T10:00:00Z"), TZ)).toBe(join(d, "gassi-2026-10-20.db"));
+  expect(readdirSync(d)).toEqual(["gassi-2026-10-20.db"]);
+});

@@ -92,6 +92,10 @@ const migrations: Record<string, Migration> = {
         .addColumn("entry_id", "integer", byEntry)
         .addColumn("treat_kind_id", "integer", (c) => c.notNull().references("treat_kind.id").onDelete("cascade"))
         .addColumn("count", "integer", (c) => c.notNull())
+        // what one piece weighed and whether it came out of the dry food when given, so later changes to the kind
+        // don't rewrite the stock
+        .addColumn("grams_per_piece", "real", (c) => c.notNull())
+        .addColumn("from_dry", "integer", (c) => c.notNull())
         .addPrimaryKeyConstraint("training_treat_pk", ["entry_id", "treat_kind_id"])
         .execute();
       await db.schema

@@ -26,7 +26,7 @@ type Fields = { at: string; durationMin: string; endedAt: string; amountG: strin
 const local = (iso: string | null, timeZone: string) => (iso ? utcToLocal(Date.parse(iso), timeZone) : "");
 
 function initialFields(target: SheetTarget, timeZone: string): Fields {
-  if (target.kind === "new") return { at: utcToLocal(Date.now(), timeZone), durationMin: "", endedAt: "", amountG: "", kg: "", foodKind: "", note: "" };
+  if (target.kind === "new") return { at: utcToLocal(Date.now(), timeZone), durationMin: "", endedAt: "", amountG: "", kg: "", foodKind: target.type === "food" ? "wet" : "", note: "" };
   const e = target.entry;
   return {
     at: local(e.at, timeZone),
@@ -34,7 +34,7 @@ function initialFields(target: SheetTarget, timeZone: string): Fields {
     endedAt: local(e.endedAt, timeZone),
     amountG: e.amountG?.toString() ?? "",
     kg: e.type === "weight" && e.amountG ? String(e.amountG / 1000).replace(".", ",") : "",
-    foodKind: e.foodKind ?? "",
+    foodKind: e.foodKind ?? (e.type === "food" || e.type === "restock" || e.type === "stockcheck" ? "wet" : ""),
     note: e.note ?? "",
   };
 }
@@ -134,7 +134,6 @@ export function EntrySheet({ target, timeZone, onClose, onLogged, onSaved, onDel
           {(type === "food" || type === "restock" || type === "stockcheck") && (
             <Field label="Futterart">
               <select value={fields.foodKind} onChange={set("foodKind")} className={input}>
-                {type === "food" && <option value="">–</option>}
                 {FOOD_KINDS.map((k) => (
                   <option key={k} value={k}>
                     {FOOD_LABEL[k]}
