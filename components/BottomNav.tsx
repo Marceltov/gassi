@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { IconDownload, IconHistory, IconHome, IconLogout, IconMenu2, IconX } from "@tabler/icons-react";
+import { IconAdjustments, IconDownload, IconHistory, IconHome, IconLogout, IconMenu2, IconX } from "@tabler/icons-react";
 
 const LINKS = [
   { href: "/", label: "Heute", Icon: IconHome },
@@ -12,7 +12,7 @@ const LINKS = [
 
 const item = "flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-sm font-semibold";
 
-// Heute and Verlauf, plus a menu with who is signed in, the CSV export and Abmelden.
+// Heute and Verlauf, plus a menu with who is signed in, the household's lists, the CSV export and Abmelden.
 export function BottomNav({ userName }: { userName: string }) {
   const path = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -45,6 +45,9 @@ function Menu({ userName, onClose }: { userName: string; onClose: () => void }) 
       <p className="px-5 pt-4 pb-2 text-muted">
         Angemeldet als <strong className="text-ink">{userName}</strong>
       </p>
+      <Link href="/einstellungen" className={row} onClick={onClose}>
+        <IconAdjustments size={24} aria-hidden /> Übungen und Leckerlis
+      </Link>
       <a href="/export.csv" download className={row} onClick={onClose}>
         <IconDownload size={24} aria-hidden /> Als CSV exportieren
       </a>

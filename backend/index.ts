@@ -21,3 +21,6 @@ export const apiEntries = logged((req) => apiEntriesRoute(req));
 
 // The use cases (backend/diary.ts) and what they hand out.
 export { diary, HISTORY_PAGE, InputError, type EntryView, type HistoryFilter, type HistoryPage, type TodayView } from "./diary";
+
+// The household's exercises and treat kinds.
+export { catalog, type Exercise, type TreatKind } from "./catalog";

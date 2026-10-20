@@ -10,6 +10,7 @@ import { database, type DB } from "./db/open";
 import { currentDog, type Dog } from "./dogs";
 import { type Entry, entryFields, latestByType, newEntryInput } from "./entries/model";
 import { EntryRepository } from "./entries/repository";
+import { InputError } from "./errors";
 import { type Names, PeopleRepository } from "./people";
 
 /** An entry as the screens show it: with the display name of whoever logged it. */
@@ -29,12 +30,7 @@ export type HistoryPage = { entries: EntryView[]; more: boolean };
 export const HISTORY_PAGE = 50;
 
 
-export class InputError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "InputError";
-  }
-}
+export { InputError };
 
 const MESSAGES: Record<string, string> = {
   at: "Die Zeit fehlt oder stimmt nicht.",
