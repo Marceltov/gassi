@@ -1,5 +1,5 @@
 // The use cases the screens, the export and the API call: log, edit and delete entries, the today view and the
-// history. It hides the database, the one dog of v1, the time zone and display names (of everyone who has signed in). Input from outside is
+// history. It hides the database, the one dog of 0.1, the time zone and display names (of everyone who has signed in). Input from outside is
 // validated here (zod); a problem is an InputError with a German message the screen can show.
 import { sql } from "kysely";
 import { z } from "zod";

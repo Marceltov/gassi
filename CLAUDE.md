@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Gassi is a self-hosted dog diary for one household (walks, food, pee, poop). v1 is built. `docs/PLAN.md` is the
+Gassi is a self-hosted dog diary for one household (walks, food, pee, poop). 0.1 is built. `docs/PLAN.md` is the
 source of truth for scope, data model, stack, auth and tests; `docs/BUILD.md` holds the implementation decisions,
 including "Decisions made during the build"; `docs/ALTERNATIVES.md` records why existing tools were rejected.
 
@@ -50,9 +50,9 @@ labels, ports); they apply to that deployment folder, not to the app code here.
 - **Stack and tests follow `notefeed/notefeed`** (not Healthy): Next.js App Router + server actions, TypeScript,
   Kysely on better-sqlite3, Tailwind, pino, zod, PWA. Vitest for units with injected `fetch`/`now` instead of
   mocks; Playwright against `next start` with phone projects and a stub OIDC issuer; an image smoke test in CI.
-  Details in PLAN.md "Tests". A separate API/SPA and Postgres were explicitly rejected for v1.
+  Details in PLAN.md "Tests". A separate API/SPA and Postgres were explicitly rejected for 0.1.
 - **UI:** German, phone-first, large touch targets, dark mode, Tabler Icons (`@tabler/icons-react`).
-- **Scope:** v1 and v1.1 are the lists in PLAN.md. Items under "Later" and the non-goals (vet records, training,
+- **Scope:** 0.1 and 0.2 are the lists in PLAN.md. Items under "Later" and the non-goals (vet records, training,
   multi-household, GPS) stay out unless asked.
 - **Deployment:** `Dockerfile` here; GitHub Actions pushes `ghcr.io/marceltov/gassi` (tags `main`, short sha,
   version tags). Watchtower in the homelab pulls updates. Expose a healthcheck endpoint.

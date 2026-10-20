@@ -229,7 +229,7 @@ describe("editing a walk's end", () => {
     const walk = await startWalk();
     await expect(diary().edit(walk.id, { at: walk.at, endedAt: "" })).rejects.toThrow(new InputError("Eine beendete Runde braucht ein Ende."));
     const sheetWalk = await diary().log(HIRSCH, { type: "walk", at: "2026-10-20T07:00:00Z", endedAt: "2026-10-20T07:30:00Z" });
-    expect(await diary().edit(sheetWalk.id, { at: sheetWalk.at, endedAt: "" })).toMatchObject({ endedAt: null }); // a moment, as in v1
+    expect(await diary().edit(sheetWalk.id, { at: sheetWalk.at, endedAt: "" })).toMatchObject({ endedAt: null }); // a moment, as in 0.1
   });
 });
 

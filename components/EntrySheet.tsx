@@ -39,7 +39,7 @@ function initialFields(target: SheetTarget, timeZone: string): Fields {
   };
 }
 
-// A new walk gets its end from "Dauer (Min.)" (none: a moment, as in v1); an existing walk or training is edited by its
+// A new walk gets its end from "Dauer (Min.)" (none: a moment, as in 0.1); an existing walk or training is edited by its
 // end ("Ende"), so a walk someone forgot to stop can be ended afterwards. A weight is entered in kg, stored in grams.
 function toInput(f: Fields, target: SheetTarget, timeZone: string, defaultAt: string) {
   // the time field only has minutes: left as it was opened, a new entry is "now", to the second

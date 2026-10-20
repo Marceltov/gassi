@@ -1,4 +1,4 @@
-// v1 has one dog: the first one, created on first start (db/open.ts).
+// 0.1 has one dog: the first one, created on first start (db/open.ts).
 import type { DB } from "./db/open";
 
 export type Dog = { id: number; name: string };

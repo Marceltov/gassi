@@ -6,7 +6,12 @@ import { type Kysely, sql } from "kysely";
 import { type Migration, type MigrationProvider, Migrator } from "kysely/migration";
 
 const migrations: Record<string, Migration> = {
-  "001_dog_and_entry": {
+  // The whole schema as of 0.2. Before 0.2 nothing held real data, so the development steps were folded into this one.
+  // Everything is an entry (walks and trainings run from `at` to `ended_at`, null while running, and carry the key the
+  // phone started them with); walkers, pauses, exercises and treats hang off an entry. `person` remembers who signed
+  // in; `applied_command` makes walk taps idempotent; `session_alias` maps the key of a second "start" (both people
+  // at the door) to the walk that was already running.
+  "001_schema": {
     async up(db: Kysely<any>) {
       await db.schema
         .createTable("dog")
@@ -20,39 +25,24 @@ const migrations: Record<string, Migration> = {
         .addColumn("dog_id", "integer", (c) => c.notNull().references("dog.id").onDelete("cascade"))
         .addColumn("type", "text", (c) => c.notNull())
         .addColumn("at", "text", (c) => c.notNull())
-        .addColumn("duration_min", "integer")
+        .addColumn("ended_at", "text")
         .addColumn("amount_g", "integer")
+        .addColumn("food_kind", "text")
+        .addColumn("unit_g", "integer")
+        .addColumn("client_key", "text")
         .addColumn("note", "text")
         .addColumn("logged_by", "text", (c) => c.notNull())
         .addColumn("created_at", "text", (c) => c.notNull())
         .addColumn("updated_at", "text", (c) => c.notNull())
         .execute();
       await db.schema.createIndex("entry_by_dog_and_time").on("entry").columns(["dog_id", sql`at desc` as any]).execute();
-    },
-  },
-  // Who has signed in, with the display name authentik last gave: the names shown for entries and in the filters.
-  "002_person": {
-    async up(db: Kysely<any>) {
+      await db.schema.createIndex("entry_by_client_key").unique().on("entry").column("client_key").execute();
       await db.schema
         .createTable("person")
         .addColumn("username", "text", (c) => c.primaryKey())
         .addColumn("name", "text", (c) => c.notNull())
         .addColumn("updated_at", "text", (c) => c.notNull())
         .execute();
-    },
-  },
-  // v1.1: walks and trainings run from `at` to `ended_at` (null while running) and carry the client's key; food has a
-  // kind; restocks of cans record the can size. The duration is derived from the two times now. Pauses, walkers,
-  // exercises and treats hang off an entry. `applied_command` makes walk taps idempotent; `session_alias` maps the key
-  // of a second "start" (both people at the door) to the walk that was already running.
-  "003_walks_training_food": {
-    async up(db: Kysely<any>) {
-      await db.schema.alterTable("entry").addColumn("ended_at", "text").execute();
-      await db.schema.alterTable("entry").addColumn("food_kind", "text").execute();
-      await db.schema.alterTable("entry").addColumn("client_key", "text").execute();
-      await db.schema.alterTable("entry").addColumn("unit_g", "integer").execute();
-      await db.schema.alterTable("entry").dropColumn("duration_min").execute();
-      await db.schema.createIndex("entry_by_client_key").unique().on("entry").column("client_key").execute();
       const byEntry = (c: any) => c.notNull().references("entry.id").onDelete("cascade");
       await db.schema
         .createTable("walk_walker")

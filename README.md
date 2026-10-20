@@ -18,7 +18,7 @@ pee and poop. Built for two people on phones, signed in through authentik.
 - **Export:** Menü → "Als CSV exportieren" downloads everything (`;`-separated, opens in Excel/LibreOffice).
 - Installable on the home screen (PWA), German, dark mode follows the phone.
 
-How it was planned: [docs/PLAN.md](docs/PLAN.md) (scope, model, stack), [docs/BUILD.md](docs/BUILD.md) (the v1 build
+How it was planned: [docs/PLAN.md](docs/PLAN.md) (scope, model, stack), [docs/BUILD.md](docs/BUILD.md) (the 0.1 build
 and the decisions made during it), [docs/ALTERNATIVES.md](docs/ALTERNATIVES.md) (why not an existing tool).
 
 ## Run locally

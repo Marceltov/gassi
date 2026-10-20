@@ -8,7 +8,7 @@ decision-makers: Marcel Bruckner
 
 ## Context and Problem Statement
 
-From v1.1 a walk runs from the front door to home, and everything on the walk and training screens (start, Pipi,
+From 0.2 a walk runs from the front door to home, and everything on the walk and training screens (start, Pipi,
 Poopoo, Pause/Weiter, Training, exercises, "+1" treat, Zuhause, Mitgehen) has to survive a phone without reception:
 taps are kept on the phone and sent later, nothing gets lost. At the same time the database must stay the only truth
 for the walk, so both phones show the same walk once they are online. How do the screens talk to the server?
@@ -18,11 +18,11 @@ for the walk, so both phones show the same walk once they are online. How do the
 * No lost taps without reception; a retry after a timeout must not log twice.
 * No second copy of a running walk in the browser (spec anti-goal).
 * Two phones can tap on the same walk; taps arrive late and out of order.
-* Same stack as v1 (Next.js server actions, SQLite), no new runtime dependency.
+* Same stack as 0.1 (Next.js server actions, SQLite), no new runtime dependency.
 
 ## Considered Options
 
-* Server actions per tap, as for v1's one-tap logging
+* Server actions per tap, as for 0.1's one-tap logging
 * Commands with a client id and the tap's time, sent in batches to one route and applied idempotently
 * A local copy of the walk in the browser, synced to the server (offline-first store)
 
@@ -55,7 +55,7 @@ laid over (`shared/sessionProjection.ts`); a command leaves the queue only once 
 
 ### Server actions per tap
 
-* Good, because it is what v1 does.
+* Good, because it is what 0.1 does.
 * Bad, because a server action needs the network at the moment of the tap; offline taps would be lost or need a
   queue anyway, and a retried action would log twice.
 
