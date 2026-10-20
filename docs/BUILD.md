@@ -258,3 +258,29 @@ Built from a local spec and plan (brainstormed on 2026-10-20); the lasting decis
   include walks/trainings that overlap the day/week; the phone's queue re-reads storage (shared by tabs) and drops a
   batch the server refuses with 400; `applied_command` forgets ids after 30 days; backups are written to a temporary
   file and renamed.
+
+## 0.3, step 1: foundation for apps (issue #9)
+
+- **Monorepo** (npm workspaces): `packages/domain` (pure, lint-enforced: no Node/React/Next/DB), `packages/api-client`,
+  `apps/server`. Packages are consumed as TypeScript source (`transpilePackages`, `outputFileTracingRoot` = repo root;
+  the image's server is `apps/server/server.js`). Installs run without scripts (`.npmrc`).
+- **The 0.2 screens are gone**; the server is an API plus `/l/<token>` (link landing page) and `/health`. The command
+  queue, entry descriptions and the weight chart path moved into the domain for the app.
+- **API contract** (ADR 0003): one endpoint table with zod in/out in `packages/api-client`; a typed client built from
+  it; the server serves it from one catch-all route and its implementation map must cover every endpoint. Entry,
+  stock and weight inputs are typed by the domain and validated by the use cases (German messages per field).
+- **Sign-in** (ADR 0004): only `PUBLIC_URL` is required. A fresh server prints a setup link (a plain stdout line, not
+  a log event, since it holds a token; a new one each start until used). Invite links (person/device/watch, single
+  use, 7 days, revocable), magic links (SMTP, 15 minutes, same answer for unknown addresses), optional OIDC keyed by
+  `sub` (in OIDC mode only devices can be invited; the app's sign-in ends in a one-time link). Devices hold Bearer
+  tokens stored as SHA-256; signing out deletes the device. The browser OIDC sign-in keeps the cookie session for
+  the dashboard. The static `API_TOKEN` is gone.
+- **Data:** one migration `001_schema`; `entry_dog` (pee/poop/weight one dog, walks/trainings/food one or more,
+  restocks/notes none); people have server-made ids; `track` + `track_batch` (points JSON per batch, unique
+  `(track, seq)`, so resends are no-ops). The walk shows a watch track, else the longest; metrics in the domain
+  (haversine, moving > 0.5 m/s, climb with 3 m hysteresis, Douglas-Peucker at 5 m for drawing).
+- **Commands** keep 0.2's rules and name dogs (`walk.start`/`training.start` `dogIds`, `log` `dogId`); a tap for an
+  unknown or archived dog is dropped.
+- **Tests:** Vitest over all workspaces (`tooling/` checks the package boundaries); e2e starts a server with only
+  `PUBLIC_URL`, sets it up from the printed link and drives the API through the typed client, plus the link page in
+  Chromium; the image smoke test expects the setup link in the log.
