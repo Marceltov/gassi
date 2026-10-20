@@ -30,7 +30,7 @@ const validTimeZone = (tz: string) => {
 
 // Unset and empty are the same: the default (or missing, when required).
 const optional = <T extends z.ZodType>(s: T) => z.preprocess((v) => (v === "" ? undefined : v), s.optional());
-const required = z.string().trim().min(1, "is required");
+const required = z.string({ error: "is required" }).trim().min(1, "is required");
 
 const schema = z.object({
   PUBLIC_URL: required.pipe(z.url({ protocol: /^https?$/ })).transform((u) => u.replace(/\/+$/, "")),

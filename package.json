@@ -13,7 +13,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "next build && playwright test",
-    "icons": "node scripts/icons.mjs"
+    "icons": "node scripts/icons.mjs",
+    "oidc-stub": "node --experimental-strip-types --no-warnings -e \"import('./e2e/oidc-stub.ts').then((m) => m.startOidcStub())\""
   },
   "dependencies": {
     "@tabler/icons-react": "^3.49.0",

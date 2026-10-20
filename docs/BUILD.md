@@ -191,3 +191,21 @@ Each phase ends with its checks passing and a commit. Don't start the next phase
   sunlight); the time since the last entry is the largest text on a tile.
 - **Unknown-user 403** is an HTML response from the callback route (`backend/http/responses.ts`), not a Next page,
   so it can carry the status code.
+- **History paging** uses offset/limit (51 rows fetched to know whether there is more). Pages loaded with "Mehr
+  laden" stay in the browser and are patched on edit/delete; the first page is refreshed by the server action.
+- **Filters are links** (`/verlauf?type=walk&by=bille`); unknown values are ignored, not an error.
+- **CSV:** oldest first, date and time in separate columns (`Datum;Uhrzeit;Art;Dauer (Min.);Menge (g);Notiz;Von`),
+  CRLF lines, file name `gassi-<today>.csv`. The proxy sends a signed-out browser to the login page; the route
+  itself answers 401 without a session.
+- **API:** `API_TOKEN` must be at least 16 characters; `POST` defaults `at` to now and answers 201 with the entry;
+  `since` is inclusive.
+- **Proxy:** only GET/HEAD page requests are redirected; server actions and route handlers check the session
+  themselves. A session counts only while its username is still in `USERS`.
+- **Startup:** `instrumentation.ts` checks the config and opens the database; on failure it prints the reason
+  (every missing variable by name) and exits 1, so the container stops instead of answering errors.
+- **Service worker** caches successful page loads for the offline fallback and never touches server actions, the
+  API, the export or the sign-in routes.
+- **CI** runs on pull requests and on pushes to `main` and `v*` tags (not on every branch push, so a PR runs once);
+  `image` also tags `sha-<short>`.
+- **`npm run oidc-stub`** runs the e2e stub issuer for local development without authentik.
+- **Image:** `TZ=Europe/Berlin` is set as the image default; `public/` is copied next to the standalone server.

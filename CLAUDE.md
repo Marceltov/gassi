@@ -4,10 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Gassi is a self-hosted dog diary for one household (walks, food, pee, poop). It is in **planning**: no code,
-build, lint or test commands exist yet. `docs/PLAN.md` is the source of truth for scope, data model, stack,
-auth and tests; `docs/BUILD.md` fixes the implementation decisions and phases for the one-shot v1 build; `docs/ALTERNATIVES.md` records why existing tools were rejected. Update this file with real
-commands once phase 1 (scaffold) lands.
+Gassi is a self-hosted dog diary for one household (walks, food, pee, poop). v1 is built. `docs/PLAN.md` is the
+source of truth for scope, data model, stack, auth and tests; `docs/BUILD.md` holds the implementation decisions,
+including "Decisions made during the build"; `docs/ALTERNATIVES.md` records why existing tools were rejected.
+
+## Commands
+
+- `npm run dev` (needs `.env.local`, see `.env.example`; `npm run oidc-stub` stands in for authentik)
+- `npm test` (Vitest); one test: `npx vitest run <path> -t <name>`
+- `npm run test:e2e` (`next build` then Playwright on desktop Chromium, iPhone 13, Pixel 7); one test:
+  `npx playwright test -g <name>` (after a build)
+- `npm run typecheck`, `npm run lint`
+- `npm run icons` after changing `public/icon.svg`
+- `scripts/quiet.sh <command>` prints only failures and the summary of a long run
+
+## Code layout
+
+- `backend/` is framework-free (lint-enforced) and reached from `app/`, `components/` and `proxy.ts` only through
+  `backend/index.ts`. Layers: `entries/repository.ts` (SQL) → `diary.ts` (use cases, validation, German errors) →
+  `app/actions.ts` (server actions; each calls `requireUser()`) and the route handlers (`backend/http/*`,
+  `backend/oidc/routes.ts`, mounted in `app/**/route.ts`).
+- `shared/` runs in the browser too (entry types and labels, Intl-only time zone helpers).
+- Tests sit next to the code. Outside calls are injected (`fetch`, `now`, the database), not mocked:
+  `backend/oidc/testing.ts` is a stub issuer, `backend/db/testing.ts` a fresh database per test,
+  `backend/testing/env.ts` a valid environment. e2e specs share one server and database and run serially.
 
 ## Repo layout
 

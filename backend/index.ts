@@ -8,6 +8,7 @@ import { logoutRoute, oidcCallbackRoute, oidcStartRoute } from "./oidc/routes";
 
 export { config } from "./config";
 export { database } from "./db/open";
+export { startup } from "./startup";
 export { SESSION_COOKIE, sessionUser, type User } from "./auth/session";
 export { safeNext } from "./http/responses";
 

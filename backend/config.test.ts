@@ -54,3 +54,7 @@ describe("parseConfig", () => {
     expect(() => parseConfig({ ...ENV, [name]: value })).toThrow(name);
   });
 });
+
+test("a missing variable says it is required", () => {
+  expect(() => parseConfig({ ...ENV, USERS: undefined })).toThrow("USERS is required");
+});
