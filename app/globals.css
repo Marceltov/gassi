@@ -75,3 +75,14 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* The entry sheet rises from the bottom bar it was opened from. */
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+.sheet-in {
+  animation: sheet-in 180ms ease-out;
+}

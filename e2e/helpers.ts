@@ -13,7 +13,7 @@ export async function signIn(page: Page, username: string, next = "/"): Promise<
 /** Signs in as a known user and waits for the today screen. */
 export async function signInAs(page: Page, username: keyof typeof USERS): Promise<void> {
   await signIn(page, username);
-  await expect(page.getByRole("heading", { name: "Heute" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Heute", exact: true })).toBeVisible();
 }
 
 export async function openMenu(page: Page): Promise<void> {

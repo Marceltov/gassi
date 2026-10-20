@@ -71,7 +71,7 @@ Port of notefeed `backend/oidc/` reduced to a single provider:
 ### Screens (German, phone-first, dark mode by `prefers-color-scheme`)
 
 - **Heute (`/`)**: four big tiles in a 2×2 grid with Tabler icons, `IconWalk` Gassi, `IconBone` Futter,
-  `IconDroplet` Pipi, `IconPoo` Kacka. Each shows how long ago it last happened ("vor 2 Std. 5 Min.", "heute noch
+  `IconDroplet` Pipi, `IconPoo` Poopoo. Each shows how long ago it last happened ("vor 2 Std. 5 Min.", "heute noch
   nicht") and who did it. A tap logs "now, by me" through a server action, shows a toast "Gassi eingetragen"
   with "Rückgängig" for 5 s, and refreshes the tiles. Each tile has a small "…" button that opens a sheet with
   time (default now), duration (walk), amount in grams (food), and note. Below the tiles: today's entries.
@@ -171,4 +171,23 @@ Each phase ends with its checks passing and a commit. Don't start the next phase
 
 ## Decisions made during the build
 
-(Filled in by the run.)
+- **Poopoo, not Kacka:** the poop tile and every label for that type say "Poopoo" (asked for during the build).
+- **Today tiles show today only:** a tile shows the latest entry of its type on today's calendar day in `TZ`, else
+  "heute noch nicht". An entry from 23:30 yesterday doesn't count as today's.
+- **One e2e server, run serially:** all specs share the server on port 3100 and one fresh `DATA_DIR`, with
+  `workers: 1`, so the tiles and lists are predictable; specs identify their entries by notes, not by counts alone.
+- **e2e stub picks the user by cookie:** the stub issuer signs in whoever the `stub_user` cookie on its own origin
+  names, so a spec chooses the user without a login form.
+- **Layers:** `backend/entries/repository.ts` (SQL) → `backend/diary.ts` (use cases: the one dog, `TZ`, display
+  names, input validation with German messages) → `app/actions.ts` (server actions: session check, revalidate) and
+  the route handlers. The frontend imports the backend only through `backend/index.ts` (lint rule, as in notefeed).
+- **`shared/`** holds browser-safe code used on both sides: entry types and labels, time zone helpers (Intl only,
+  no date library), the action result type.
+- **Times in the sheet:** the `datetime-local` value is wall time in `TZ` (passed to the client), converted to UTC
+  in the browser; the server only accepts ISO instants.
+- **Delete confirmation** is a second button in the sheet ("Wirklich löschen"), not `window.confirm`.
+- **Look:** gravel-sage background with a colour per entry type (walk green, food ochre, pee mustard, poop brown,
+  note slate) used for tile, list dot and filter chip; Atkinson Hyperlegible Next as the only typeface (legible in
+  sunlight); the time since the last entry is the largest text on a tile.
+- **Unknown-user 403** is an HTML response from the callback route (`backend/http/responses.ts`), not a Next page,
+  so it can carry the status code.
