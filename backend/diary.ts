@@ -38,8 +38,10 @@ export class InputError extends Error {
 
 const MESSAGES: Record<string, string> = {
   at: "Die Zeit fehlt oder stimmt nicht.",
-  durationMin: "Die Dauer muss eine ganze Zahl Minuten sein (1 bis 1440).",
-  amountG: "Die Menge muss eine ganze Zahl Gramm sein (1 bis 10000).",
+  endedAt: "Das Ende fehlt, stimmt nicht oder liegt vor dem Anfang.",
+  amountG: "Die Menge muss eine ganze Zahl Gramm sein.",
+  foodKind: "Diese Futterart gibt es nicht.",
+  unitG: "Die Dosengröße muss eine ganze Zahl Gramm sein (1 bis 10000).",
   note: "Die Notiz ist zu lang (höchstens 1000 Zeichen).",
   type: "Diese Art von Eintrag gibt es nicht.",
 };

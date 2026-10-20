@@ -15,7 +15,8 @@ describe("log", () => {
 
   test.each([
     [{ type: "walk", at: "gestern" }, "Die Zeit fehlt oder stimmt nicht."],
-    [{ type: "walk", at: "2026-10-20T09:00:00Z", durationMin: "1.5" }, /Dauer/],
+    [{ type: "walk", at: "2026-10-20T09:00:00Z", endedAt: "2026-10-20T08:00:00Z" }, /Ende/],
+    [{ type: "food", at: "2026-10-20T09:00:00Z", foodKind: "canned" }, /Futterart/],
     [{ type: "food", at: "2026-10-20T09:00:00Z", amountG: -1 }, /Menge/],
     [{ type: "bark", at: "2026-10-20T09:00:00Z" }, /Art/],
   ])("rejects %j", async (input, message) => {
@@ -46,7 +47,7 @@ describe("today", () => {
 test("edit changes the fields, remove deletes", async () => {
   const d = diary();
   const e = await d.log(HIRSCH, { type: "walk", at: "2026-10-20T09:00:00Z" });
-  expect(await d.edit(e.id, { at: "2026-10-20T08:00:00Z", durationMin: 40 })).toMatchObject({ at: "2026-10-20T08:00:00.000Z", durationMin: 40 });
+  expect(await d.edit(e.id, { at: "2026-10-20T08:00:00Z", endedAt: "2026-10-20T08:40:00Z" })).toMatchObject({ at: "2026-10-20T08:00:00.000Z", durationMin: 40 });
   expect(await d.edit(999, { at: "2026-10-20T08:00:00Z" })).toBeNull();
   expect(await d.remove(e.id)).toBe(true);
   expect(await d.all()).toEqual([]);

@@ -1,5 +1,5 @@
 // The entry table. Newest first everywhere; ties on `at` break by id, so paging is stable.
-import { isEntryType } from "../../shared/entryTypes";
+import { isEntryType, isFoodKind, minutesBetween } from "../../shared/entryTypes";
 import type { DB } from "../db/open";
 import type { EntryRow } from "../db/schema";
 import type { Entry, EntryFields, NewEntry } from "./model";
@@ -21,8 +21,12 @@ function toEntry(row: EntryRow): Entry {
     dogId: row.dog_id,
     type: row.type,
     at: row.at,
-    durationMin: row.duration_min,
+    endedAt: row.ended_at,
+    durationMin: minutesBetween(row.at, row.ended_at),
     amountG: row.amount_g,
+    foodKind: isFoodKind(row.food_kind) ? row.food_kind : null,
+    unitG: row.unit_g,
+    clientKey: row.client_key,
     note: row.note,
     loggedBy: row.logged_by,
     createdAt: row.created_at,
@@ -30,7 +34,7 @@ function toEntry(row: EntryRow): Entry {
   };
 }
 
-const columns = (f: EntryFields) => ({ at: f.at, duration_min: f.durationMin, amount_g: f.amountG, note: f.note });
+const columns = (f: EntryFields) => ({ at: f.at, ended_at: f.endedAt, amount_g: f.amountG, food_kind: f.foodKind, unit_g: f.unitG, note: f.note });
 
 export class EntryRepository {
   constructor(
@@ -42,7 +46,7 @@ export class EntryRepository {
     const stamp = this.now().toISOString();
     const row = await this.db
       .insertInto("entry")
-      .values({ dog_id: e.dogId, type: e.type, logged_by: e.loggedBy, ...columns(e), created_at: stamp, updated_at: stamp })
+      .values({ dog_id: e.dogId, type: e.type, logged_by: e.loggedBy, client_key: e.clientKey ?? null, ...columns(e), created_at: stamp, updated_at: stamp })
       .returningAll()
       .executeTakeFirstOrThrow();
     return toEntry(row);
@@ -50,6 +54,17 @@ export class EntryRepository {
 
   async get(id: number): Promise<Entry | undefined> {
     const row = await this.db.selectFrom("entry").selectAll().where("id", "=", id).executeTakeFirst();
+    return row && toEntry(row);
+  }
+
+  /** The newest walk or training that was started with a key and has not ended (one logged afterwards without an end is a moment, not running). */
+  async running(type: "walk" | "training"): Promise<Entry | undefined> {
+    const row = await this.db.selectFrom("entry").selectAll().where("type", "=", type).where("ended_at", "is", null).where("client_key", "is not", null).orderBy("at", "desc").orderBy("id", "desc").executeTakeFirst();
+    return row && toEntry(row);
+  }
+
+  async byClientKey(key: string): Promise<Entry | undefined> {
+    const row = await this.db.selectFrom("entry").selectAll().where("client_key", "=", key).executeTakeFirst();
     return row && toEntry(row);
   }
 

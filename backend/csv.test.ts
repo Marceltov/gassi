@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { csvField, entriesCsv } from "./csv";
 import type { EntryView } from "./diary";
 
-const entry = (more: Partial<EntryView>): EntryView => ({ id: 1, dogId: 1, type: "walk", at: "2026-10-20T12:05:00.000Z", durationMin: null, amountG: null, note: null, loggedBy: "marcel", byName: "Hirsch", createdAt: "", updatedAt: "", ...more });
+const entry = (more: Partial<EntryView>): EntryView => ({ id: 1, dogId: 1, type: "walk", at: "2026-10-20T12:05:00.000Z", endedAt: null, durationMin: null, amountG: null, foodKind: null, unitG: null, clientKey: null, note: null, loggedBy: "marcel", byName: "Hirsch", createdAt: "", updatedAt: "", ...more });
 
 test("starts with a BOM and the German header, separated by ;", () => {
   const csv = entriesCsv([], "Europe/Berlin");

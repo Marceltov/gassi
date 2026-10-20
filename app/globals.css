@@ -15,6 +15,7 @@
   --pee: #b8961c;
   --poop: #7a4e2d;
   --note: #4b6a9b;
+  --training: #8a4fa3;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,6 +33,7 @@
     --pee: #e3c552;
     --poop: #c49067;
     --note: #8fa9d6;
+    --training: #c79be0;
   }
 }
 
@@ -50,6 +52,7 @@
   --color-pee: var(--pee);
   --color-poop: var(--poop);
   --color-note: var(--note);
+  --color-training: var(--training);
 }
 
 html {
