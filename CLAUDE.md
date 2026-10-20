@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Gassi is a self-hosted dog diary for one household (walks, food, pee, poop). v1 is built. `docs/PLAN.md` is the
+Gassi is a self-hosted dog diary for one household (walks, food, pee, poop). 0.1 is built. `docs/PLAN.md` is the
 source of truth for scope, data model, stack, auth and tests; `docs/BUILD.md` holds the implementation decisions,
 including "Decisions made during the build"; `docs/ALTERNATIVES.md` records why existing tools were rejected.
 
@@ -23,8 +23,10 @@ including "Decisions made during the build"; `docs/ALTERNATIVES.md` records why 
 - `backend/` is framework-free (lint-enforced) and reached from `app/`, `components/` and `proxy.ts` only through
   `backend/index.ts`. Layers: `entries/repository.ts` (SQL) → `diary.ts` (use cases, validation, German errors) →
   `app/actions.ts` (server actions; each calls `requireUser()`) and the route handlers (`backend/http/*`,
-  `backend/oidc/routes.ts`, mounted in `app/**/route.ts`).
-- `shared/` runs in the browser too (entry types and labels, Intl-only time zone helpers).
+  `backend/oidc/routes.ts`, mounted in `app/**/route.ts`). Walks/trainings: `sessions.ts` applies the taps
+  (commands, `POST /api/commands`; ADR 0001); `stock.ts`, `week.ts` and `backup.ts` are the pure/ops parts.
+- `shared/` runs in the browser too (entry types and labels, Intl-only time zone helpers, `commands.ts`,
+  `sessionProjection.ts`). The phone's command queue is `components/commandQueue.ts` + `useSessions.ts`.
 - Tests sit next to the code. Outside calls are injected (`fetch`, `now`, the database), not mocked:
   `backend/oidc/testing.ts` is a stub issuer, `backend/db/testing.ts` a fresh database per test,
   `backend/testing/env.ts` a valid environment. e2e specs share one server and database and run serially.
@@ -38,9 +40,9 @@ labels, ports); they apply to that deployment folder, not to the app code here.
 
 ## Decisions to respect (from docs/PLAN.md)
 
-- **One model for everything:** an `Entry` (`dogId`, `type`, `at`, optional `durationMin`/`amount`/`note`,
-  `loggedBy`). New kinds of events are new `type` values, not new tables. Pee/poop during a walk are separate
-  entries sharing a timestamp, not nested.
+- **One model for everything:** an `Entry` (`dogId`, `type`, `at`, optional `endedAt`/`amountG`/`foodKind`/`note`,
+  `loggedBy`). New kinds of events are new `type` values, not new tables; walkers, pauses, exercises and treats are
+  child rows. "During a walk" is decided by time, not links (ADR 0002).
 - **Auth is a real OIDC client of authentik**, modelled on `notefeed/notefeed` (`backend/oidc/`): code flow +
   PKCE, state/nonce in a short-lived signed cookie, id_token claims checked, signed session cookie with expiry.
   No auth library, no forward-auth header. authentik's application bindings decide who gets in; users are keyed by
@@ -48,9 +50,9 @@ labels, ports); they apply to that deployment folder, not to the app code here.
 - **Stack and tests follow `notefeed/notefeed`** (not Healthy): Next.js App Router + server actions, TypeScript,
   Kysely on better-sqlite3, Tailwind, pino, zod, PWA. Vitest for units with injected `fetch`/`now` instead of
   mocks; Playwright against `next start` with phone projects and a stub OIDC issuer; an image smoke test in CI.
-  Details in PLAN.md "Tests". A separate API/SPA and Postgres were explicitly rejected for v1.
+  Details in PLAN.md "Tests". A separate API/SPA and Postgres were explicitly rejected for 0.1.
 - **UI:** German, phone-first, large touch targets, dark mode, Tabler Icons (`@tabler/icons-react`).
-- **Scope:** v1 is the five-item list in PLAN.md. Items under "Later" and the non-goals (vet records, training,
+- **Scope:** 0.1 and 0.2 are the lists in PLAN.md. Items under "Later" and the non-goals (vet records, training,
   multi-household, GPS) stay out unless asked.
 - **Deployment:** `Dockerfile` here; GitHub Actions pushes `ghcr.io/marceltov/gassi` (tags `main`, short sha,
   version tags). Watchtower in the homelab pulls updates. Expose a healthcheck endpoint.

@@ -12,8 +12,8 @@ test("the CSV download has the header and the entries", async ({ page }, info) =
   expect(download.suggestedFilename()).toMatch(/^gassi-\d{4}-\d\d-\d\d\.csv$/);
   const csv = await readFile((await download.path())!, "utf8");
   const lines = csv.replace(/^\uFEFF/, "").split("\r\n");
-  expect(lines[0]).toBe("Datum;Uhrzeit;Art;Dauer (Min.);Menge (g);Notiz;Von");
-  expect(lines.find((l) => l.includes(note))).toMatch(new RegExp(`^\\d{4}-\\d\\d-\\d\\d;\\d\\d:\\d\\d;Poopoo;;;${note};Hirsch$`));
+  expect(lines[0]).toBe("Datum;Uhrzeit;Art;Ende;Dauer (Min.);Pause (Min.);Futterart;Menge (g);Übungen;Leckerlis;Notiz;Von");
+  expect(lines.find((l) => l.includes(note))).toMatch(new RegExp(`^\\d{4}-\\d\\d-\\d\\d;\\d\\d:\\d\\d;Poopoo;;;;;;;;${note};Hirsch$`));
 });
 
 test("signed out, the export sends you to the login page", async ({ page }) => {

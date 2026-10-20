@@ -1,7 +1,8 @@
 // Gassi's service worker, hand-written. Build assets and icons: cache first (their names change with their content).
 // Pages: network first, falling back to the last copy of that page, else the offline page. Nothing else is touched:
-// server actions, the API, the export and the sign-in always go to the network.
-const VERSION = "gassi-v1";
+// server actions, the API, the walk commands (POST /api/commands, queued by the page itself), the export and the
+// sign-in always go to the network.
+const VERSION = "gassi-v2";
 const OFFLINE = "/offline.html";
 const ICONS = ["/icon.svg", "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png", "/apple-icon.png"];
 

@@ -4,7 +4,8 @@ import { type FormEvent, useEffect, useRef, useState, useTransition } from "reac
 import { IconTrash, IconX } from "@tabler/icons-react";
 import { deleteEntry, editEntry, logEntry } from "@/app/actions";
 import type { EntryView } from "@/backend";
-import { type EntryType, TYPE_LABEL } from "@/shared/entryTypes";
+import { type EntryType, FOOD_KINDS, FOOD_LABEL, TYPE_LABEL } from "@/shared/entryTypes";
+import { parseDecimal } from "@/shared/food";
 import { localToUtc, utcToLocal } from "@/shared/time";
 import { TYPE_COLOR, TYPE_ICON } from "./entryStyle";
 
@@ -20,21 +21,48 @@ type Props = {
   onDeleted: (entry: EntryView) => void;
 };
 
-type Fields = { at: string; durationMin: string; amountG: string; note: string };
+type Fields = { at: string; durationMin: string; endedAt: string; amountG: string; kg: string; foodKind: string; note: string };
+
+const local = (iso: string | null, timeZone: string) => (iso ? utcToLocal(Date.parse(iso), timeZone) : "");
 
 function initialFields(target: SheetTarget, timeZone: string): Fields {
-  if (target.kind === "new") return { at: utcToLocal(Date.now(), timeZone), durationMin: "", amountG: "", note: "" };
+  if (target.kind === "new") return { at: utcToLocal(Date.now(), timeZone), durationMin: "", endedAt: "", amountG: "", kg: "", foodKind: target.type === "food" ? "wet" : "", note: "" };
   const e = target.entry;
-  return { at: utcToLocal(Date.parse(e.at), timeZone), durationMin: e.durationMin?.toString() ?? "", amountG: e.amountG?.toString() ?? "", note: e.note ?? "" };
+  return {
+    at: local(e.at, timeZone),
+    durationMin: e.durationMin?.toString() ?? "",
+    endedAt: local(e.endedAt, timeZone),
+    amountG: e.amountG?.toString() ?? "",
+    kg: e.type === "weight" && e.amountG ? String(e.amountG / 1000).replace(".", ",") : "",
+    foodKind: e.foodKind ?? (e.type === "food" || e.type === "restock" || e.type === "stockcheck" ? "wet" : ""),
+    note: e.note ?? "",
+  };
 }
 
-const toInput = (f: Fields, timeZone: string) => ({ at: new Date(localToUtc(f.at, timeZone)).toISOString(), durationMin: f.durationMin, amountG: f.amountG, note: f.note });
+// A new walk gets its end from "Dauer (Min.)" (none: a moment, as in 0.1); an existing walk or training is edited by its
+// end ("Ende"), so a walk someone forgot to stop can be ended afterwards. A weight is entered in kg, stored in grams.
+function toInput(f: Fields, target: SheetTarget, timeZone: string, defaultAt: string) {
+  // the time field only has minutes: left as it was opened, a new entry is "now", to the second
+  const at = target.kind === "new" && f.at === defaultAt ? Date.now() : localToUtc(f.at, timeZone);
+  const type = target.kind === "new" ? target.type : target.entry.type;
+  let endedAt: string | null = null;
+  if (target.kind === "new" && type === "walk") {
+    const minutes = Number(f.durationMin);
+    if (f.durationMin.trim() && Number.isFinite(minutes) && minutes > 0) endedAt = new Date(at + Math.round(minutes) * 60_000).toISOString();
+  } else if (f.endedAt) endedAt = new Date(localToUtc(f.endedAt, timeZone)).toISOString();
+  const kg = parseDecimal(f.kg);
+  const amountG = type === "weight" ? (Number.isFinite(kg) ? Math.round(kg * 10) * 100 : "") : f.amountG;
+  const unitG = target.kind === "edit" ? target.entry.unitG : null;
+  return { at: new Date(at).toISOString(), endedAt, amountG, foodKind: f.foodKind, unitG, note: f.note };
+}
 
-// A bottom sheet with time (default now), duration (walks), amount in grams (food) and note; for an existing entry
+// A bottom sheet with time (default now), duration or end (walks, trainings), kind and grams (food, restock, stock),
+// kg (weight) and note; for an existing entry
 // also "Löschen", which asks once more.
 export function EntrySheet({ target, timeZone, onClose, onLogged, onSaved, onDeleted }: Props) {
   const type = target.kind === "new" ? target.type : target.entry.type;
-  const [fields, setFields] = useState(() => initialFields(target, timeZone));
+  const [initial] = useState(() => initialFields(target, timeZone));
+  const [fields, setFields] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -54,7 +82,7 @@ export function EntrySheet({ target, timeZone, onClose, onLogged, onSaved, onDel
     e.preventDefault();
     if (!fields.at) return setError("Die Zeit fehlt.");
     startTransition(async () => {
-      const input = toInput(fields, timeZone);
+      const input = toInput(fields, target, timeZone, initial.at);
       if (target.kind === "new") {
         const r = await logEntry({ ...input, type });
         return r.ok ? onLogged(r.value) : setError(r.error);
@@ -93,14 +121,35 @@ export function EntrySheet({ target, timeZone, onClose, onLogged, onSaved, onDel
           <Field label="Zeit">
             <input type="datetime-local" required value={fields.at} onChange={set("at")} className={input} />
           </Field>
-          {type === "walk" && (
+          {type === "walk" && target.kind === "new" && (
             <Field label="Dauer (Min.)">
               <input type="number" inputMode="numeric" min={1} max={1440} value={fields.durationMin} onChange={set("durationMin")} className={input} />
             </Field>
           )}
-          {type === "food" && (
+          {(type === "walk" || type === "training") && target.kind === "edit" && (
+            <Field label="Ende">
+              <input type="datetime-local" min={fields.at} value={fields.endedAt} onChange={set("endedAt")} className={input} />
+            </Field>
+          )}
+          {(type === "food" || type === "restock" || type === "stockcheck") && (
+            <Field label="Futterart">
+              <select value={fields.foodKind} onChange={set("foodKind")} className={input}>
+                {FOOD_KINDS.map((k) => (
+                  <option key={k} value={k}>
+                    {FOOD_LABEL[k]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {(type === "food" || type === "restock" || type === "stockcheck") && (
             <Field label="Menge (g)">
-              <input type="number" inputMode="numeric" min={1} max={10000} value={fields.amountG} onChange={set("amountG")} className={input} />
+              <input type="number" inputMode="numeric" min={0} max={1000000} value={fields.amountG} onChange={set("amountG")} className={input} />
+            </Field>
+          )}
+          {type === "weight" && (
+            <Field label="Gewicht (kg)">
+              <input inputMode="decimal" value={fields.kg} onChange={set("kg")} className={input} />
             </Field>
           )}
           <Field label="Notiz">

@@ -6,33 +6,41 @@ Two people (Hirsch and Herzii) share one dog (Toffee). Either of them should be 
 in one tap, and see at a glance what has happened today: when the dog was last out, last ate, last peed and
 pooped, and who did it.
 
-Non-goals: vet records, training plans, multi-household SaaS, GPS tracking. If we miss one of these later,
-it's a later version, not the first one.
+Non-goals: vet records, training plans, multi-household SaaS, GPS tracking, several dogs, reminders. If we miss one
+of these later, it's a later version.
 
 ## The core idea
 
-Everything is an **entry**: *who* did *what* with *which dog*, *when*, with an optional amount, duration and
-note. Walks, meals, pee and poop are entry types. That keeps the data model and the UI to one list.
+Everything is an **entry**: *who* did *what* with *which dog*, *when*, with an optional end, amount and note.
+Walks, trainings, meals, pee, poop, weight, restocks and stock counts are entry types. That keeps the data model and
+the UI to one list.
 
 ```
 Entry
   id
   dogId
-  type        walk | food | pee | poop | note   (more types later, no schema change needed)
-  at          when it happened (editable, defaults to now)
-  durationMin optional, for walks
-  amount      optional, for food (grams)
+  type        walk | food | pee | poop | note | training | weight | restock | stockcheck
+  at          when it happened / started (editable, defaults to now)
+  endedAt     optional; walks and trainings (null while one runs); the duration is derived
+  amount      optional grams: food, restock, stockcheck, weight
+  foodKind    optional: wet | dry (food, restock, stockcheck)
+  unitG       optional: grams per can on wet restocks
+  clientKey   the key a walk or training was started with (from the phone)
   note        optional free text
   loggedBy    username from authentik
   createdAt / updatedAt
+
+  hanging off a walk: walkers (several people), pauses (start/end)
+  hanging off a training: exercises practised (tags, not timed), treats given (count per treat kind)
 
 Dog
   id, name, (photo later)
 ```
 
-A walk can carry pee/poop as separate entries at the same time. There's no nesting, just a shared timestamp.
+Pee/poop during a walk are separate entries. "During a walk" is decided by time (an entry whose `at` lies between
+the walk's start and end), not by links (ADR 0002).
 
-## First version (v1)
+## First version (0.1)
 
 1. **One-tap logging:** big buttons with icons for walk, food, pee and poop. A tap logs "now, by me". A long
    press or a follow-up sheet adjusts time, duration, amount or note.
@@ -41,13 +49,24 @@ A walk can carry pee/poop as separate entries at the same time. There's no nesti
 4. **Built for phones:** installable PWA ("Add to Home Screen"), German UI, large touch targets, dark mode.
 5. **Data:** SQLite in a mounted volume, plus a CSV export.
 
+## 0.2
+
+1. **Walks with start and stop ("Runde"):** the Gassi tile starts a walk at the door; `/runde` has a running clock,
+   Pipi, Poopoo, Pause/Weiter, Training and Zuhause (stop, then a summary with a note). Several people can walk
+   ("Mitgehen"); a joint walk counts for each of them. The walk is in the database from its start; every tap is a
+   command with a client id and its own time, queued on the phone without reception and applied once, in time
+   order (ADR 0001).
+2. **Training** on a walk or at home: a block with a clock, exercises tapped (a household list) and a "+1" per treat
+   kind (a household list with grams per piece and whether it comes out of the dry food).
+3. **Food** as wet or dry in grams, the last portion offered; **Vorrat:** restocks (cans × grams, or kg), what is
+   left, "reicht noch etwa N Tage" from the last 14 days, corrections by hand.
+4. **Woche:** sums per person, exercises, treats, a column per day, a 0–24 h strip per day; a day opens its Verlauf.
+5. **Weight** in kg with a curve. **Daily backup** of `gassi.db` (14 kept).
+
 ## Later, only if we miss it
 
-- Reminders through ntfy (for example, "no walk for 6 hours")
-- Weekly overview and simple charts (walks per person, meals per day)
-- Weight tracking
+- Reminders as push notifications of the installed PWA, with rules editable in the app (no ntfy)
 - Several dogs (the model already has `dogId`)
-- Food stock ("bag runs out in about 5 days")
 
 ## Authentication
 
@@ -82,7 +101,7 @@ Modelled on notefeed (`notefeed/notefeed`), which already runs the same kind of 
 - **pino** for logs, **zod** for config and input validation
 - PWA manifest and service worker
 
-Considered and rejected for v1: a separate API and SPA (twice the moving parts), Postgres (one household doesn't
+Considered and rejected for 0.1: a separate API and SPA (twice the moving parts), Postgres (one household doesn't
 need it).
 
 ## Tests
@@ -112,10 +131,10 @@ Scripts: `npm test` (`vitest run`), `npm run test:e2e` (`next build && playwrigh
 - `services` repo: new `gassi/docker-compose.yaml` following the homelab conventions (gethomepage network,
   homepage, kuma and dynacat labels, healthcheck, `./data` volume gitignored). Watchtower updates it.
 - Hostname: `gassi.herziis.de` (new DNS record and Caddy route), port `10038`.
-- Cut-over: Housetrained kept running until Gassi v1 worked. No data migration, since Housetrained held no real
+- Cut-over: Housetrained kept running until Gassi 0.1 worked. No data migration, since Housetrained held no real
   history.
 
 ## Build
 
-v1 was built in one run and is live since 2026-10-20 (`v1.0.0`); see [BUILD.md](BUILD.md) for the goal statement, the fixed implementation
+0.1 was built in one run and is live since 2026-10-20 (it was first tagged `v1.0.0`; that tag was retired, and versions stay 0.x until there is real data to keep); see [BUILD.md](BUILD.md) for the goal statement, the fixed implementation
 decisions, the phases and their checks, and the manual steps after the build (authentik, compose, hostname).

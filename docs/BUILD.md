@@ -1,6 +1,6 @@
-# Build: Gassi v1 in one shot
+# Build: Gassi 0.1 in one shot
 
-How v1 gets built in a single autonomous run, from an empty repo to a green pull request. `PLAN.md` says *what*
+How 0.1 gets built in a single autonomous run, from an empty repo to a green pull request. `PLAN.md` says *what*
 and *why*. This file fixes every *how* decision, so the run never has to stop and ask. Where the two disagree,
 PLAN.md wins and this file gets fixed.
 
@@ -9,7 +9,7 @@ same test layers). Copy its patterns, not its features.
 
 ## Goal statement
 
-> Build Gassi v1 as described in `docs/PLAN.md` and `docs/BUILD.md`, in one run, on the branch `v1`. Done means
+> Build Gassi 0.1 as described in `docs/PLAN.md` and `docs/BUILD.md`, in one run, on the branch `v1` (as 0.1 was called then). Done means
 > every phase's checks below pass locally, the work is committed phase by phase, the branch is pushed, a pull
 > request is open against `main`, and its CI run is green. Do not merge it, and don't touch the homelab: no
 > authentik, Caddy, DNS or `services` repo changes. When something isn't decided here, take the simplest option
@@ -49,7 +49,7 @@ same test layers). Copy its patterns, not its features.
 - `entry`: `id` integer pk, `dog_id` → dog, `type` text (`walk|food|pee|poop|note`, checked in code, not a DB
   enum), `at` text (ISO 8601 UTC), `duration_min` int null, `amount_g` int null, `note` text null, `logged_by`
   text (username), `created_at`, `updated_at`. Index on `(dog_id, at desc)`.
-- On startup, if no dog exists, create one named `DOG_NAME`. v1 always uses the first dog.
+- On startup, if no dog exists, create one named `DOG_NAME`. 0.1 always uses the first dog.
 - All times are stored in UTC and shown in `TZ`. "Today" is the calendar day in `TZ`.
 
 ### Sign-in
@@ -155,7 +155,7 @@ Each phase ends with its checks passing and a commit. Don't start the next phase
 6. **PWA and polish**: manifest, icons, service worker, offline page, dark mode, German copy pass. Check:
    `pwa.spec.ts` passes; screenshots of Heute and Verlauf on iPhone 13 in light and dark look right.
 7. **Ship**: Dockerfile, entrypoint, CI workflow, README (run locally, configure, deploy), CLAUDE.md commands.
-   Check: `docker build` works and the container turns healthy locally; push `v1`, open the PR, CI green.
+   Check: `docker build` works and the container turns healthy locally; push the `v1` branch, open the PR, CI green.
 
 ## After the build (by hand, not part of the run)
 
@@ -197,7 +197,8 @@ package), deployed by `services` PR #23.
 - **History paging** uses offset/limit (51 rows fetched to know whether there is more). Pages loaded with "Mehr
   laden" stay in the browser and are patched on edit/delete; the first page is refreshed by the server action.
 - **Filters are links** (`/verlauf?type=walk&by=bille`); unknown values are ignored, not an error.
-- **CSV:** oldest first, date and time in separate columns (`Datum;Uhrzeit;Art;Dauer (Min.);Menge (g);Notiz;Von`),
+- **CSV:** oldest first, date and time in separate columns (since 0.2:
+  `Datum;Uhrzeit;Art;Ende;Dauer (Min.);Pause (Min.);Futterart;Menge (g);Übungen;Leckerlis;Notiz;Von`),
   CRLF lines, file name `gassi-<today>.csv`. The proxy sends a signed-out browser to the login page; the route
   itself answers 401 without a session.
 - **API:** `API_TOKEN` must be at least 16 characters; `POST` defaults `at` to now and answers 201 with the entry;
@@ -221,3 +222,39 @@ package), deployed by `services` PR #23.
   host ever runs Gassi.
 - **The image package is public** on GHCR (the repo is private): the host pulls it without a login, like the other
   ghcr images there, and Watchtower updates it. The image holds only app code; secrets stay in the deployment `.env`.
+
+## 0.2 (walks, training, food stock, week)
+
+Built from a local spec and plan (brainstormed on 2026-10-20); the lasting decisions are ADRs in `docs/adr/`.
+
+- **One migration:** nothing held real data before 0.2, so the schema is a single migration `001_schema` (entry with
+  `ended_at`, `food_kind`, `client_key`, `unit_g`; `duration_min` is derived now; child tables `walk_walker`,
+  `walk_pause`, `exercise`, `training_exercise`, `treat_kind`, `training_treat`, `applied_command`, `session_alias`).
+  A database from 0.1 is not migrated: it is deleted at the 0.2 deploy (it held test entries only). From 0.2 on,
+  migrations that have shipped are never edited.
+- **Commands (ADR 0001):** `POST /api/commands` (session cookie, JSON only, at most 100) applies walk/training taps
+  in tap-time order, each id once. Late taps: pee/poop always become entries; pause/resume/join/training taps at or
+  after the end are dropped; a second "start" while a walk runs joins it (`session_alias`). The phone keeps unsent
+  commands per person in `localStorage` (`gassi.commands.<username>`) and lays them over the server's view
+  (`shared/sessionProjection.ts`); a command leaves the queue only when the server lists it as applied or dropped.
+- **During a walk by time (ADR 0002):** a training or a pee belongs to the walk whose interval holds its `at`; the
+  summary and the training's "back to the walk" use that rule.
+- **Running** means a walk/training started with a key and without an end; one logged afterwards without an end is a
+  moment, not running. A forgotten walk is ended by editing its "Ende" in the sheet; nothing stops automatically.
+- **Live refresh:** Heute, `/runde` and `/training` reload on `visibilitychange` and every 30 s; the queue flushes
+  on `online` and every 15 s.
+- **Stock** counts from the latest stockcheck (feedings after it), else from the first restock; below zero shows 0
+  and asks for a correction; dry treats count against dry food. Restock, correction, weight and the week view are
+  use cases on `Diary`; the pure parts are `backend/stock.ts` and `backend/week.ts`.
+- **Futter** opens a sheet with the usual portion per kind (two taps); the "…" sheet stays for other times. A new
+  entry whose time field was left untouched is logged at "now" to the second.
+- **Backups:** `VACUUM INTO ${DATA_DIR}/backups/gassi-YYYY-MM-DD.db` at startup and hourly when today's is missing,
+  newest 14 kept; failures are logged, never fatal.
+- **Service worker** cache bumped to `gassi-v2`; `/api/commands` always goes to the network.
+- **After the branch review:** a start queued offline that arrives after the stop joins the walk that was running at
+  its time; an earlier joining start moves the walk's start back; pauses count only inside a walk's (edited)
+  interval; a finished walk/training started on its screen can't lose its end; each treat row keeps the grams per
+  piece and "from dry" it had when given; food, restock and stock entries need a kind; Verlauf `?day=` and the week
+  include walks/trainings that overlap the day/week; the phone's queue re-reads storage (shared by tabs) and drops a
+  batch the server refuses with 400; `applied_command` forgets ids after 30 days; backups are written to a temporary
+  file and renamed.

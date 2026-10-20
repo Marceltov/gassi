@@ -13,3 +13,15 @@ export function useNow(initial: string): number {
   }, [initial]);
   return now;
 }
+
+/** The current time in ms, ticking every `ms` (1 s for a running clock); null until mounted, so server and client agree. */
+export function useTicker(ms = 1000): number | null {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    tick();
+    const id = setInterval(tick, ms);
+    return () => clearInterval(id);
+  }, [ms]);
+  return now;
+}

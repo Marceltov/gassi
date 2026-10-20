@@ -20,5 +20,5 @@ test("a CSV download of every entry, named by today's date", async () => {
   const res = await exportRoute(new Request("https://gassi.example/export.csv", { headers: signedIn() }), open, NOW);
   expect(res.headers.get("content-type")).toBe("text/csv; charset=utf-8");
   expect(res.headers.get("content-disposition")).toBe('attachment; filename="gassi-2026-10-20.csv"');
-  expect(await res.text()).toContain("2026-10-20;11:00;Pipi;;;;Hirsch");
+  expect(await res.text()).toContain("2026-10-20;11:00;Pipi;;;;;;;;;Hirsch");
 });

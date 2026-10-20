@@ -66,3 +66,16 @@ export function formatAgo(thenMs: number, nowMs: number): string {
   const days = Math.floor(hours / 24);
   return days === 1 ? "vor 1 Tag" : `vor ${days} Tagen`;
 }
+
+/** A running clock for `ms` elapsed: "52:13", "1:02:05". */
+export function formatElapsed(ms: number): string {
+  const s = Math.floor(Math.max(0, ms) / 1000);
+  const [h, m, sec] = [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60];
+  return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+
+/** A duration in German: "52 Min.", "1 Std.", "3 Std. 20 Min.". */
+export function formatMinutes(min: number): string {
+  if (min < 60) return `${min} Min.`;
+  return `${Math.floor(min / 60)} Std.${min % 60 ? ` ${min % 60} Min.` : ""}`;
+}

@@ -9,7 +9,7 @@ import { EntryRepository } from "./repository";
 const { db, dataDir } = freshDatabase();
 const NOW = new Date("2026-10-20T10:00:00Z");
 const repo = () => new EntryRepository(db(), () => NOW);
-const entryAt = (at: string, more: Partial<NewEntry> = {}): NewEntry => ({ dogId: 1, type: "walk", at, durationMin: null, amountG: null, note: null, loggedBy: "marcel", ...more });
+const entryAt = (at: string, more: Partial<NewEntry> = {}): NewEntry => ({ dogId: 1, type: "walk", at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: null, loggedBy: "marcel", ...more });
 
 describe("the database", () => {
   test("starts with the configured dog", async () => {
@@ -26,8 +26,8 @@ describe("the database", () => {
 
 describe("EntryRepository", () => {
   test("creates an entry with its timestamps", async () => {
-    const e = await repo().create(entryAt("2026-10-20T09:30:00.000Z", { durationMin: 30, note: "Park" }));
-    expect(e).toEqual<Entry>({ id: 1, dogId: 1, type: "walk", at: "2026-10-20T09:30:00.000Z", durationMin: 30, amountG: null, note: "Park", loggedBy: "marcel", createdAt: NOW.toISOString(), updatedAt: NOW.toISOString() });
+    const e = await repo().create(entryAt("2026-10-20T09:30:00.000Z", { endedAt: "2026-10-20T10:00:00.000Z", note: "Park" }));
+    expect(e).toEqual<Entry>({ id: 1, dogId: 1, type: "walk", at: "2026-10-20T09:30:00.000Z", endedAt: "2026-10-20T10:00:00.000Z", durationMin: 30, amountG: null, foodKind: null, unitG: null, clientKey: null, note: "Park", loggedBy: "marcel", createdAt: NOW.toISOString(), updatedAt: NOW.toISOString() });
     expect(await repo().get(e.id)).toEqual(e);
   });
 
@@ -55,11 +55,38 @@ describe("EntryRepository", () => {
   });
 
   test("edits the fields and stamps updatedAt", async () => {
-    const e = await repo().create(entryAt("2026-10-20T09:00:00.000Z", { durationMin: 20 }));
+    const e = await repo().create(entryAt("2026-10-20T09:00:00.000Z", { endedAt: "2026-10-20T09:20:00.000Z" }));
     const later = new Date("2026-10-20T11:00:00Z");
-    const edited = await new EntryRepository(db(), () => later).update(e.id, { at: "2026-10-20T08:45:00.000Z", durationMin: 25, amountG: null, note: "kurz" });
+    const edited = await new EntryRepository(db(), () => later).update(e.id, { at: "2026-10-20T08:45:00.000Z", endedAt: "2026-10-20T09:10:00.000Z", amountG: null, foodKind: null, unitG: null, note: "kurz" });
     expect(edited).toMatchObject({ at: "2026-10-20T08:45:00.000Z", durationMin: 25, note: "kurz", createdAt: NOW.toISOString(), updatedAt: later.toISOString() });
-    expect(await repo().update(999, { at: e.at, durationMin: null, amountG: null, note: null })).toBeUndefined();
+    expect(await repo().update(999, { at: e.at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: null })).toBeUndefined();
+  });
+
+  test("an ended walk reports its duration", async () => {
+    const e = await repo().create(entryAt("2026-10-20T09:00:00.000Z", { endedAt: "2026-10-20T09:52:00.000Z" }));
+    expect(e.durationMin).toBe(52);
+  });
+
+  test("a running walk has no duration and is found by running(\"walk\")", async () => {
+    const r = repo();
+    await r.create(entryAt("2026-10-20T07:00:00.000Z", { endedAt: "2026-10-20T07:30:00.000Z" }));
+    const running = await r.create(entryAt("2026-10-20T09:00:00.000Z", { clientKey: "w1" }));
+    expect(running.durationMin).toBeNull();
+    expect(await r.running("walk")).toEqual(running);
+    expect(await r.running("training")).toBeUndefined();
+    await r.create(entryAt("2026-10-20T09:30:00.000Z")); // logged afterwards without an end: a moment, not running
+    expect(await r.running("walk")).toEqual(running);
+    expect(await r.byClientKey("w1")).toEqual(running);
+  });
+
+  test("client keys are unique", async () => {
+    await repo().create(entryAt("2026-10-20T09:00:00.000Z", { clientKey: "k" }));
+    await expect(repo().create(entryAt("2026-10-20T09:05:00.000Z", { clientKey: "k" }))).rejects.toThrow();
+  });
+
+  test("food keeps its kind", async () => {
+    const e = await repo().create(entryAt("2026-10-20T09:00:00.000Z", { type: "food", foodKind: "wet", amountG: 200 }));
+    expect(await repo().get(e.id)).toMatchObject({ type: "food", foodKind: "wet", amountG: 200 });
   });
 
   test("deletes", async () => {

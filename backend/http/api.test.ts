@@ -32,8 +32,19 @@ describe("auth", () => {
 });
 
 describe("POST", () => {
+  test("takes the new types and fields: a walk with its end, food with its kind, a weight", async () => {
+    const walk = await post({ loggedBy: "marcel", type: "walk", at: "2026-10-20T08:00:00Z", endedAt: "2026-10-20T08:45:00Z" });
+    expect(await walk.json()).toMatchObject({ type: "walk", endedAt: "2026-10-20T08:45:00.000Z", durationMin: 45, walkers: [] });
+    expect(await (await post({ loggedBy: "marcel", type: "food", foodKind: "dry", amountG: 80 })).json()).toMatchObject({ foodKind: "dry", amountG: 80 });
+    expect((await post({ loggedBy: "marcel", type: "weight", amountG: 12_400 })).status).toBe(201);
+    expect((await post({ loggedBy: "marcel", type: "food", amountG: 80 })).status).toBe(400);
+    expect((await post({ loggedBy: "marcel", type: "walk", at: "2026-10-20T08:00:00Z", endedAt: "2026-10-20T07:00:00Z" })).status).toBe(400);
+    const listed = (await (await get("?type=walk")).json()).entries;
+    expect(listed[0]).toMatchObject({ endedAt: "2026-10-20T08:45:00.000Z", durationMin: 45 });
+  });
+
   test("logs for a known user, now unless `at` is given", async () => {
-    const res = await post({ loggedBy: "bille", type: "food", amountG: 150 });
+    const res = await post({ loggedBy: "bille", type: "food", foodKind: "wet", amountG: 150 });
     expect(res.status).toBe(201);
     expect(await res.json()).toMatchObject({ type: "food", amountG: 150, at: NOW.toISOString(), loggedBy: "bille", byName: "Herzii" });
   });
