@@ -19,10 +19,9 @@ import type { Entry } from "./entries/model";
 import { EntryRepository } from "./entries/repository";
 import { type Names, PeopleRepository } from "./people";
 
-export type Person = { username: string; name: string };
-export type WalkView = { key: string; startedAt: string; walkers: Person[]; pauses: { startedAt: string; endedAt: string | null }[]; paused: boolean };
-export type TrainingView = { key: string; startedAt: string; walkKey: string | null; exercises: number[]; treats: Record<number, number> };
-export type SessionsView = { walk: WalkView | null; training: TrainingView | null };
+import type { Person, SessionsView, TrainingView, WalkView } from "../shared/sessionProjection";
+
+export type { Person, SessionsView, TrainingView, WalkView };
 
 export type TrainingSummary = { min: number; exercises: string[]; treats: { name: string; count: number }[] };
 export type WalkSummary = {
