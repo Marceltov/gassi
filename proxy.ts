@@ -3,7 +3,7 @@ import { SESSION_COOKIE, config as appConfig, sessionUser } from "@/backend";
 
 // Paths anyone may load: the login page and its sign-in routes, the probe, and what the browser fetches for the
 // installed app (manifest, icons, service worker, offline page). Everything else needs a session.
-const PUBLIC = /^\/(login|health|logout|offline|manifest\.webmanifest|sw\.js|favicon\.ico|icon[\w.-]*|apple-icon[\w.-]*)$|^\/api\//;
+const PUBLIC = /^\/(login|health|logout|offline\.html|manifest\.webmanifest|sw\.js|favicon\.ico|icon[\w.-]*|apple-icon[\w.-]*)$|^\/api\//;
 
 // Signed-out page requests go to /login?next=<path>. Other methods pass: server actions and route handlers check the
 // session themselves.
