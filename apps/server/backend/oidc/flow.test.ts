@@ -46,21 +46,21 @@ test("authorizeUrl asks for a code with PKCE S256, state, nonce and the scopes",
 });
 
 describe("exchange", () => {
-  test("sends the code with the verifier and returns the preferred_username and name", async () => {
+  test("sends the code with the verifier and returns the subject and name", async () => {
     const f = stubIssuer(P.nonce);
-    expect(await exchange(CLIENT, META, P, f, NOW)).toEqual({ username: "marcel", name: "Hirsch" });
+    expect(await exchange(CLIENT, META, P, f, NOW)).toEqual({ subject: "sub-marcel", name: "Hirsch" });
     const [, init] = f.mock.calls[0];
     expect(Object.fromEntries(new URLSearchParams(String(init!.body)))).toMatchObject({ grant_type: "authorization_code", code: "the-code", code_verifier: "the-verifier", client_id: "gassi", client_secret: "client-secret", redirect_uri: P.redirectUri });
   });
 
   test("several audiences need azp to name this client", async () => {
     const f = stubIssuer(P.nonce, { claims: (n) => goodClaims(n, { aud: ["gassi", "other"], azp: "gassi" }) });
-    expect(await exchange(CLIENT, META, P, f, NOW)).toMatchObject({ username: "marcel" });
+    expect(await exchange(CLIENT, META, P, f, NOW)).toMatchObject({ subject: "sub-marcel" });
   });
 
-  test.each([undefined, "", "  "])("without a name (%j) the username is the name", async (name) => {
+  test.each([undefined, "", "  "])("without a name (%j) the preferred_username is the name", async (name) => {
     const f = stubIssuer(P.nonce, { claims: (n) => goodClaims(n, { name }) });
-    expect(await exchange(CLIENT, META, P, f, NOW)).toEqual({ username: "marcel", name: "marcel" });
+    expect(await exchange(CLIENT, META, P, f, NOW)).toEqual({ subject: "sub-marcel", name: "marcel" });
   });
 
   test.each<[string, Record<string, unknown>]>([
@@ -71,7 +71,7 @@ describe("exchange", () => {
     ["exp in the past", { exp: NOW / 1000 }],
     ["exp missing", { exp: undefined }],
     ["nonce", { nonce: "another-nonce" }],
-    ["preferred_username missing", { preferred_username: undefined }],
+    ["sub missing", { sub: undefined }],
   ])("a bad %s fails", async (_, bad) => {
     await expect(exchange(CLIENT, META, P, stubIssuer(P.nonce, { claims: (n) => goodClaims(n, bad) }), NOW)).rejects.toThrow(AuthError);
   });

@@ -2,6 +2,7 @@
 // (enforced in eslint.config.mjs). Pages and actions call the use cases here; route handlers are mounted as they are.
 import { config } from "./config";
 import { database } from "./db/open";
+import { type Mailer, smtpMailer } from "./auth/mail";
 import { apiRouter } from "./http/api";
 import { type Landing, landing } from "./http/landing";
 import { commandsRoute } from "./http/commands";
@@ -22,9 +23,13 @@ export const oidcCallback = logged((req) => oidcCallbackRoute(req));
 export const logout = logged(() => logoutRoute());
 export const exportCsv = logged((req) => exportRoute(req));
 export const commands = logged((req) => commandsRoute(req));
+// One SMTP transport per process (it pools connections).
+let cachedMailer: { url: string; mailer: Mailer } | null = null;
+const mailer = (smtp: { url: string; from: string }): Mailer => (cachedMailer?.url === smtp.url ? cachedMailer : (cachedMailer = { url: smtp.url, mailer: smtpMailer(smtp) })).mailer;
+
 export const api = logged(async (req) => {
   const { publicUrl, oidc, smtp } = config();
-  return apiRouter({ db: await database(), now: () => new Date(), publicUrl, oidc: oidc !== null, mail: smtp !== null })(req);
+  return apiRouter({ db: await database(), now: () => new Date(), publicUrl, oidc: oidc !== null, mailer: smtp && mailer(smtp) })(req);
 });
 
 // The use cases (backend/diary.ts) and what they hand out.

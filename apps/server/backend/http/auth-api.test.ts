@@ -5,7 +5,7 @@ import { apiRouter, type ApiDeps } from "./api";
 
 const { db } = freshDatabase();
 const NOW = new Date("2026-10-20T10:00:00Z");
-const deps = (more: Partial<ApiDeps> = {}): ApiDeps => ({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", oidc: false, mail: false, ...more });
+const deps = (more: Partial<ApiDeps> = {}): ApiDeps => ({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", oidc: false, mailer: null, ...more });
 const call = (path: string, init: { method?: string; token?: string; body?: unknown } = {}, more: Partial<ApiDeps> = {}) =>
   apiRouter(deps(more))(
     new Request(`https://gassi.example${path}`, {
@@ -59,5 +59,26 @@ describe("invites over the API", () => {
     const token = await hirschPhone();
     expect(await (await call("/api/me", { method: "PATCH", token, body: { name: "Marcel", email: "marcel@example.org" } })).json()).toEqual({ person: { id: HIRSCH.id, name: "Marcel", email: "marcel@example.org" } });
     expect((await call("/api/me", { method: "PATCH", token, body: { email: "kein-mail" } })).status).toBe(400);
+  });
+});
+
+describe("magic links over the API", () => {
+  test("without SMTP the request is refused", async () => {
+    const res = await call("/api/auth/magic", { method: "POST", body: { email: "marcel@example.org" } });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "E-Mail ist auf diesem Server nicht eingerichtet." });
+  });
+
+  test("with SMTP every address gets the same answer; a known one gets the mail", async () => {
+    const sent: string[] = [];
+    const mailer = { send: async (to: string) => void sent.push(to) };
+    const token = await hirschPhone();
+    await call("/api/me", { method: "PATCH", token, body: { email: "marcel@example.org" } });
+    for (const email of ["marcel@example.org", "nobody@example.org"]) {
+      const res = await call("/api/auth/magic", { method: "POST", body: { email } }, { mailer });
+      expect(await res.json()).toEqual({ sent: true });
+    }
+    expect(sent).toEqual(["marcel@example.org"]);
+    expect(await (await call("/api/me", { token }, { mailer })).json()).toMatchObject({ household: { mail: true } });
   });
 });

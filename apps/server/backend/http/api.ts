@@ -1,17 +1,23 @@
 // The implementations of the API contract, each a thin call into a use case.
 import { Devices } from "../auth/devices";
 import { appLink, INVITE_TTL, Links } from "../auth/links";
+import { type Mailer, sendMagicLink } from "../auth/mail";
 import { InputError } from "../errors";
 import { PeopleRepository } from "../people";
 import type { DB } from "../db/open";
 import { type Implementations, NotFound, router } from "./router";
 
-export type ApiDeps = { db: DB; now: () => Date; publicUrl: string; oidc: boolean; mail: boolean };
+export type ApiDeps = { db: DB; now: () => Date; publicUrl: string; oidc: boolean; mailer: Mailer | null };
 
 const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl);
 
 const implementations: Implementations<ApiDeps> = {
   redeem: async ({ input, deps }) => links(deps).redeem(input.token, input),
+  magicLink: async ({ input, deps }) => {
+    if (!deps.mailer) throw new InputError("E-Mail ist auf diesem Server nicht eingerichtet.");
+    await sendMagicLink(deps.db, deps.now, deps.publicUrl, deps.mailer, input.email);
+    return { sent: true as const };
+  },
   createInvite: async ({ input, auth, deps }) => {
     // with an OIDC provider, the provider decides who is in: invites only add devices of existing members
     if (input.kind === "person" && deps.oidc) throw new InputError("Neue Personen kommen über die Anmeldung herein.");
@@ -24,7 +30,7 @@ const implementations: Implementations<ApiDeps> = {
     return { revoked: true as const };
   },
   updateMe: async ({ input, auth, deps }) => ({ person: await new PeopleRepository(deps.db, deps.now).update(auth.person.id, input) }),
-  me: async ({ auth, deps }) => ({ person: auth.person, device: auth.device, household: { oidc: deps.oidc, mail: deps.mail } }),
+  me: async ({ auth, deps }) => ({ person: auth.person, device: auth.device, household: { oidc: deps.oidc, mail: deps.mailer !== null } }),
   devices: async ({ auth, deps }) => ({
     devices: (await new Devices(deps.db, deps.now).list(auth.person.id)).map((d) => ({ ...d, current: d.id === auth.device.id })),
   }),

@@ -10,19 +10,32 @@ import { config } from "../config";
 import { secret } from "../secret";
 import { database } from "../db/open";
 import { safeNext, seeOther } from "../http/responses";
+import { appLink as appLinkFor, Links, MAGIC_TTL } from "../auth/links";
 import { PeopleRepository } from "../people";
 import { authorizeUrl, type Client, discover, exchange } from "./flow";
 import { AuthError, errorCode, fail, log } from "./log";
 
 /** Outside calls: the provider (`fetch`), the clock, and where a signed-in person's name is kept. */
-export type OidcDeps = { fetch: typeof fetch; now: () => number; remember: (claims: { subject: string; name: string }) => Promise<User> };
+export type OidcDeps = {
+  fetch: typeof fetch;
+  now: () => number;
+  remember: (claims: { subject: string; name: string }) => Promise<User>;
+  /** A one-time link (gassi://join…) that signs a new device of `personId` in: how the app's sign-in ends. */
+  appLink: (personId: string) => Promise<string>;
+};
 const defaultDeps: OidcDeps = {
   fetch: (...args) => fetch(...args),
   now: () => Date.now(),
   remember: async (claims) => new PeopleRepository(await database()).signInOidc(claims),
+  appLink: async (personId) => {
+    const { publicUrl } = config();
+    const { token } = await new Links(await database(), () => new Date(), publicUrl).create({ kind: "device", personId, ttlMs: MAGIC_TTL });
+    return appLinkFor(publicUrl, token);
+  },
 };
 
-type Flight = { state: string; nonce: string; verifier: string; next: string };
+// `app`: the sign-in was started by the app, so it ends in the app (a one-time link) instead of with a cookie.
+type Flight = { state: string; nonce: string; verifier: string; next: string; app: boolean };
 
 const FLIGHT_COOKIE = "gassi_oidc";
 const FLIGHT_PATH = "/api/oidc";
@@ -55,7 +68,8 @@ export async function oidcStartRoute(req: Request, deps: OidcDeps = defaultDeps)
     if (e instanceof AuthError) return loginFailed(next);
     throw e;
   }
-  const flight: Flight = { state: random(16), nonce: random(16), verifier: random(32), next };
+  const app = new URL(req.url).searchParams.get("app") === "1";
+  const flight: Flight = { state: random(16), nonce: random(16), verifier: random(32), next, app };
   const to = authorizeUrl(client(), meta, { redirectUri: redirectUri(), state: flight.state, nonce: flight.nonce, challenge: challengeOf(flight.verifier) });
   return seeOther(to, { "Set-Cookie": flightCookie(signer(secret(config().secret, config().dataDir)).sign("oidc", flight, FLIGHT_TTL, deps.now())) });
 }
@@ -67,8 +81,7 @@ async function signIn(params: URLSearchParams, flight: Flight | null, deps: Oidc
   if (!flight || state === null || !safeEqual(state, flight.state)) fail("state mismatch or missing sign-in cookie");
   if (!code) fail("no code in the callback");
   const meta = await discover(client(), deps.fetch, deps.now());
-  const who = await exchange(client(), meta, { code, redirectUri: redirectUri(), verifier: flight.verifier, nonce: flight.nonce }, deps.fetch, deps.now());
-  return { subject: who.username, name: who.name };
+  return exchange(client(), meta, { code, redirectUri: redirectUri(), verifier: flight.verifier, nonce: flight.nonce }, deps.fetch, deps.now());
 }
 
 export async function oidcCallbackRoute(req: Request, deps: OidcDeps = defaultDeps): Promise<Response> {
@@ -83,6 +96,11 @@ export async function oidcCallbackRoute(req: Request, deps: OidcDeps = defaultDe
   }
   const user = await deps.remember(claims);
   log.info("sign-in succeeded"); // never who
+  if (flight?.app) {
+    const res = seeOther(await deps.appLink(user.id));
+    res.headers.append("Set-Cookie", noFlightCookie());
+    return res;
+  }
   const res = seeOther(next, { "Set-Cookie": sessionCookie(user, deps.now()) });
   res.headers.append("Set-Cookie", noFlightCookie());
   return res;

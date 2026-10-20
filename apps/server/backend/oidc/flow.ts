@@ -97,11 +97,12 @@ function checkClaims(client: Client, c: Record<string, unknown>, meta: Meta, non
 
 export type ExchangeParams = { code: string; redirectUri: string; verifier: string; nonce: string };
 
-// The display name: authentik's `name`, else the username.
-const displayName = (c: Record<string, unknown>, username: string) => (typeof c.name === "string" && c.name.trim() ? c.name.trim() : username);
+// The display name: the provider's `name`, else `preferred_username`, else a placeholder the person can change.
+const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+const displayName = (c: Record<string, unknown>) => text(c.name) ?? text(c.preferred_username) ?? "Gassi-Nutzer";
 
-/** Trades the code for an id_token and returns who it names: `preferred_username` and the display name. */
-export async function exchange(client: Client, meta: Meta, p: ExchangeParams, fetchFn: Fetch = fetch, now = Date.now()): Promise<{ username: string; name: string }> {
+/** Trades the code for an id_token and returns who it names: the stable subject (`sub`) and a display name. */
+export async function exchange(client: Client, meta: Meta, p: ExchangeParams, fetchFn: Fetch = fetch, now = Date.now()): Promise<{ subject: string; name: string }> {
   const body = new URLSearchParams({ grant_type: "authorization_code", code: p.code, redirect_uri: p.redirectUri, code_verifier: p.verifier, client_id: client.clientId, client_secret: client.clientSecret });
   const headers = { accept: "application/json", "content-type": "application/x-www-form-urlencoded" };
   const res = await getJson(fetchFn, meta.token_endpoint, { method: "POST", headers, body }, "token request rejected");
@@ -109,7 +110,7 @@ export async function exchange(client: Client, meta: Meta, p: ExchangeParams, fe
   // 3.1.3.7 lets stand in for it. Verify against the provider's JWKS if tokens ever arrive another way.
   const claims = payload(res.id_token);
   checkClaims(client, claims, meta, p.nonce, now);
-  const username = claims.preferred_username;
-  if (typeof username !== "string" || username === "") fail("id_token has no preferred_username");
-  return { username, name: displayName(claims, username) };
+  const subject = claims.sub;
+  if (typeof subject !== "string" || subject === "") fail("id_token has no sub");
+  return { subject, name: displayName(claims) };
 }

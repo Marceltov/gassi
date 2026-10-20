@@ -42,6 +42,13 @@ export const contract = {
     }),
     output: z.object({ deviceToken: z.string(), person: personSchema, device: deviceSchema }),
   }),
+  magicLink: endpoint({
+    method: "POST",
+    path: "/api/auth/magic",
+    auth: false,
+    input: z.object({ email: z.string().trim().min(3).max(200) }),
+    output: z.object({ sent: z.literal(true) }),
+  }),
   createInvite: endpoint({
     method: "POST",
     path: "/api/invites",

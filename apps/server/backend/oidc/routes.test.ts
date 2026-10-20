@@ -13,18 +13,23 @@ const cookies = (res: Response) => res.headers.getSetCookie();
 const cookieValue = (res: Response, name: string) => cookies(res).find((c) => c.startsWith(`${name}=`))?.split(";")[0].slice(name.length + 1);
 
 // Starts a sign-in and returns what the callback needs: the flight cookie and the state/nonce the provider was sent.
-async function start(next?: string, o: StubOptions = {}) {
+async function start(next?: string, o: StubOptions = {}, app = false) {
   const fetch = stubIssuer("", o);
-  const res = await oidcStartRoute(new Request(`${BASE}/api/oidc/start${next ? `?next=${encodeURIComponent(next)}` : ""}`), { fetch, now: () => NOW, remember: vi.fn() });
+  const query = new URLSearchParams({ ...(next ? { next } : {}), ...(app ? { app: "1" } : {}) });
+  const res = await oidcStartRoute(new Request(`${BASE}/api/oidc/start${query.size ? `?${query}` : ""}`), { fetch, now: () => NOW, remember: vi.fn(), appLink: vi.fn() });
   const to = new URL(res.headers.get("location")!);
   return { res, to, flight: cookieValue(res, "gassi_oidc")!, state: to.searchParams.get("state")!, nonce: to.searchParams.get("nonce")! };
 }
 
 let remember: ReturnType<typeof vi.fn<OidcDeps["remember"]>>;
-beforeEach(() => void (remember = vi.fn<OidcDeps["remember"]>(async (c) => ({ id: `p-${c.subject}`, name: c.name }))));
+let appLink: ReturnType<typeof vi.fn<OidcDeps["appLink"]>>;
+beforeEach(() => {
+  remember = vi.fn<OidcDeps["remember"]>(async (c) => ({ id: `p-${c.subject}`, name: c.name }));
+  appLink = vi.fn<OidcDeps["appLink"]>(async (personId) => `gassi://join?server=x&token=for-${personId}`);
+});
 
 function callback(flight: string | undefined, query: Record<string, string>, nonce: string, o: StubOptions = {}) {
-  const deps: OidcDeps = { fetch: stubIssuer(nonce, o), now: () => NOW, remember };
+  const deps: OidcDeps = { fetch: stubIssuer(nonce, o), now: () => NOW, remember, appLink };
   const headers = flight ? { cookie: `gassi_oidc=${flight}` } : undefined;
   return oidcCallbackRoute(new Request(`${BASE}/api/oidc/callback?${new URLSearchParams(query)}`, { headers }), deps);
 }
@@ -40,20 +45,29 @@ describe("start", () => {
   });
 
   test("an unreachable provider goes back to the login page with an error", async () => {
-    const res = await oidcStartRoute(new Request(`${BASE}/api/oidc/start?next=/verlauf`), { fetch: async () => Promise.reject(new TypeError("down")), now: () => NOW, remember: vi.fn() });
+    const res = await oidcStartRoute(new Request(`${BASE}/api/oidc/start?next=/verlauf`), { fetch: async () => Promise.reject(new TypeError("down")), now: () => NOW, remember: vi.fn(), appLink: vi.fn() });
     expect(res.headers.get("location")).toBe("/login?error=1&next=%2Fverlauf");
   });
 });
 
 describe("callback", () => {
+  test("the app's sign-in ends in the app with a one-time link, not a cookie", async () => {
+    const { flight, state, nonce } = await start(undefined, {}, true);
+    const res = await callback(flight, { state, code: "c" }, nonce);
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toBe("gassi://join?server=x&token=for-p-sub-marcel");
+    expect(cookieValue(res, "gassi_session")).toBeUndefined();
+    expect(appLink).toHaveBeenCalledWith("p-sub-marcel");
+  });
+
   test("signs in whoever authentik names, remembers their name and goes where the sign-in started", async () => {
     const { flight, state, nonce } = await start("/verlauf?type=walk");
     const res = await callback(flight, { state, code: "c" }, nonce);
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("/verlauf?type=walk");
-    expect(sessionUser(cookieValue(res, "gassi_session"), NOW)).toEqual({ id: "p-marcel", name: "Hirsch" });
+    expect(sessionUser(cookieValue(res, "gassi_session"), NOW)).toEqual({ id: "p-sub-marcel", name: "Hirsch" });
     expect(cookieValue(res, "gassi_oidc")).toBe("");
-    expect(remember).toHaveBeenCalledWith({ subject: "marcel", name: "Hirsch" });
+    expect(remember).toHaveBeenCalledWith({ subject: "sub-marcel", name: "Hirsch" });
   });
 
   test("a state that doesn't match the flight fails", async () => {
@@ -82,9 +96,9 @@ describe("callback", () => {
 
   test("anyone authentik signs in gets a session, under their own name", async () => {
     const { flight, state, nonce } = await start();
-    const res = await callback(flight, { state, code: "c" }, nonce, { claims: (n) => goodClaims(n, { preferred_username: "gast", name: "Gast" }) });
-    expect(sessionUser(cookieValue(res, "gassi_session"), NOW)).toEqual({ id: "p-gast", name: "Gast" });
-    expect(remember).toHaveBeenCalledWith({ subject: "gast", name: "Gast" });
+    const res = await callback(flight, { state, code: "c" }, nonce, { claims: (n) => goodClaims(n, { sub: "sub-gast", preferred_username: "gast", name: "Gast" }) });
+    expect(sessionUser(cookieValue(res, "gassi_session"), NOW)).toEqual({ id: "p-sub-gast", name: "Gast" });
+    expect(remember).toHaveBeenCalledWith({ subject: "sub-gast", name: "Gast" });
   });
 
   test.each(["//evil.example", "https://evil.example/", "/\\evil.example"])("an open redirect in next (%j) goes home instead", async (next) => {

@@ -5,7 +5,7 @@ import { apiRouter } from "./api";
 
 const { db } = freshDatabase();
 const NOW = new Date("2026-10-20T10:00:00Z");
-const handle = () => apiRouter({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", oidc: false, mail: false });
+const handle = () => apiRouter({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", oidc: false, mailer: null });
 const call = (path: string, init: RequestInit & { token?: string } = {}) =>
   handle()(new Request(`https://gassi.example${path}`, { ...init, headers: { "content-type": "application/json", ...(init.token ? { authorization: `Bearer ${init.token}` } : {}) } }));
 const phone = () => new Devices(db(), () => NOW).create(HIRSCH.id, { kind: "phone", name: "iPhone" });
