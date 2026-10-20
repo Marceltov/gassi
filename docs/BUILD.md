@@ -258,3 +258,14 @@ Built from a local spec and plan (brainstormed on 2026-10-20); the lasting decis
   include walks/trainings that overlap the day/week; the phone's queue re-reads storage (shared by tabs) and drops a
   batch the server refuses with 400; `applied_command` forgets ids after 30 days; backups are written to a temporary
   file and renamed.
+
+## Navigation on the way (issue #7)
+
+From a Playwright walkthrough of 0.2. **Leash bar:** while a walk runs, a strip above the bottom nav on every screen but
+`/runde` with the walk's clock (one tap back to it) and, for walkers, Pipi and Poopoo; while only a training runs it
+shows the training. It sets `data-dock` on `<html>`; `--chrome` (globals.css) keeps pages, toasts and the sticky
+"Training fertig" clear of the bars. **Heute:** Gassi is the large card (start, time since the last walk, pee and
+poop); Futter and Training next; Pipi and Poopoo "Zwischendurch" (hidden for whoever is on a walk, the leash bar has
+them). **Wayfinding:** sub-pages mark their tab (Runde/Training → Heute, Gewicht/Vorrat → Woche, Einstellungen → Menü)
+and have "Zurück" (history, else a fixed parent); the menu closes on outside tap, Escape and navigation; "Fertig"
+after a walk replaces the history entry; Gewicht and Vorrat sit under the Woche header.

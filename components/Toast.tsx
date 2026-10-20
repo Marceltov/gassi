@@ -15,7 +15,7 @@ export function Toast({ toast, onDismiss }: { toast: ToastMessage | null; onDism
   }, [toast, onDismiss]);
   if (!toast) return null;
   return (
-    <div role="status" className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl bg-ink py-2 pr-2 pl-5 text-bg shadow-lg">
+    <div role="status" className="fixed inset-x-4 bottom-[calc(var(--chrome)+0.5rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl bg-ink py-2 pr-2 pl-5 text-bg shadow-lg">
       <span className="font-semibold">{toast.text}</span>
       {toast.action && (
         <button type="button" onClick={toast.action.run} className="min-h-12 rounded-xl px-4 font-bold underline-offset-4 hover:underline">

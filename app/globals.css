@@ -55,6 +55,16 @@
   --color-training: var(--training);
 }
 
+/* How much of the screen's bottom the fixed bars take: the nav, and the leash bar above it while a walk or training
+   runs (it sets data-dock on <html>). Page padding, toasts and sticky buttons keep clear of both. */
+:root {
+  --chrome: 4.5rem;
+}
+
+:root[data-dock] {
+  --chrome: 8.75rem;
+}
+
 html {
   color-scheme: light dark;
   -webkit-tap-highlight-color: transparent;

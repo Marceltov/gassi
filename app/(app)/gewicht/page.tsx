@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { diary } from "@/backend";
+import { BackButton } from "@/components/BackButton";
 import { formatKg } from "@/components/entryStyle";
 import { WeightChart } from "@/components/WeightChart";
 import { WeightForm } from "@/components/WeightForm";
@@ -17,6 +18,7 @@ export default async function Weight() {
   return (
     <>
       <header className="mb-4">
+        <BackButton fallback="/woche" />
         <h1 className="text-3xl font-extrabold tracking-tight">Gewicht</h1>
         <p className="text-muted">{last ? `${formatKg(last.amountG ?? 0)} am ${dayMonth(last.at, d.timeZone)}` : `Noch kein Gewicht von ${d.dogName} eingetragen.`}</p>
       </header>

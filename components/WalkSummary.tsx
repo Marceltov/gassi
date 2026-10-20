@@ -19,7 +19,7 @@ export function WalkSummary({ summary, timeZone, pending }: { summary: Summary |
       </h1>
       {summary ? <Details summary={summary} timeZone={timeZone} /> : <p className="text-lg text-muted">Die Zusammenfassung kommt, sobald alles gesendet ist.</p>}
       <PendingHint count={pending} />
-      <Link href="/" className="flex min-h-14 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-primary-ink">
+      <Link href="/" replace className="flex min-h-14 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-primary-ink">
         Fertig
       </Link>
     </section>

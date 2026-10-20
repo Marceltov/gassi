@@ -14,7 +14,7 @@ const range = (monday: string) => {
 };
 
 const arrow = "flex size-12 items-center justify-center rounded-full border border-line bg-surface";
-const link = "flex min-h-14 flex-1 items-center justify-center gap-2 rounded-2xl border border-line bg-surface text-lg font-bold";
+const link = "flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl border border-line bg-surface text-lg font-bold";
 
 export default async function Week({ searchParams }: PageProps<"/woche">) {
   const d = await diary();
@@ -33,9 +33,7 @@ export default async function Week({ searchParams }: PageProps<"/woche">) {
           <IconChevronRight size={24} aria-hidden />
         </Link>
       </header>
-      <WeekSums week={week} />
-      <WeekStrips week={week} />
-      <div className="mt-6 flex gap-3">
+      <div className="mb-4 flex gap-3">
         <Link href="/gewicht" className={link}>
           <IconScale size={24} aria-hidden /> Gewicht
         </Link>
@@ -43,6 +41,8 @@ export default async function Week({ searchParams }: PageProps<"/woche">) {
           <IconBuildingWarehouse size={24} aria-hidden /> Vorrat
         </Link>
       </div>
+      <WeekSums week={week} />
+      <WeekStrips week={week} />
     </>
   );
 }
