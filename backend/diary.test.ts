@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { parseUsers } from "./config";
 import { freshDatabase } from "./db/testing";
-import { Diary, HISTORY_PAGE, InputError } from "./diary";
+import { Diary, HISTORY_PAGE, historyFilter, InputError } from "./diary";
 
 const { db } = freshDatabase();
 const HIRSCH = { username: "marcel", name: "Hirsch" };
@@ -65,4 +65,11 @@ test("history pages by 50 and says when there is more", async () => {
   expect(second.more).toBe(false);
   expect((await d.history({ by: "bille" })).entries).toHaveLength(1);
   expect((await d.history({ type: "food" })).entries[0].byName).toBe("Herzii");
+});
+
+test("historyFilter keeps only known types and people", () => {
+  const users = parseUsers("marcel:Hirsch");
+  expect(historyFilter({ type: "walk", by: "marcel" }, users)).toEqual({ type: "walk", by: "marcel" });
+  expect(historyFilter({ type: "bark", by: "mallory" }, users)).toEqual({});
+  expect(historyFilter({ type: ["walk"], by: 1 }, users)).toEqual({});
 });

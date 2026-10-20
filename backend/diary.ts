@@ -2,7 +2,7 @@
 // history. It hides the database, the one dog of v1, the time zone and display names. Input from outside is
 // validated here (zod); a problem is an InputError with a German message the screen can show.
 import { z } from "zod";
-import { type EntryType, TILE_TYPES } from "../shared/entryTypes";
+import { type EntryType, isEntryType, TILE_TYPES } from "../shared/entryTypes";
 import { dayBounds } from "../shared/time";
 import type { User } from "./auth/session";
 import { config, type Users } from "./config";
@@ -26,6 +26,14 @@ export type HistoryFilter = { type?: EntryType; by?: string };
 export type HistoryPage = { entries: EntryView[]; more: boolean };
 
 export const HISTORY_PAGE = 50;
+
+/** The history filter from untrusted values (search params, an action's argument): anything unknown is left out. */
+export function historyFilter(raw: { type?: unknown; by?: unknown }, users: Users = config().users): HistoryFilter {
+  return {
+    ...(isEntryType(raw.type) ? { type: raw.type } : {}),
+    ...(typeof raw.by === "string" && users.has(raw.by) ? { by: raw.by } : {}),
+  };
+}
 
 export class InputError extends Error {
   constructor(message: string) {
