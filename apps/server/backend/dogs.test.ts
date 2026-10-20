@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { freshDatabase } from "./db/testing";
-import { DogRepository } from "./dogs";
+import { DogRepository, ensureFirstDog } from "./dogs";
 import { InputError } from "./errors";
 
 const { db } = freshDatabase({ empty: true });
@@ -20,6 +20,20 @@ describe("DogRepository", () => {
     await expect(dogs().add({ name: "", color: "#000000" })).rejects.toThrow(new InputError("Der Name muss 1 bis 30 Zeichen lang sein."));
     await expect(dogs().add({ name: "x".repeat(31), color: "#000000" })).rejects.toThrow(InputError);
     await expect(dogs().add({ name: "Bruno", color: "blau" })).rejects.toThrow(new InputError("Die Farbe stimmt nicht."));
+  });
+
+  test("the last active dog can't be archived", async () => {
+    const toffee = await dogs().add({ name: "Toffee", color: "#c0813a" });
+    await expect(dogs().update(toffee.id, { archived: true })).rejects.toThrow(new InputError("Mindestens ein Hund muss bleiben."));
+    const bruno = await dogs().add({ name: "Bruno", color: "#3a6fc0" });
+    expect(await dogs().update(toffee.id, { archived: true })).toMatchObject({ archived: true });
+    await expect(dogs().update(bruno.id, { archived: true })).rejects.toThrow(InputError);
+  });
+
+  test("the first OIDC sign-in into a household without dogs brings a first dog", async () => {
+    expect(await ensureFirstDog(db(), null, () => new Date())).toMatchObject({ name: "Mein Hund" });
+    expect(await ensureFirstDog(db(), "Toffee", () => new Date())).toBeNull(); // there is one already
+    expect(await dogs().list()).toHaveLength(1);
   });
 
   test("a fresh database has no dogs (setup creates the first)", async () => {

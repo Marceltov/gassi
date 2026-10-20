@@ -1,4 +1,4 @@
-// A QR code as inline SVG in the page's text colour, so it shows in light and dark mode.
+// A QR code as inline SVG drawn in currentColor; the page shows it dark on white in both themes (inverted codes scan badly).
 import QRCode from "qrcode";
 
 export async function qrSvg(text: string): Promise<string> {

@@ -11,7 +11,7 @@ describe("parseConfig", () => {
       secret: null,
       oidc: null,
       smtp: null,
-      defaultDogName: "Toffee",
+      defaultDogName: null,
       dataDir: "./data",
       timeZone: "Europe/Berlin",
       logLevel: "info",
@@ -21,7 +21,10 @@ describe("parseConfig", () => {
 
   test("OIDC is all three or none", () => {
     expect(parseConfig({ ...ENV, ...OIDC }).oidc).toEqual({ issuer: OIDC.OIDC_ISSUER, clientId: "gassi", clientSecret: "client-secret" });
-    expect(() => parseConfig({ ...ENV, OIDC_ISSUER: OIDC.OIDC_ISSUER })).toThrow("OIDC_CLIENT_ID and OIDC_CLIENT_SECRET are needed with OIDC_ISSUER");
+    const together = "OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET go together";
+    expect(() => parseConfig({ ...ENV, OIDC_ISSUER: OIDC.OIDC_ISSUER })).toThrow(together);
+    expect(() => parseConfig({ ...ENV, OIDC_CLIENT_ID: "gassi" })).toThrow(together);
+    expect(() => parseConfig({ ...ENV, OIDC_CLIENT_ID: "gassi", OIDC_CLIENT_SECRET: "s" })).toThrow(together);
   });
 
   test("SMTP_URL alone is enough for mail; MAIL_FROM defaults to gassi@ the server's host", () => {
@@ -30,7 +33,8 @@ describe("parseConfig", () => {
   });
 
   test("an empty optional variable means its default", () => {
-    expect(parseConfig({ ...ENV, DOG_NAME: "", SECRET: "", SMTP_URL: "" })).toMatchObject({ defaultDogName: "Toffee", secret: null, smtp: null });
+    expect(parseConfig({ ...ENV, DOG_NAME: "", SECRET: "", SMTP_URL: "" })).toMatchObject({ defaultDogName: null, secret: null, smtp: null });
+    expect(parseConfig({ ...ENV, DOG_NAME: " Toffee " }).defaultDogName).toBe("Toffee");
   });
 
   test("a missing PUBLIC_URL says it is required", () => {

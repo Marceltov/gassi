@@ -32,6 +32,25 @@ describe("setup", () => {
     expect(await new Devices(db(), () => clock).authenticate(`Bearer ${r.deviceToken}`)).toMatchObject({ person: r.person, device: { kind: "phone", name: "iPhone" } });
   });
 
+  test("setup takes DOG_NAME when the dog's name isn't given", async () => {
+    const { token } = await new Links(db(), () => clock, URL_, "Bello").create({ kind: "setup", ttlMs: DAY });
+    await new Links(db(), () => clock, URL_, "Bello").redeem(token, { deviceKind: "phone", deviceName: "iPhone", personName: "Hirsch" });
+    expect(await db().selectFrom("dog").select("name").execute()).toEqual([{ name: "Bello" }]);
+  });
+
+  test("a rejected redeem leaves nothing behind", async () => {
+    const { token } = await links().create({ kind: "setup", ttlMs: DAY });
+    await expect(links().redeem(token, { deviceKind: "phone", deviceName: "iPhone", personName: "Hirsch" })).rejects.toThrow(InputError);
+    for (const table of ["person", "dog", "device"] as const) expect(await db().selectFrom(table).selectAll().execute()).toEqual([]);
+    expect(await links().peek(token)).toEqual({ kind: "setup", valid: true });
+  });
+
+  test("with OIDC there is no setup link: the provider lets the first person in", async () => {
+    const lines: string[] = [];
+    expect(await ensureSetupLink(db(), URL_, (l) => lines.push(l), () => clock, { oidc: true })).toBeNull();
+    expect(lines).toEqual(["Gassi wird über OIDC eingerichtet: die erste Anmeldung über den Anbieter legt den Haushalt an."]);
+  });
+
   test("setup needs a name and the dog's name", async () => {
     const { token } = await links().create({ kind: "setup", ttlMs: DAY });
     await expect(links().redeem(token, { deviceKind: "phone", deviceName: "iPhone", personName: "", dogName: "Toffee" })).rejects.toThrow(new InputError("Wie heißt du?"));

@@ -20,7 +20,7 @@ export async function startup(): Promise<void> {
   await ensureSetupLink(db, publicUrl, (line) => {
     process.stdout.write(`${line}\n`);
     if (setupLinkFile) appendFileSync(setupLinkFile, `${line}\n`);
-  });
+  }, undefined, { oidc: oidc !== null });
   if (state.started) return;
   state.started = true;
   const log = logger("backup");

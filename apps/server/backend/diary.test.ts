@@ -6,6 +6,7 @@ import { Sessions } from "./sessions";
 
 const { db } = freshDatabase();
 const HIRSCH = { id: "marcel", name: "Hirsch" };
+const HERZII = { id: "bille", name: "Herzii" };
 let clock = new Date("2026-10-20T10:00:00Z");
 const diary = () => new Diary({ db: db(), names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), timeZone: "Europe/Berlin", now: () => clock });
 
@@ -28,31 +29,6 @@ describe("log", () => {
     await expect(diary().log(HIRSCH, input)).rejects.toThrow(message);
   });
 
-  test("logAs takes only people who have signed in", async () => {
-    expect(await diary().logAs("bille", { type: "pee", at: "2026-10-20T09:00:00Z" })).toMatchObject({ byName: "Herzii" });
-    await expect(diary().logAs("mallory", { type: "pee", at: "2026-10-20T09:00:00Z" })).rejects.toThrow(InputError);
-  });
-});
-
-describe("today", () => {
-  test("has today's entries in Berlin and the latest of each tile type", async () => {
-    clock = new Date("2026-10-20T22:30:00Z"); // 00:30 on the 21st in Berlin
-    const d = diary();
-    await d.log(HIRSCH, { type: "walk", at: "2026-10-20T21:30:00Z" }); // 23:30 on the 20th
-    const pee1 = await d.log(HIRSCH, { type: "pee", at: "2026-10-20T22:05:00Z" });
-    const pee2 = await d.logAs("bille", { type: "pee", at: "2026-10-20T22:20:00Z" });
-    const today = await d.today();
-    expect(today.entries.map((e) => e.id)).toEqual([pee2.id, pee1.id]);
-    expect(today.tiles).toEqual({ walk: null, food: null, pee: pee2, poop: null });
-    expect(today).toMatchObject({ timeZone: "Europe/Berlin", now: clock.toISOString() });
-  });
-
-  test("shows the walk that runs now", async () => {
-    clock = new Date("2026-10-20T10:00:00Z");
-    await new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"]]), now: () => clock }).apply(HIRSCH, [{ id: "c1", at: "2026-10-20T09:40:00.000Z", kind: "walk.start", walkKey: "w" }]);
-    const today = await diary().today();
-    expect(today.sessions).toEqual({ walk: { key: "w", startedAt: "2026-10-20T09:40:00.000Z", dogIds: [1], walkers: [HIRSCH], pauses: [], paused: false }, training: null });
-  });
 });
 
 test("edit changes the fields, remove deletes", async () => {
@@ -67,7 +43,7 @@ test("edit changes the fields, remove deletes", async () => {
 test("history pages by 50 and says when there is more", async () => {
   const d = diary();
   for (let i = 0; i < HISTORY_PAGE + 1; i++) await d.log(HIRSCH, { type: "walk", at: new Date(Date.UTC(2026, 9, 1, 0, i)).toISOString() });
-  await d.logAs("bille", { type: "food", foodKind: "dry", at: "2026-10-02T00:00:00Z" });
+  await d.log(HERZII, { type: "food", foodKind: "dry", at: "2026-10-02T00:00:00Z" });
   const first = await d.history({});
   expect(first.entries).toHaveLength(HISTORY_PAGE);
   expect(first.more).toBe(true);
@@ -94,7 +70,6 @@ describe("food and stock", () => {
     await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 180, at: "2026-10-20T08:00:00Z" });
     await d.log(HIRSCH, { type: "food", foodKind: "dry", amountG: 80, at: "2026-10-20T08:30:00Z" });
     expect(await d.lastFoodAmounts()).toEqual({ wet: 180, dry: 80 });
-    expect((await d.today()).lastFood).toEqual({ wet: 180, dry: 80 });
   });
 
   test("restocks: cans × grams per can for wet food, grams for dry food", async () => {

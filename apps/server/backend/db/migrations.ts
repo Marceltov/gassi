@@ -11,7 +11,8 @@ const migrations: Record<string, Migration> = {
   // happens is an entry for one or more dogs (walks and trainings run from `at` to `ended_at`, null while running, and
   // carry the key the phone started them with); walkers, pauses, exercises, treats and GPS tracks hang off an entry.
   // `applied_command` makes taps idempotent; `session_alias` maps the key of a second "start" to the running walk.
-  "001_schema": {
+  // Named 0.3_schema: 0.2 called its only migration "001_schema", and its databases must not pass for this one.
+  "0.3_schema": {
     async up(db: Kysely<any>) {
       await db.schema
         .createTable("dog")
@@ -152,7 +153,17 @@ const migrations: Record<string, Migration> = {
 
 const provider: MigrationProvider = { getMigrations: async () => migrations };
 
+/** Thrown for a database whose recorded migrations this version doesn't know (made by an older Gassi before 0.3). */
+export class OldDatabaseError extends Error {}
+
 export async function migrate(db: Kysely<any>): Promise<void> {
+  const done = await sql<{ name: string }>`select name from kysely_migration`.execute(db).then(
+    (r) => r.rows.map((row) => row.name),
+    () => [] as string[], // a fresh database has no migration table yet
+  );
+  const unknown = done.filter((name) => !(name in migrations));
+  if (unknown.length)
+    throw new OldDatabaseError(`gassi.db was made by an older Gassi (migrations ${unknown.join(", ")}) and can't be migrated: stop Gassi, move gassi.db, gassi.db-wal and gassi.db-shm out of the data folder (to keep them), and start again to set up afresh.`);
   const { error, results } = await new Migrator({ db, provider }).migrateToLatest();
   const failed = results?.find((r) => r.status === "Error");
   if (error) throw new Error(`migration ${failed?.migrationName ?? "(unknown)"} failed`, { cause: error });

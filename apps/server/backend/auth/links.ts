@@ -3,7 +3,7 @@
 // e-mail. Each is used once, expires, and can be revoked by whoever made it. The server keeps only the token's hash.
 // A link points to a page on the household's own server (/l/<token>) that opens the app; nothing central is involved.
 import type { DB } from "../db/open";
-import { DogRepository } from "../dogs";
+import { DogRepository, FIRST_DOG_COLOR } from "../dogs";
 import { InputError } from "../errors";
 import { PeopleRepository } from "../people";
 import { type DeviceInfo, type DeviceKind, Devices } from "./devices";
@@ -17,7 +17,6 @@ const DAY = 86_400_000;
 export const SETUP_TTL = 7 * DAY;
 export const INVITE_TTL = 7 * DAY;
 export const MAGIC_TTL = 15 * 60_000;
-export const FIRST_DOG_COLOR = "#b8691a";
 
 const USED = "Dieser Link ist abgelaufen oder schon benutzt.";
 const isKind = (k: string): k is LinkKind => ["setup", "person", "device", "watch", "magic"].includes(k);
@@ -30,6 +29,7 @@ export class Links {
     private readonly db: DB,
     private readonly now: () => Date,
     private readonly publicUrl: string,
+    private readonly defaultDogName: string | null = null, // DOG_NAME: the first dog's name when setup doesn't say
   ) {}
 
   async create(l: { kind: LinkKind; personId?: string | null; createdBy?: string | null; ttlMs: number }): Promise<{ id: number; token: string; url: string; expiresAt: string }> {
@@ -63,7 +63,7 @@ export class Links {
         const name = d.personName?.trim().slice(0, 40);
         if (!name) throw new InputError("Wie heißt du?");
         if (link.kind === "setup") {
-          const dogName = d.dogName?.trim();
+          const dogName = d.dogName?.trim() || this.defaultDogName;
           if (!dogName) throw new InputError("Wie heißt dein Hund?");
           await new DogRepository(tx, this.now).add({ name: dogName, color: FIRST_DOG_COLOR });
         }
@@ -97,10 +97,15 @@ export class Links {
   }
 }
 
-/** While nobody has set the server up: a fresh setup link on each start (only its hash is kept, so an old one can't be
+/** While nobody has set the server up (and no OIDC provider does it): a fresh setup link on each start (only its hash is kept, so an old one can't be
  * shown again; earlier unused ones are revoked). Returns the URL, or null once someone is in. */
-export async function ensureSetupLink(db: DB, publicUrl: string, print: (line: string) => void, now: () => Date = () => new Date()): Promise<string | null> {
+export async function ensureSetupLink(db: DB, publicUrl: string, print: (line: string) => void, now: () => Date = () => new Date(), { oidc = false } = {}): Promise<string | null> {
   if ((await new PeopleRepository(db).count()) > 0) return null;
+  // with a provider, the provider decides who is in: its first sign-in sets the household up
+  if (oidc) {
+    print("Gassi wird über OIDC eingerichtet: die erste Anmeldung über den Anbieter legt den Haushalt an.");
+    return null;
+  }
   await db.updateTable("link").set({ revoked_at: now().toISOString() }).where("kind", "=", "setup").where("used_at", "is", null).where("revoked_at", "is", null).execute();
   const { url } = await new Links(db, now, publicUrl).create({ kind: "setup", ttlMs: SETUP_TTL });
   print(`Gassi einrichten: ${url}`);

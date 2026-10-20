@@ -12,7 +12,15 @@ import { Tracks } from "../tracks";
 import type { DB } from "../db/open";
 import { type Implementations, NotFound, router } from "./router";
 
-export type ApiDeps = { db: DB; now: () => Date; publicUrl: string; oidc: boolean; mailer: Mailer | null; timeZone?: string /* default Europe/Berlin */ };
+export type ApiDeps = {
+  db: DB;
+  now: () => Date;
+  publicUrl: string;
+  oidc: boolean;
+  mailer: Mailer | null;
+  timeZone?: string; // default Europe/Berlin
+  defaultDogName?: string | null; // DOG_NAME
+};
 
 const names = (deps: ApiDeps) => new PeopleRepository(deps.db).names();
 const diary = async (deps: ApiDeps) => new Diary({ db: deps.db, names: await names(deps), timeZone: deps.timeZone ?? "Europe/Berlin", now: deps.now });
@@ -22,7 +30,7 @@ const missing = (what: string) => {
   throw new NotFound(what);
 };
 
-const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl);
+const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl, deps.defaultDogName ?? null);
 
 const implementations: Implementations<ApiDeps> = {
   redeem: async ({ input, deps }) => links(deps).redeem(input.token, input),

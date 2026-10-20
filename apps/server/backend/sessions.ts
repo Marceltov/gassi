@@ -11,12 +11,11 @@
 //   running at its time. Trainings do the same; a training started on a walk that has since ended ends with it.
 import { sql, type Kysely } from "kysely";
 import { type Command, type Entry, minutesBetween, type Person, type SessionsView, type TrainingView, type WalkView } from "@gassi/domain";
-import type { User } from "./auth/session";
-import { database, type DB } from "./db/open";
+import type { DB } from "./db/open";
 import type { Schema } from "./db/schema";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
-import { type Names, PeopleRepository } from "./people";
+import type { Names } from "./people";
 
 
 export type { Person, SessionsView, TrainingView, WalkView };
@@ -55,7 +54,7 @@ export class Sessions {
   constructor(private readonly deps: SessionsDeps) {}
 
   /** Applies `commands` by `user` in time order. An id seen before is not applied again and counts as applied. */
-  async apply(user: User, commands: readonly Command[]): Promise<{ applied: string[]; dropped: string[] }> {
+  async apply(user: Person, commands: readonly Command[]): Promise<{ applied: string[]; dropped: string[] }> {
     const result = { applied: [] as string[], dropped: [] as string[] };
     for (const c of [...commands].sort(byTime)) {
       const outcome = await this.deps.db.transaction().execute(async (tx) => {
@@ -170,7 +169,7 @@ class Step {
   constructor(
     private readonly tx: Tx,
     private readonly deps: SessionsDeps,
-    private readonly user: User,
+    private readonly user: Person,
   ) {
     this.entries = new EntryRepository(tx, deps.now);
   }
@@ -345,11 +344,4 @@ class Step {
       .execute();
     return "applied";
   }
-}
-
-/** The sessions for one request, on the configured database and dog, with the names as they are now. */
-export async function sessions(): Promise<Sessions> {
-  const db = await database();
-  const names = await new PeopleRepository(db).names();
-  return new Sessions({ db, names, now: () => new Date() });
 }

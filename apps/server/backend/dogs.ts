@@ -17,6 +17,9 @@ function checked<T>(schema: z.ZodType<T>, value: unknown, message: string): T {
 const NAME = "Der Name muss 1 bis 30 Zeichen lang sein.";
 const COLOR = "Die Farbe stimmt nicht.";
 
+/** The colour a household's first dog gets. */
+export const FIRST_DOG_COLOR = "#b8691a";
+
 const toDog = (r: { id: number; name: string; color: string; archived: number }): Dog => ({ id: r.id, name: r.name, color: r.color, archived: r.archived === 1 });
 
 export class DogRepository {
@@ -42,6 +45,11 @@ export class DogRepository {
   }
 
   async update(id: number, change: { name?: string; color?: string; archived?: boolean }): Promise<Dog | undefined> {
+    // every walk, pee and feeding needs a dog to belong to
+    if (change.archived) {
+      const active = await this.activeIds();
+      if (active.length === 1 && active[0] === id) throw new InputError("Mindestens ein Hund muss bleiben.");
+    }
     const row = await this.db
       .updateTable("dog")
       .set({
@@ -59,4 +67,11 @@ export class DogRepository {
   async activeIds(): Promise<number[]> {
     return (await this.list()).map((d) => d.id);
   }
+}
+
+/** A household that has no dog yet (the first OIDC sign-in sets it up) gets one: `name` (DOG_NAME), else "Mein Hund".
+ * Returns it, or null when there is a dog already. */
+export async function ensureFirstDog(db: DB, name: string | null, now: () => Date): Promise<Dog | null> {
+  const any = await db.selectFrom("dog").select("id").limit(1).executeTakeFirst();
+  return any ? null : new DogRepository(db, now).add({ name: name ?? "Mein Hund", color: FIRST_DOG_COLOR });
 }

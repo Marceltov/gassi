@@ -1,25 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { sessionUser } from "../auth/session";
-import { withEnv } from "../testing/env";
+import { setEnv, withEnv } from "../testing/env";
 import { resetDiscoveryForTests } from "./flow";
-import { logoutRoute, oidcCallbackRoute, oidcStartRoute, type OidcDeps } from "./routes";
+import { oidcCallbackRoute, oidcStartRoute, type OidcDeps } from "./routes";
 import { goodClaims, META, NOW, stubIssuer, type StubOptions } from "./testing";
 
 withEnv();
 beforeEach(() => resetDiscoveryForTests());
 
 const BASE = "https://gassi.example";
+const FAILED = "gassi://join?error=signin";
 const cookies = (res: Response) => res.headers.getSetCookie();
 const cookieValue = (res: Response, name: string) => cookies(res).find((c) => c.startsWith(`${name}=`))?.split(";")[0].slice(name.length + 1);
-
-// Starts a sign-in and returns what the callback needs: the flight cookie and the state/nonce the provider was sent.
-async function start(next?: string, o: StubOptions = {}, app = false) {
-  const fetch = stubIssuer("", o);
-  const query = new URLSearchParams({ ...(next ? { next } : {}), ...(app ? { app: "1" } : {}) });
-  const res = await oidcStartRoute(new Request(`${BASE}/api/oidc/start${query.size ? `?${query}` : ""}`), { fetch, now: () => NOW, remember: vi.fn(), appLink: vi.fn() });
-  const to = new URL(res.headers.get("location")!);
-  return { res, to, flight: cookieValue(res, "gassi_oidc")!, state: to.searchParams.get("state")!, nonce: to.searchParams.get("nonce")! };
-}
 
 let remember: ReturnType<typeof vi.fn<OidcDeps["remember"]>>;
 let appLink: ReturnType<typeof vi.fn<OidcDeps["appLink"]>>;
@@ -28,15 +19,21 @@ beforeEach(() => {
   appLink = vi.fn<OidcDeps["appLink"]>(async (personId) => `gassi://join?server=x&token=for-${personId}`);
 });
 
+// Starts the app's sign-in and returns what the callback needs: the flight cookie and the state/nonce sent.
+async function start(o: StubOptions = {}) {
+  const res = await oidcStartRoute(new Request(`${BASE}/api/oidc/start?app=1`), { fetch: stubIssuer("", o), now: () => NOW, remember, appLink });
+  const to = new URL(res.headers.get("location")!);
+  return { res, to, flight: cookieValue(res, "gassi_oidc")!, state: to.searchParams.get("state")!, nonce: to.searchParams.get("nonce")! };
+}
+
 function callback(flight: string | undefined, query: Record<string, string>, nonce: string, o: StubOptions = {}) {
-  const deps: OidcDeps = { fetch: stubIssuer(nonce, o), now: () => NOW, remember, appLink };
   const headers = flight ? { cookie: `gassi_oidc=${flight}` } : undefined;
-  return oidcCallbackRoute(new Request(`${BASE}/api/oidc/callback?${new URLSearchParams(query)}`, { headers }), deps);
+  return oidcCallbackRoute(new Request(`${BASE}/api/oidc/callback?${new URLSearchParams(query)}`, { headers }), { fetch: stubIssuer(nonce, o), now: () => NOW, remember, appLink });
 }
 
 describe("start", () => {
   test("redirects to the provider with PKCE and sets the flight cookie on /api/oidc for 10 minutes", async () => {
-    const { res, to } = await start("/verlauf");
+    const { res, to } = await start();
     expect(res.status).toBe(303);
     expect(to.origin + to.pathname).toBe(META.authorization_endpoint);
     expect(to.searchParams.get("redirect_uri")).toBe(`${BASE}/api/oidc/callback`);
@@ -44,71 +41,46 @@ describe("start", () => {
     expect(cookies(res)[0]).toMatch(/^gassi_oidc=[^;]+; Path=\/api\/oidc; Max-Age=600; HttpOnly; SameSite=Lax; Secure$/);
   });
 
-  test("an unreachable provider goes back to the login page with an error", async () => {
-    const res = await oidcStartRoute(new Request(`${BASE}/api/oidc/start?next=/verlauf`), { fetch: async () => Promise.reject(new TypeError("down")), now: () => NOW, remember: vi.fn(), appLink: vi.fn() });
-    expect(res.headers.get("location")).toBe("/login?error=1&next=%2Fverlauf");
+  test("only the app signs in this way for now (the dashboard comes later)", async () => {
+    const res = await oidcStartRoute(new Request(`${BASE}/api/oidc/start`), { fetch: stubIssuer(""), now: () => NOW, remember, appLink });
+    expect(res.status).toBe(400);
+  });
+
+  test("an unreachable provider sends the app back with an error", async () => {
+    const res = await oidcStartRoute(new Request(`${BASE}/api/oidc/start?app=1`), { fetch: async () => Promise.reject(new TypeError("down")), now: () => NOW, remember, appLink });
+    expect(res.headers.get("location")).toBe(FAILED);
+  });
+
+  test("without OIDC configured the routes don't exist", async () => {
+    setEnv({ OIDC_ISSUER: undefined, OIDC_CLIENT_ID: undefined, OIDC_CLIENT_SECRET: undefined });
+    expect((await oidcStartRoute(new Request(`${BASE}/api/oidc/start?app=1`))).status).toBe(404);
   });
 });
 
 describe("callback", () => {
-  test("the app's sign-in ends in the app with a one-time link, not a cookie", async () => {
-    const { flight, state, nonce } = await start(undefined, {}, true);
+  test("ends in the app with a one-time link for whoever the provider names, and remembers their name", async () => {
+    const { flight, state, nonce } = await start();
     const res = await callback(flight, { state, code: "c" }, nonce);
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe("gassi://join?server=x&token=for-p-sub-marcel");
-    expect(cookieValue(res, "gassi_session")).toBeUndefined();
+    expect(cookieValue(res, "gassi_oidc")).toBe("");
+    expect(remember).toHaveBeenCalledWith({ subject: "sub-marcel", name: "Hirsch" });
     expect(appLink).toHaveBeenCalledWith("p-sub-marcel");
   });
 
-  test("signs in whoever authentik names, remembers their name and goes where the sign-in started", async () => {
-    const { flight, state, nonce } = await start("/verlauf?type=walk");
-    const res = await callback(flight, { state, code: "c" }, nonce);
-    expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toBe("/verlauf?type=walk");
-    expect(sessionUser(cookieValue(res, "gassi_session"), NOW)).toEqual({ id: "p-sub-marcel", name: "Hirsch" });
-    expect(cookieValue(res, "gassi_oidc")).toBe("");
-    expect(remember).toHaveBeenCalledWith({ subject: "sub-marcel", name: "Hirsch" });
-  });
-
-  test("a state that doesn't match the flight fails", async () => {
-    const { flight, nonce } = await start();
-    const res = await callback(flight, { state: "forged", code: "c" }, nonce);
-    expect(res.headers.get("location")).toBe("/login?error=1");
-    expect(cookieValue(res, "gassi_session")).toBeUndefined();
+  test.each([
+    ["a state that doesn't match the flight", { state: "forged", code: "c" }, {}],
+    ["a provider error", { error: "access_denied" }, {}],
+    ["a bad id_token", { code: "c" }, { claims: (n: string) => goodClaims(n, { aud: "other" }) }],
+  ])("%s ends in the app with an error and signs nobody in", async (_, query, o) => {
+    const { flight, state, nonce } = await start();
+    const res = await callback(flight, { state, ...query }, nonce, o as StubOptions);
+    expect(res.headers.get("location")).toBe(FAILED);
     expect(remember).not.toHaveBeenCalled();
   });
 
   test("no flight cookie fails", async () => {
     const { state, nonce } = await start();
-    expect((await callback(undefined, { state, code: "c" }, nonce)).headers.get("location")).toBe("/login?error=1");
+    expect((await callback(undefined, { state, code: "c" }, nonce)).headers.get("location")).toBe(FAILED);
   });
-
-  test("a provider error fails", async () => {
-    const { flight, state, nonce } = await start();
-    expect((await callback(flight, { state, error: "access_denied" }, nonce)).headers.get("location")).toBe("/login?error=1");
-  });
-
-  test("a bad id_token fails", async () => {
-    const { flight, state, nonce } = await start();
-    const res = await callback(flight, { state, code: "c" }, nonce, { claims: (n) => goodClaims(n, { aud: "other" }) });
-    expect(res.headers.get("location")).toBe("/login?error=1");
-  });
-
-  test("anyone authentik signs in gets a session, under their own name", async () => {
-    const { flight, state, nonce } = await start();
-    const res = await callback(flight, { state, code: "c" }, nonce, { claims: (n) => goodClaims(n, { sub: "sub-gast", preferred_username: "gast", name: "Gast" }) });
-    expect(sessionUser(cookieValue(res, "gassi_session"), NOW)).toEqual({ id: "p-sub-gast", name: "Gast" });
-    expect(remember).toHaveBeenCalledWith({ subject: "sub-gast", name: "Gast" });
-  });
-
-  test.each(["//evil.example", "https://evil.example/", "/\\evil.example"])("an open redirect in next (%j) goes home instead", async (next) => {
-    const { flight, state, nonce } = await start(next);
-    expect((await callback(flight, { state, code: "c" }, nonce)).headers.get("location")).toBe("/");
-  });
-});
-
-test("logout clears the session and goes to the login page", () => {
-  const res = logoutRoute();
-  expect(res.headers.get("location")).toBe("/login");
-  expect(cookieValue(res, "gassi_session")).toBe("");
 });

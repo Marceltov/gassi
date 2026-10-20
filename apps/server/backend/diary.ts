@@ -1,31 +1,21 @@
-// The use cases the screens, the export and the API call: log, edit and delete entries, the today view and the
-// history. It hides the database, the one dog of 0.1, the time zone and display names (of everyone who has signed in). Input from outside is
-// validated here (zod); a problem is an InputError with a German message the screen can show.
+// The use cases of the diary: log, edit and delete entries (for the right dogs), the history, food and stock,
+// weight and the week. It hides the database, the time zone and display names. Input from outside is validated here
+// (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, dayBounds, dogRule, type Entry, entryFields, type EntryType, FOOD_KINDS, type FoodKind, isEntryType, latestByType, mondayOf, newEntryInput, type Stock, TILE_TYPES, weekBounds, type WeekInput, type WeekView, weekView } from "@gassi/domain";
-import type { User } from "./auth/session";
-import { config } from "./config";
-import { database, type DB } from "./db/open";
+import { checkDogs, computeStock, dayBounds, dogRule, type Entry, entryFields, type EntryType, FOOD_KINDS, type FoodKind, isEntryType, mondayOf, newEntryInput, type Stock, weekBounds, type WeekInput, type WeekView, weekView } from "@gassi/domain";
+import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
 import { InputError } from "./errors";
-import { type Names, PeopleRepository } from "./people";
-import { pausedWithin, Sessions, type SessionsView } from "./sessions";
+import type { Names, Person } from "./people";
+import { pausedWithin } from "./sessions";
 import { dryTreats } from "./stock";
 
 /** An entry as the screens show it: with the display name of whoever logged it, and for walks the walkers' names and
  * minutes paused, for trainings the exercises practised and treats given. */
 export type EntryView = Entry & { byName: string; walkers: string[]; pauseMin: number | null; exercises: string[]; treats: number | null };
 
-export type TodayView = {
-  timeZone: string;
-  now: string;
-  tiles: Record<(typeof TILE_TYPES)[number], EntryView | null>;
-  entries: EntryView[];
-  sessions: SessionsView; // the walk and training running now
-  lastFood: Record<FoodKind, number | null>; // the usual portions, for the food sheet
-};
 
 export type HistoryFilter = { type?: EntryType; by?: string; day?: string; dog?: number };
 export type HistoryPage = { entries: EntryView[]; more: boolean };
@@ -92,11 +82,6 @@ export class Diary {
     return this.deps.timeZone;
   }
 
-  /** Everyone who has signed in, for the person filter. */
-  people(): { id: string; name: string }[] {
-    return [...this.deps.names].map(([id, name]) => ({ id, name }));
-  }
-
   /** The history filter from untrusted values (search params, an action's argument): anything unknown is left out. */
   filter(raw: { type?: unknown; by?: unknown; day?: unknown; dog?: unknown }): HistoryFilter {
     return {
@@ -107,17 +92,10 @@ export class Diary {
     };
   }
 
-  async log(user: User, input: unknown): Promise<EntryView> {
+  async log(user: Person, input: unknown): Promise<EntryView> {
     const fields = parse(newEntryInput, input);
     needsKind(fields.type, fields.foodKind);
     return this.view1(await this.entries.create({ ...fields, dogIds: await this.dogsFor(fields.type, fields.dogIds), loggedBy: user.id }));
-  }
-
-  /** Logs on behalf of `loggedBy` (the API): someone who has signed in at least once. */
-  async logAs(loggedBy: string, input: unknown): Promise<EntryView> {
-    const name = this.deps.names.get(loggedBy);
-    if (!name) throw new InputError("Diese Person gibt es nicht.");
-    return this.log({ id: loggedBy, name }, input);
   }
 
   async edit(id: number, input: unknown): Promise<EntryView | null> {
@@ -135,16 +113,6 @@ export class Diary {
     return this.entries.remove(id);
   }
 
-  async today(): Promise<TodayView> {
-    const now = this.deps.now();
-    const { start, end } = dayBounds(now.getTime(), this.deps.timeZone);
-    const entries = await this.views(await this.entries.list({ since: iso(start), until: iso(end) }));
-    const latest = latestByType(entries);
-    const tiles = Object.fromEntries(TILE_TYPES.map((t) => [t, (latest[t] as EntryView | undefined) ?? null])) as TodayView["tiles"];
-    const [sessions, lastFood] = await Promise.all([new Sessions(this.deps).current(), this.lastFoodAmounts()]);
-    return { timeZone: this.deps.timeZone, now: now.toISOString(), tiles, entries, sessions, lastFood };
-  }
-
   /** The amount of the newest feeding of each kind, offered as the usual portion. */
   async lastFoodAmounts(): Promise<Record<FoodKind, number | null>> {
     const food = await this.entries.list({ type: "food" });
@@ -153,7 +121,7 @@ export class Diary {
   }
 
   /** Bought food: wet as cans × grams per can, dry in grams. */
-  async restock(user: User, input: unknown): Promise<EntryView> {
+  async restock(user: Person, input: unknown): Promise<EntryView> {
     const kind = foodKindOf(input);
     const r = restockInput.safeParse(input);
     if (!r.success) throw new InputError(kind === "wet" ? "Wie viele Dosen, und wie viel Gramm hat eine Dose?" : "Wie viel Gramm hast du gekauft?");
@@ -162,7 +130,7 @@ export class Diary {
   }
 
   /** What is there now, counted by hand: wet in cans (of the last can size bought), dry in grams. */
-  async correctStock(user: User, input: unknown): Promise<EntryView> {
+  async correctStock(user: Person, input: unknown): Promise<EntryView> {
     const kind = foodKindOf(input);
     const r = stockInput.safeParse(input);
     if (!r.success) throw new InputError(kind === "wet" ? "Wie viele Dosen sind noch da?" : "Wie viel Gramm sind noch da?");
@@ -176,7 +144,7 @@ export class Diary {
   }
 
   /** Toffee's weight in kg (one decimal), stored as grams. */
-  async logWeight(user: User, input: unknown): Promise<EntryView> {
+  async logWeight(user: Person, input: unknown): Promise<EntryView> {
     const r = weightInput.safeParse(input);
     if (!r.success) throw new InputError(r.error.issues[0]?.path[0] === "at" ? MESSAGES.at : "Das Gewicht muss zwischen 0,5 und 100 kg liegen.");
     const amountG = Math.round(r.data.kg * 10) * 100;
@@ -188,7 +156,7 @@ export class Diary {
     return computeStock({ entries, treats, now: this.deps.now().getTime() });
   }
 
-  private async create(user: User, e: { type: EntryType; foodKind: FoodKind; amountG: number; unitG: number | null }): Promise<EntryView> {
+  private async create(user: Person, e: { type: EntryType; foodKind: FoodKind; amountG: number; unitG: number | null }): Promise<EntryView> {
     const at = this.deps.now().toISOString();
     return this.view1(await this.entries.create({ ...e, at, endedAt: null, note: null, dogIds: [], loggedBy: user.id }));
   }
@@ -281,10 +249,3 @@ export class Diary {
 const iso = (ms: number) => new Date(ms).toISOString();
 
 const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T12:00:00Z`));
-
-/** The diary for one request, on the configured database and dog, with the names as they are now. */
-export async function diary(): Promise<Diary> {
-  const db = await database();
-  const names = await new PeopleRepository(db).names();
-  return new Diary({ db, names, timeZone: config().timeZone, now: () => new Date() });
-}

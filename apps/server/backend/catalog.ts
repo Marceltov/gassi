@@ -1,7 +1,7 @@
 // The household's own lists: the exercises it trains and the kinds of treats it gives. Removing one archives it, so
 // past trainings keep their names; adding an archived name again brings it back.
 import { z } from "zod";
-import { database, type DB } from "./db/open";
+import type { DB } from "./db/open";
 import { InputError } from "./errors";
 
 export type Exercise = { id: number; name: string };
@@ -94,8 +94,4 @@ export class Catalog {
   async archiveTreatKind(id: number): Promise<void> {
     await this.db.updateTable("treat_kind").set({ archived: 1 }).where("id", "=", id).execute();
   }
-}
-
-export async function catalog(): Promise<Catalog> {
-  return new Catalog(await database());
 }
