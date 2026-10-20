@@ -159,14 +159,20 @@ Each phase ends with its checks passing and a commit. Don't start the next phase
 
 ## After the build (by hand, not part of the run)
 
+Done on 2026-10-20: Gassi runs at `https://gassi.herziis.de` from `ghcr.io/marceltov/gassi:main` (a public GHCR
+package), deployed by `services` PR #23.
+
 1. Review and merge the PR. CI pushes `ghcr.io/marceltov/gassi:main`.
 2. authentik: create an OAuth2/OpenID provider and application `gassi` (confidential client, redirect URI
-   `https://<host>/api/oidc/callback`, scopes openid, profile, email), and bind it to Hirsch and Herzii.
+   `https://<host>/api/oidc/callback`, scopes openid, profile, email), and bind it to Hirsch and Herzii. The
+   provider's **grant types must include Authorization Code**: without it authentik answers every authorize request
+   with `invalid_request` ("The request is otherwise malformed"), which Gassi logs as "provider denied the sign-in".
+   Set each person's display name in authentik's Name field.
 3. `services` repo: add `gassi/docker-compose.yaml` (port `10038`, gethomepage network, homepage, kuma and
    dynacat labels, `./data` volume gitignored, `.env` with the variables above). Watchtower stays on. The app checkout lives in the
    gitignored sibling `gassi-dev/`, so it doesn't collide.
-4. Caddy: plain reverse proxy for the host, without forward auth.
-5. Switch the hostname over and retire Housetrained.
+4. Caddy: plain reverse proxy for `gassi.herziis.de` to port `10038`, without forward auth.
+5. Retire Housetrained.
 
 ## Decisions made during the build
 
