@@ -17,7 +17,8 @@ export default async function LinkPage({ params }: PageProps<"/l/[token]">) {
             In App öffnen
           </a>
           <figure className="flex flex-col items-center gap-2 rounded-3xl bg-surface p-6 text-ink">
-            <div className="w-56" role="img" aria-label="QR-Code für die Gassi-App" dangerouslySetInnerHTML={{ __html: page.qr }} />
+            {/* dark on white in both themes: inverted codes are read by fewer scanners */}
+            <div className="w-60 rounded-xl bg-white p-2 text-black" role="img" aria-label="QR-Code für die Gassi-App" dangerouslySetInnerHTML={{ __html: page.qr }} />
             <figcaption className="text-muted">Oder in der Gassi-App scannen</figcaption>
           </figure>
         </>
