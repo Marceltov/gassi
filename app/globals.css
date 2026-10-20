@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/* Gravel-sage by day, a night park by dark. Each entry type has its own colour, used for its tile, dot and chip. */
+:root {
+  --bg: #e8ece3;
+  --surface: #fbfcf8;
+  --ink: #1e2a21;
+  --muted: #5b685d;
+  --line: #d3d9cd;
+  --primary: #2f6b45;
+  --primary-ink: #ffffff;
+  --danger: #b3261e;
+  --walk: #2f7d4f;
+  --food: #b8691a;
+  --pee: #b8961c;
+  --poop: #7a4e2d;
+  --note: #4b6a9b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111813;
+    --surface: #1a241d;
+    --ink: #e4ebe1;
+    --muted: #9aa79b;
+    --line: #2c3a30;
+    --primary: #7cc496;
+    --primary-ink: #0d1f13;
+    --danger: #ff8a80;
+    --walk: #6cc28c;
+    --food: #e8a050;
+    --pee: #e3c552;
+    --poop: #c49067;
+    --note: #8fa9d6;
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
+  --color-danger: var(--danger);
+  --color-walk: var(--walk);
+  --color-food: var(--food);
+  --color-pee: var(--pee);
+  --color-poop: var(--poop);
+  --color-note: var(--note);
+}
+
+html {
+  color-scheme: light dark;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* The entry sheet rises from the bottom bar it was opened from. */
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+.sheet-in {
+  animation: sheet-in 180ms ease-out;
+}

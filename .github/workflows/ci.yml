@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:e2e
+      # Kept for a run that passed too: a test that failed once and passed on its retry leaves its trace only here.
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+  # The image has no shell, so its entrypoint and health check are Node code that only a running container exercises.
+  image-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: gassi:smoke
+          cache-from: type=gha
+      - name: Starts on the runner's folder, turns healthy and writes the database as the folder's owner
+        run: |
+          mkdir data
+          docker run -d --name gassi -p 3000:3000 -v "$PWD/data:/data" \
+            -e PUBLIC_URL=http://localhost:3000 -e SECRET=smoke-secret-0123456789abcdefghijkl \
+            -e OIDC_ISSUER=https://auth.example/application/o/gassi/ -e OIDC_CLIENT_ID=gassi -e OIDC_CLIENT_SECRET=smoke \
+            -e USERS=marcel:Hirsch gassi:smoke
+          for i in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' gassi)" = healthy ] && break
+            sleep 2
+          done
+          docker inspect -f '{{.State.Health.Status}}' gassi | grep -qx healthy || { docker logs gassi; exit 1; }
+          curl -fsS http://localhost:3000/health
+          owner=$(stat -c %u data/gassi.db)
+          [ "$owner" = "$(id -u)" ] || { echo "::error::gassi.db belongs to uid $owner, not $(id -u)"; exit 1; }
+
+  # main pushes build :main, :sha-<short> and :latest; vX.Y.Z tags build :X.Y.Z, :X.Y, :X and :latest.
+  image:
+    needs: [check, image-smoke]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      # Derived from the repository (lower case), so it is ghcr.io/marceltov/gassi.
+      - run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
