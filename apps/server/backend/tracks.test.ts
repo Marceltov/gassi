@@ -50,6 +50,14 @@ describe("Tracks", () => {
     await expect(tracks().addBatch(await device(HIRSCH.id, "phone"), { trackId: "x", walkKey: "nope", source: "phone", seq: 1, points: [pt(0, 0)] })).rejects.toThrow(new InputError("Diese Runde gibt es nicht."));
   });
 
+  test("a track id already used for another walk is refused, not attached to it", async () => {
+    await walk("w1");
+    const phone = await device(HIRSCH.id, "phone");
+    await tracks().addBatch(phone, { trackId: "track-1", walkKey: "w1", source: "phone", seq: 0, points: [pt(0, 0)] });
+    await sessions().apply(HIRSCH, [{ id: "stop-w1", at: "2026-10-20T09:30:00.000Z", kind: "walk.stop", walkKey: "w1" }, { id: "start-w2", at: "2026-10-20T10:00:00.000Z", kind: "walk.start", walkKey: "w2" }]);
+    await expect(tracks().addBatch(phone, { trackId: "track-1", walkKey: "w2", source: "phone", seq: 0, points: [pt(3600, 0)] })).rejects.toThrow(new InputError("Diese Strecke gehört zu einer anderen Runde."));
+  });
+
   test("a walk without a track has none", async () => {
     expect(await tracks().forWalk(await walk())).toBeNull();
   });

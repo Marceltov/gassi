@@ -238,6 +238,14 @@ describe("entries and dogs", () => {
     await expect(diary().log(HIRSCH, { type: "pee", dogIds: [999], at: "2026-10-20T09:08:00Z" })).rejects.toThrow(new InputError("Diesen Hund gibt es nicht."));
   });
 
+  test("an old entry of an archived dog can still be edited with its dogs", async () => {
+    const bruno = await addDog("Bruno");
+    const walk = await diary().log(HIRSCH, { type: "walk", dogIds: [bruno], at: "2026-10-20T09:00:00Z" });
+    await db().updateTable("dog").set({ archived: 1 }).where("id", "=", bruno).execute();
+    expect(await diary().edit(walk.id, { at: walk.at, dogIds: [bruno], note: "der alte Weg" })).toMatchObject({ dogIds: [bruno], note: "der alte Weg" });
+    await expect(diary().log(HIRSCH, { type: "walk", dogIds: [bruno], at: "2026-10-20T10:00:00Z" })).rejects.toThrow(new InputError("Diesen Hund gibt es nicht."));
+  });
+
   test("entries list filters by dog", async () => {
     const bruno = await addDog("Bruno");
     await diary().log(HIRSCH, { type: "pee", dogIds: [1], at: "2026-10-20T09:00:00Z" });

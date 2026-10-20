@@ -102,7 +102,7 @@ export class Diary {
     const fields = parse(entryFields, input);
     const before = await this.entries.get(id);
     if (before) needsKind(before.type, fields.foodKind);
-    if (before && fields.dogIds) fields.dogIds = await this.dogsFor(before.type, fields.dogIds);
+    if (before && fields.dogIds) fields.dogIds = await this.dogsFor(before.type, fields.dogIds, before.dogIds);
     // without an end it would run again (it was started on the walk screen); a walk logged afterwards may lose its end
     if (before?.clientKey && before.endedAt && !fields.endedAt) throw new InputError(before.type === "walk" ? "Eine beendete Runde braucht ein Ende." : "Ein beendetes Training braucht ein Ende.");
     const entry = await this.entries.update(id, fields);
@@ -195,8 +195,9 @@ export class Diary {
   }
 
   /** The dogs an entry of `type` is for: the named ones (active, fitting the type), else the default: no dog for
-   * restocks and notes, all active dogs for walks, trainings and food, the only dog for pee/poop/weight if there is one. */
-  private async dogsFor(type: EntryType, requested: number[] | undefined): Promise<number[]> {
+   * restocks and notes, all active dogs for walks, trainings and food, the only dog for pee/poop/weight if there is one.
+   * `kept`: dogs an edited entry already has, allowed even when archived since. */
+  private async dogsFor(type: EntryType, requested: number[] | undefined, kept: readonly number[] = []): Promise<number[]> {
     const rule = dogRule(type);
     const active = await new DogRepository(this.deps.db).activeIds();
     if (requested === undefined) {
@@ -204,7 +205,7 @@ export class Diary {
       if (rule === "some" || active.length === 1) return active;
       throw new InputError("Für welchen Hund?");
     }
-    if (requested.some((id) => !active.includes(id))) throw new InputError("Diesen Hund gibt es nicht.");
+    if (requested.some((id) => !active.includes(id) && !kept.includes(id))) throw new InputError("Diesen Hund gibt es nicht.");
     const problem = checkDogs(type, requested);
     if (problem) throw new InputError(problem);
     return [...new Set(requested)];

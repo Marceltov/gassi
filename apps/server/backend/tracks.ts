@@ -22,6 +22,8 @@ export class Tracks {
       if (!walk) throw new InputError("Diese Runde gibt es nicht.");
       const at = this.now().toISOString();
       await tx.insertInto("track").values({ id: b.trackId, entry_id: walk.id, source: b.source, device_id: deviceId, created_at: at }).onConflict((oc) => oc.column("id").doNothing()).execute();
+      const track = await tx.selectFrom("track").select("entry_id").where("id", "=", b.trackId).executeTakeFirstOrThrow();
+      if (track.entry_id !== walk.id) throw new InputError("Diese Strecke gehört zu einer anderen Runde."); // a reused track id
       const r = await tx
         .insertInto("track_batch")
         .values({ track_id: b.trackId, seq: b.seq, points: JSON.stringify(b.points), received_at: at })

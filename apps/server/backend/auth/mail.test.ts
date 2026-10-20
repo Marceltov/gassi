@@ -32,3 +32,24 @@ test("an unknown address gets no mail and no hint that it is unknown", async () 
   await expect(sendMagicLink(db(), () => NOW, URL_, mailer, "nobody@example.org")).resolves.toBeUndefined();
   expect(sent).toEqual([]);
 });
+
+test("the answer doesn't wait for the mail (same timing for known and unknown addresses), and a failing send is no error", async () => {
+  await new PeopleRepository(db()).update(HIRSCH.id, { email: "marcel@example.org" });
+  const never: Mailer = { send: () => new Promise(() => {}) };
+  const quick = await Promise.race([sendMagicLink(db(), () => NOW, URL_, never, "marcel@example.org").then(() => "answered"), new Promise((r) => setTimeout(() => r("waited"), 200))]);
+  expect(quick).toBe("answered");
+  const failing: Mailer = { send: async () => Promise.reject(new Error("smtp down")) };
+  await expect(sendMagicLink(db(), () => new Date(NOW.getTime() + 61_000), URL_, failing, "marcel@example.org")).resolves.toBeUndefined();
+});
+
+test("at most one link a minute per person, so nobody's inbox can be flooded", async () => {
+  await new PeopleRepository(db()).update(HIRSCH.id, { email: "marcel@example.org" });
+  const { sent, mailer } = recording();
+  await sendMagicLink(db(), () => NOW, URL_, mailer, "marcel@example.org");
+  await sendMagicLink(db(), () => new Date(NOW.getTime() + 30_000), URL_, mailer, "marcel@example.org");
+  await new Promise((r) => setTimeout(r, 10));
+  expect(sent).toHaveLength(1);
+  await sendMagicLink(db(), () => new Date(NOW.getTime() + 61_000), URL_, mailer, "marcel@example.org");
+  await new Promise((r) => setTimeout(r, 10));
+  expect(sent).toHaveLength(2);
+});
