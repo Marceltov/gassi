@@ -111,13 +111,11 @@ Scripts: `npm test` (`vitest run`), `npm run test:e2e` (`next build && playwrigh
   (tags: `main`, the short sha) and on version tags.
 - `services` repo: new `gassi/docker-compose.yaml` following the homelab conventions (gethomepage network,
   homepage, kuma and dynacat labels, healthcheck, `./data` volume gitignored). Watchtower updates it.
-- Hostname: reuse `housetrained.herziis.de` (DNS and Caddy route already exist; the
-  forward-auth provider is replaced by the new OIDC provider) or move to
-  `gassi.herziis.de`. Decide at cut-over.
-- Cut-over: Housetrained keeps running until Gassi v1 works, then the hostname is switched over. No data
-  migration, since Housetrained holds no real history yet.
+- Hostname: `gassi.herziis.de` (new DNS record and Caddy route), port `10038`.
+- Cut-over: Housetrained kept running until Gassi v1 worked. No data migration, since Housetrained held no real
+  history.
 
 ## Build
 
-v1 is built in one autonomous run; see [BUILD.md](BUILD.md) for the goal statement, the fixed implementation
+v1 was built in one run and is live since 2026-10-20 (`v1.0.0`); see [BUILD.md](BUILD.md) for the goal statement, the fixed implementation
 decisions, the phases and their checks, and the manual steps after the build (authentik, compose, hostname).
