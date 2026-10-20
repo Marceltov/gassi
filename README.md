@@ -3,10 +3,18 @@
 A small, self-hosted dog diary for one household: who walked the dog and when, what and how much the dog ate,
 pee and poop. Built for two people on phones, signed in through authentik.
 
-- **Heute:** four big tiles (Gassi, Futter, Pipi, Poopoo). A tap logs "now, by me" and can be undone for 5 seconds;
-  the "…" on a tile adds time, duration, amount or a note. Each tile shows how long ago it last happened today and
-  who did it, and today's entries follow as a timeline.
-- **Verlauf:** every entry, newest first, by day, filterable by type and person; tap one to edit or delete it.
+- **Heute:** four big tiles (Gassi, Futter, Pipi, Poopoo) and "Training starten". Pipi and Poopoo log "now, by me"
+  (undo for 5 seconds); Futter offers the usual portion of wet or dry food; the "…" on a tile adds time, duration,
+  amount or a note. Each tile shows how long ago it last happened today and who did it; today's entries follow.
+- **Runde:** Gassi starts a walk at the door: a running clock, Pipi, Poopoo, Pause, Training, Zuhause, and
+  "Mitgehen" for the other person. The walk lives on the server, so both phones see it; taps without reception wait
+  on the phone and are sent later. Zuhause shows a summary (time, pause, trainings, pee/poop) with a note.
+- **Training:** on a walk or at home, with the household's exercises and a "+1" per treat kind.
+- **Vorrat:** wet food in cans, dry food in kg, what is left and how long it lasts; restocks and corrections.
+- **Woche:** walk and training time per person, exercises, treats, and each day as a 0–24 h strip. Gewicht: a curve.
+- **Verlauf:** every entry, newest first, by day, filterable by type, person and day; tap one to edit or delete it
+  (a walk someone forgot to stop gets its end here).
+- **Einstellungen** (Menü → "Übungen und Leckerlis"): the household's exercises and treat kinds.
 - **Export:** Menü → "Als CSV exportieren" downloads everything (`;`-separated, opens in Excel/LibreOffice).
 - Installable on the home screen (PWA), German, dark mode follows the phone.
 
@@ -48,8 +56,10 @@ curl -H "Authorization: Bearer $API_TOKEN" -H 'Content-Type: application/json' \
   -d '{"loggedBy":"marcel","type":"food","amountG":200}' https://gassi.example/api/v1/entries
 ```
 
-Types: `walk`, `food`, `pee`, `poop`, `note`. Optional fields: `at` (ISO 8601, default now), `durationMin`, `amountG`,
-`note`. `loggedBy` must be the username of someone who has signed in.
+Types: `walk`, `food`, `pee`, `poop`, `note`, `training`, `weight` (grams), `restock`, `stockcheck`. Optional fields:
+`at` (ISO 8601, default now), `endedAt` (ISO 8601, not before `at`), `amountG`, `foodKind` (`wet`/`dry`), `unitG`,
+`note`. GET returns entries with the derived `durationMin` and, for walks and trainings, `walkers`, `pauseMin`,
+`exercises` and `treats`. `loggedBy` must be the username of someone who has signed in.
 
 ## Deploy
 
@@ -67,6 +77,9 @@ services:
     volumes:
       - ./data:/data   # gassi.db is written as the owner of this folder (PUID/PGID override)
 ```
+
+Gassi writes a consistent copy of the database every day to `./data/backups/gassi-YYYY-MM-DD.db` and keeps the
+last 14; copy that folder off the host if the host's own backup doesn't cover it.
 
 The image has a `HEALTHCHECK` on `GET /health` (200 `{"status":"ok"}` while the database answers). In authentik,
 create an OAuth2/OpenID provider and application `gassi` (confidential client, redirect URI

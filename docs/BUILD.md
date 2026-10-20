@@ -197,7 +197,8 @@ package), deployed by `services` PR #23.
 - **History paging** uses offset/limit (51 rows fetched to know whether there is more). Pages loaded with "Mehr
   laden" stay in the browser and are patched on edit/delete; the first page is refreshed by the server action.
 - **Filters are links** (`/verlauf?type=walk&by=bille`); unknown values are ignored, not an error.
-- **CSV:** oldest first, date and time in separate columns (`Datum;Uhrzeit;Art;Dauer (Min.);Menge (g);Notiz;Von`),
+- **CSV:** oldest first, date and time in separate columns (since v1.1:
+  `Datum;Uhrzeit;Art;Ende;Dauer (Min.);Pause (Min.);Futterart;Menge (g);Übungen;Leckerlis;Notiz;Von`),
   CRLF lines, file name `gassi-<today>.csv`. The proxy sends a signed-out browser to the login page; the route
   itself answers 401 without a session.
 - **API:** `API_TOKEN` must be at least 16 characters; `POST` defaults `at` to now and answers 201 with the entry;
@@ -221,3 +222,30 @@ package), deployed by `services` PR #23.
   host ever runs Gassi.
 - **The image package is public** on GHCR (the repo is private): the host pulls it without a login, like the other
   ghcr images there, and Watchtower updates it. The image holds only app code; secrets stay in the deployment `.env`.
+
+## v1.1 (walks, training, food stock, week)
+
+Built from a local spec and plan (brainstormed on 2026-10-20); the lasting decisions are ADRs in `docs/adr/`.
+
+- **Schema 003** adds `ended_at`, `food_kind`, `client_key`, `unit_g` to `entry`, drops `duration_min` (derived now),
+  and child tables `walk_walker`, `walk_pause`, `exercise`, `training_exercise`, `treat_kind`, `training_treat`,
+  `applied_command`, `session_alias`. There was no real data, so no compatibility layer.
+- **Commands (ADR 0001):** `POST /api/commands` (session cookie, JSON only, at most 100) applies walk/training taps
+  in tap-time order, each id once. Late taps: pee/poop always become entries; pause/resume/join/training taps at or
+  after the end are dropped; a second "start" while a walk runs joins it (`session_alias`). The phone keeps unsent
+  commands per person in `localStorage` (`gassi.commands.<username>`) and lays them over the server's view
+  (`shared/sessionProjection.ts`); a command leaves the queue only when the server lists it as applied or dropped.
+- **During a walk by time (ADR 0002):** a training or a pee belongs to the walk whose interval holds its `at`; the
+  summary and the training's "back to the walk" use that rule.
+- **Running** means a walk/training started with a key and without an end; one logged afterwards without an end is a
+  moment, not running. A forgotten walk is ended by editing its "Ende" in the sheet; nothing stops automatically.
+- **Live refresh:** Heute, `/runde` and `/training` reload on `visibilitychange` and every 30 s; the queue flushes
+  on `online` and every 15 s.
+- **Stock** counts from the latest stockcheck (feedings after it), else from the first restock; below zero shows 0
+  and asks for a correction; dry treats count against dry food. Restock, correction, weight and the week view are
+  use cases on `Diary`; the pure parts are `backend/stock.ts` and `backend/week.ts`.
+- **Futter** opens a sheet with the usual portion per kind (two taps); the "…" sheet stays for other times. A new
+  entry whose time field was left untouched is logged at "now" to the second.
+- **Backups:** `VACUUM INTO ${DATA_DIR}/backups/gassi-YYYY-MM-DD.db` at startup and hourly when today's is missing,
+  newest 14 kept; failures are logged, never fatal.
+- **Service worker** cache bumped to `gassi-v2`; `/api/commands` always goes to the network.
