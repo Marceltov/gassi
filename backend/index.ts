@@ -2,8 +2,14 @@
 // (enforced in eslint.config.mjs). Pages and actions call the use cases here; route handlers are mounted as they are.
 import { healthRoute } from "./http/health";
 import { logged } from "./http/requestlog";
+import { logoutRoute, oidcCallbackRoute, oidcStartRoute } from "./oidc/routes";
 
 export { config } from "./config";
 export { database } from "./db/open";
+export { SESSION_COOKIE, sessionUser, type User } from "./auth/session";
+export { safeNext } from "./http/responses";
 
 export const health = logged(() => healthRoute());
+export const oidcStart = logged((req) => oidcStartRoute(req));
+export const oidcCallback = logged((req) => oidcCallbackRoute(req));
+export const logout = logged(() => logoutRoute());
