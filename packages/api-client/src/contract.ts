@@ -2,6 +2,7 @@
 // of what goes in and what comes back. The client is built from it and the server's router validates against it, so
 // the two can't drift apart. Path params (":id") are filled from the input; the rest of a GET or DELETE input goes
 // into the query string, of a POST or PATCH into the JSON body.
+import { commandSchema, ENTRY_TYPES, FOOD_KINDS, type newEntryInput } from "@gassi/domain";
 import { z } from "zod";
 
 export type Method = "GET" | "POST" | "PATCH" | "DELETE";
@@ -24,6 +25,56 @@ const id = z.coerce.number().int().positive();
 export const personSchema = z.object({ id: z.string(), name: z.string() });
 export const deviceKinds = ["phone", "watch", "web", "script"] as const;
 export const deviceSchema = z.object({ id: z.number(), kind: z.enum(deviceKinds), name: z.string() });
+
+// Entries are checked by the server's use cases (with German messages per field); the contract only types them.
+type EntryWrite = Omit<z.input<typeof newEntryInput>, "at"> & { at?: string };
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+const entryWrite = z.custom<EntryWrite>(isObject);
+const entryEdit = z
+  .custom<Omit<EntryWrite, "type"> & { id: number | string }>((v) => isObject(v) && /^[1-9]\d*$/.test(String(v.id)))
+  .transform((v) => ({ ...v, id: Number(v.id) }));
+
+export const dogSchema = z.object({ id: z.number(), name: z.string(), color: z.string(), archived: z.boolean() });
+
+export const entryViewSchema = z.object({
+  id: z.number(),
+  dogIds: z.array(z.number()),
+  type: z.enum(ENTRY_TYPES),
+  at: z.string(),
+  endedAt: z.string().nullable(),
+  durationMin: z.number().nullable(),
+  amountG: z.number().nullable(),
+  foodKind: z.enum(FOOD_KINDS).nullable(),
+  unitG: z.number().nullable(),
+  clientKey: z.string().nullable(),
+  note: z.string().nullable(),
+  loggedBy: z.string(),
+  byName: z.string(),
+  walkers: z.array(z.string()),
+  pauseMin: z.number().nullable(),
+  exercises: z.array(z.string()),
+  treats: z.number().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const walkView = z.object({
+  key: z.string(),
+  startedAt: z.string(),
+  dogIds: z.array(z.number()),
+  walkers: z.array(personSchema),
+  pauses: z.array(z.object({ startedAt: z.string(), endedAt: z.string().nullable() })),
+  paused: z.boolean(),
+});
+const trainingView = z.object({
+  key: z.string(),
+  startedAt: z.string(),
+  dogIds: z.array(z.number()),
+  walkKey: z.string().nullable(),
+  exercises: z.array(z.number()),
+  treats: z.record(z.string(), z.number()),
+});
+export const sessionsViewSchema = z.object({ walk: walkView.nullable(), training: trainingView.nullable() });
 
 export const linkKinds = ["setup", "person", "device", "watch", "magic"] as const;
 const openLink = z.object({ id: z.number(), kind: z.enum(linkKinds), createdAt: z.string(), expiresAt: z.string() });
@@ -57,6 +108,30 @@ export const contract = {
   }),
   invites: endpoint({ method: "GET", path: "/api/invites", input: none, output: z.object({ invites: z.array(openLink) }) }),
   revokeInvite: endpoint({ method: "DELETE", path: "/api/invites/:id", input: z.object({ id }), output: z.object({ revoked: z.literal(true) }) }),
+  dogs: endpoint({ method: "GET", path: "/api/dogs", input: z.object({ archived: z.enum(["0", "1"]).optional() }), output: z.object({ dogs: z.array(dogSchema) }) }),
+  addDog: endpoint({ method: "POST", path: "/api/dogs", input: z.object({ name: z.string(), color: z.string() }), output: dogSchema }),
+  updateDog: endpoint({
+    method: "PATCH",
+    path: "/api/dogs/:id",
+    input: z.object({ id, name: z.string().optional(), color: z.string().optional(), archived: z.boolean().optional() }),
+    output: dogSchema,
+  }),
+  sessions: endpoint({ method: "GET", path: "/api/sessions", input: none, output: sessionsViewSchema }),
+  commands: endpoint({
+    method: "POST",
+    path: "/api/commands",
+    input: z.object({ commands: z.array(commandSchema).max(100) }),
+    output: z.object({ applied: z.array(z.string()), dropped: z.array(z.string()), view: sessionsViewSchema }),
+  }),
+  entries: endpoint({
+    method: "GET",
+    path: "/api/entries",
+    input: z.object({ type: z.string().optional(), by: z.string().optional(), day: z.string().optional(), dog: z.string().optional(), offset: z.coerce.number().int().min(0).optional() }),
+    output: z.object({ entries: z.array(entryViewSchema), more: z.boolean() }),
+  }),
+  logEntry: endpoint({ method: "POST", path: "/api/entries", input: entryWrite, output: entryViewSchema }),
+  editEntry: endpoint({ method: "PATCH", path: "/api/entries/:id", input: entryEdit, output: entryViewSchema }),
+  deleteEntry: endpoint({ method: "DELETE", path: "/api/entries/:id", input: z.object({ id }), output: z.object({ deleted: z.literal(true) }) }),
   updateMe: endpoint({
     method: "PATCH",
     path: "/api/me",

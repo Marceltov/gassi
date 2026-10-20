@@ -4,8 +4,8 @@
 import type { Command } from "./commands";
 
 export type Person = { id: string; name: string };
-export type WalkView = { key: string; startedAt: string; walkers: Person[]; pauses: { startedAt: string; endedAt: string | null }[]; paused: boolean };
-export type TrainingView = { key: string; startedAt: string; walkKey: string | null; exercises: number[]; treats: Record<number, number> };
+export type WalkView = { key: string; startedAt: string; dogIds: number[]; walkers: Person[]; pauses: { startedAt: string; endedAt: string | null }[]; paused: boolean };
+export type TrainingView = { key: string; startedAt: string; dogIds: number[]; walkKey: string | null; exercises: number[]; treats: Record<number, number> };
 export type SessionsView = { walk: WalkView | null; training: TrainingView | null };
 
 const byTime = (a: Command, b: Command) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
@@ -15,7 +15,7 @@ function step(v: SessionsView, c: Command, user: Person): SessionsView {
   switch (c.kind) {
     case "walk.start":
     case "walk.join": {
-      if (!walk) return c.kind === "walk.start" ? { ...v, walk: { key: c.walkKey, startedAt: c.at, walkers: [user], pauses: [], paused: false } } : v;
+      if (!walk) return c.kind === "walk.start" ? { ...v, walk: { key: c.walkKey, startedAt: c.at, dogIds: c.dogIds ?? [], walkers: [user], pauses: [], paused: false } } : v;
       // A start from this phone lends its key: the server joins it to the walk that really runs, and if the shown walk
       // is an old one (a page cached by the service worker), the taps still reach the walk just started.
       const keyed = c.kind === "walk.start" ? { ...walk, key: c.walkKey } : walk;
@@ -28,7 +28,7 @@ function step(v: SessionsView, c: Command, user: Person): SessionsView {
     case "walk.stop":
       return { walk: null, training: training?.walkKey ? null : training };
     case "training.start":
-      return training ? { ...v, training: { ...training, key: c.trainingKey } } : { ...v, training: { key: c.trainingKey, startedAt: c.at, walkKey: c.walkKey ?? null, exercises: [], treats: {} } };
+      return training ? { ...v, training: { ...training, key: c.trainingKey } } : { ...v, training: { key: c.trainingKey, startedAt: c.at, dogIds: c.dogIds ?? [], walkKey: c.walkKey ?? null, exercises: [], treats: {} } };
     case "training.stop":
       return { ...v, training: null };
     case "training.exercise": {

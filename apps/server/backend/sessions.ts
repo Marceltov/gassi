@@ -79,7 +79,7 @@ export class Sessions {
     const repo = new EntryRepository(db);
     const [walk, training] = await Promise.all([repo.running("walk"), repo.running("training")]);
     return {
-      walk: walk ? { key: walk.clientKey!, startedAt: walk.at, walkers: await this.walkers(walk.id), ...(await this.pauses(walk.id)) } : null,
+      walk: walk ? { key: walk.clientKey!, startedAt: walk.at, dogIds: walk.dogIds, walkers: await this.walkers(walk.id), ...(await this.pauses(walk.id)) } : null,
       training: training ? await this.trainingView(training, walk) : null,
     };
   }
@@ -135,6 +135,7 @@ export class Sessions {
     return {
       key: t.clientKey!,
       startedAt: t.at,
+      dogIds: t.dogIds,
       walkKey: walk && walk.at <= t.at ? walk.clientKey : null,
       exercises: exercises.map((r) => r.exercise_id),
       treats: Object.fromEntries(treats.map((r) => [r.treat_kind_id, r.count])),
@@ -177,7 +178,7 @@ class Step {
   async run(c: Command): Promise<Outcome> {
     switch (c.kind) {
       case "walk.start":
-        return this.start("walk", c.walkKey, c.at);
+        return this.start("walk", c.walkKey, c.at, null, c.dogIds);
       case "walk.join":
         return this.onWalk(c.walkKey, c.at, (w) => this.addWalker(w.id));
       case "walk.pause":
@@ -190,7 +191,7 @@ class Step {
         const walk = c.walkKey ? await this.find(c.walkKey, "walk") : undefined;
         if (c.walkKey && (!walk || isOver(walk, c.at))) return "dropped";
         // started before the walk ended but arriving after the stop: it ended with the walk
-        return this.start("training", c.trainingKey, c.at, walk?.endedAt ?? null);
+        return this.start("training", c.trainingKey, c.at, walk?.endedAt ?? null, c.dogIds);
       }
       case "training.stop": {
         const t = await this.find(c.trainingKey, "training");
@@ -202,9 +203,12 @@ class Step {
         return this.onTraining(c.trainingKey, c.at, (t) => this.exercise(t, c.exerciseId, c.on));
       case "training.treat":
         return this.onTraining(c.trainingKey, c.at, (t) => this.treat(t, c.treatKindId, c.delta));
-      case "log":
-        await this.create(c.type, c.at, null);
+      case "log": {
+        // a dog that isn't (or is no longer) the household's: the tap can't belong anywhere
+        if (!(await this.activeDogs()).includes(c.dogId)) return "dropped";
+        await this.create(c.type, c.at, null, [c.dogId]);
         return "applied";
+      }
     }
   }
 
@@ -212,19 +216,24 @@ class Step {
     return findByKey(this.tx, key, type);
   }
 
-  // Until commands name their dogs (step 1, task 7): every active dog, or the first for pee and poop.
-  private async defaultDogs(type: Entry["type"]): Promise<number[]> {
-    const ids = await new DogRepository(this.tx).activeIds();
-    return type === "pee" || type === "poop" ? ids.slice(0, 1) : ids;
+  private activeDogs(): Promise<number[]> {
+    return new DogRepository(this.tx).activeIds();
   }
 
-  private async create(type: Entry["type"], at: string, clientKey: string | null): Promise<Entry> {
-    return this.entries.create({ type, at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: null, dogIds: await this.defaultDogs(type), loggedBy: this.user.id, clientKey });
+  /** The named dogs that are active; none named, or none of them active: every active dog. */
+  private async dogsFor(requested: readonly number[] | undefined): Promise<number[]> {
+    const active = await this.activeDogs();
+    const named = (requested ?? []).filter((id) => active.includes(id));
+    return named.length ? named : active;
+  }
+
+  private create(type: Entry["type"], at: string, clientKey: string | null, dogIds: number[]): Promise<Entry> {
+    return this.entries.create({ type, at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: null, dogIds, loggedBy: this.user.id, clientKey });
   }
 
   // A start joins the walk/training that runs now, or the one that was running at the tap's time (a start queued without
   // reception that arrives after the stop); only otherwise does it begin a new one.
-  private async start(type: "walk" | "training", key: string, at: string, endedAt: string | null = null): Promise<Outcome> {
+  private async start(type: "walk" | "training", key: string, at: string, endedAt: string | null, dogIds: readonly number[] | undefined): Promise<Outcome> {
     let e = await this.find(key, type);
     if (e && isOver(e, at)) return "dropped";
     if (!e) {
@@ -238,7 +247,7 @@ class Step {
         }
       }
       else {
-        e = await this.create(type, at, key);
+        e = await this.create(type, at, key, await this.dogsFor(dogIds));
         if (endedAt) await this.end(e, endedAt);
       }
     }

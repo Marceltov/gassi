@@ -3,11 +3,22 @@ import { Devices } from "../auth/devices";
 import { appLink, INVITE_TTL, Links } from "../auth/links";
 import { type Mailer, sendMagicLink } from "../auth/mail";
 import { InputError } from "../errors";
+import { Diary } from "../diary";
+import { DogRepository } from "../dogs";
 import { PeopleRepository } from "../people";
+import { Sessions } from "../sessions";
 import type { DB } from "../db/open";
 import { type Implementations, NotFound, router } from "./router";
 
-export type ApiDeps = { db: DB; now: () => Date; publicUrl: string; oidc: boolean; mailer: Mailer | null };
+export type ApiDeps = { db: DB; now: () => Date; publicUrl: string; oidc: boolean; mailer: Mailer | null; timeZone?: string /* default Europe/Berlin */ };
+
+const names = (deps: ApiDeps) => new PeopleRepository(deps.db).names();
+const diary = async (deps: ApiDeps) => new Diary({ db: deps.db, names: await names(deps), timeZone: deps.timeZone ?? "Europe/Berlin", now: deps.now });
+const sessions = async (deps: ApiDeps) => new Sessions({ db: deps.db, names: await names(deps), now: deps.now });
+const dogs = (deps: ApiDeps) => new DogRepository(deps.db, deps.now);
+const missing = (what: string) => {
+  throw new NotFound(what);
+};
 
 const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl);
 
@@ -29,6 +40,21 @@ const implementations: Implementations<ApiDeps> = {
     if (!(await links(deps).revoke(auth.person.id, input.id))) throw new NotFound("Diese Einladung gibt es nicht.");
     return { revoked: true as const };
   },
+  dogs: async ({ input, deps }) => ({ dogs: await dogs(deps).list({ withArchived: input.archived === "1" }) }),
+  addDog: async ({ input, deps }) => dogs(deps).add(input),
+  updateDog: async ({ input: { id, ...change }, deps }) => (await dogs(deps).update(id, change)) ?? missing("Diesen Hund gibt es nicht."),
+  sessions: async ({ deps }) => (await sessions(deps)).current(),
+  commands: async ({ input, auth, deps }) => {
+    const s = await sessions(deps);
+    return { ...(await s.apply(auth.person, input.commands)), view: await s.current() };
+  },
+  entries: async ({ input, deps }) => {
+    const d = await diary(deps);
+    return d.history(d.filter(input), input.offset ?? 0);
+  },
+  logEntry: async ({ input, auth, deps }) => (await diary(deps)).log(auth.person, { at: deps.now().toISOString(), ...input }),
+  editEntry: async ({ input: { id, ...fields }, deps }) => (await (await diary(deps)).edit(id, fields)) ?? missing("Diesen Eintrag gibt es nicht."),
+  deleteEntry: async ({ input, deps }) => ((await (await diary(deps)).remove(input.id)) ? { deleted: true as const } : missing("Diesen Eintrag gibt es nicht.")),
   updateMe: async ({ input, auth, deps }) => ({ person: await new PeopleRepository(deps.db, deps.now).update(auth.person.id, input) }),
   me: async ({ auth, deps }) => ({ person: auth.person, device: auth.device, household: { oidc: deps.oidc, mail: deps.mailer !== null } }),
   devices: async ({ auth, deps }) => ({

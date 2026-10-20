@@ -5,7 +5,6 @@ import { database } from "./db/open";
 import { type Mailer, smtpMailer } from "./auth/mail";
 import { apiRouter } from "./http/api";
 import { type Landing, landing } from "./http/landing";
-import { commandsRoute } from "./http/commands";
 import { exportRoute } from "./http/export";
 import { healthRoute } from "./http/health";
 import { logged } from "./http/requestlog";
@@ -22,14 +21,13 @@ export const oidcStart = logged((req) => oidcStartRoute(req));
 export const oidcCallback = logged((req) => oidcCallbackRoute(req));
 export const logout = logged(() => logoutRoute());
 export const exportCsv = logged((req) => exportRoute(req));
-export const commands = logged((req) => commandsRoute(req));
 // One SMTP transport per process (it pools connections).
 let cachedMailer: { url: string; mailer: Mailer } | null = null;
 const mailer = (smtp: { url: string; from: string }): Mailer => (cachedMailer?.url === smtp.url ? cachedMailer : (cachedMailer = { url: smtp.url, mailer: smtpMailer(smtp) })).mailer;
 
 export const api = logged(async (req) => {
-  const { publicUrl, oidc, smtp } = config();
-  return apiRouter({ db: await database(), now: () => new Date(), publicUrl, oidc: oidc !== null, mailer: smtp && mailer(smtp) })(req);
+  const { publicUrl, oidc, smtp, timeZone } = config();
+  return apiRouter({ db: await database(), now: () => new Date(), publicUrl, oidc: oidc !== null, mailer: smtp && mailer(smtp), timeZone })(req);
 });
 
 // The use cases (backend/diary.ts) and what they hand out.

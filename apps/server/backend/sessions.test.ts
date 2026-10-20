@@ -44,7 +44,7 @@ describe("walks", () => {
   test("a running walk shows who walks, since when and whether it is paused", async () => {
     const s = sessions();
     await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" }), cmd(10, { kind: "walk.pause", walkKey: "w" })]);
-    expect((await s.current()).walk).toEqual({ key: "w", startedAt: at(0), walkers: [HIRSCH], pauses: [{ startedAt: at(10), endedAt: null }], paused: true });
+    expect((await s.current()).walk).toEqual({ key: "w", startedAt: at(0), dogIds: [1], walkers: [HIRSCH], pauses: [{ startedAt: at(10), endedAt: null }], paused: true });
   });
 
   test("second start joins the running walk", async () => {
@@ -59,7 +59,7 @@ describe("walks", () => {
   test("a start that arrives after the walk ended joins that walk", async () => {
     const s = sessions();
     await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w1" }), cmd(40, { kind: "walk.stop", walkKey: "w1" })]);
-    await s.apply(HERZII, [cmd(1, { kind: "walk.start", walkKey: "w2" }), cmd(5, { kind: "log", type: "pee" })]); // queued without reception
+    await s.apply(HERZII, [cmd(1, { kind: "walk.start", walkKey: "w2" }), cmd(5, { kind: "log", type: "pee", dogId: 1 })]); // queued without reception
     expect((await entries()).filter((e) => e.type === "walk")).toHaveLength(1);
     expect(await s.current()).toEqual({ walk: null, training: null });
     expect(await s.summaryFor("w2")).toMatchObject({ totalMin: 40, walkers: [HIRSCH, HERZII], pee: 1 });
@@ -101,8 +101,8 @@ describe("walks", () => {
 
   test("applied ids older than 30 days are forgotten", async () => {
     const old = new Sessions({ db: db(), names, now: () => new Date("2026-09-01T12:00:00Z") });
-    await old.apply(HIRSCH, [cmd("2026-09-01T09:00:00.000Z", { id: "old", kind: "log", type: "pee" })]);
-    await sessions().apply(HIRSCH, [cmd(0, { kind: "log", type: "poop" })]);
+    await old.apply(HIRSCH, [cmd("2026-09-01T09:00:00.000Z", { id: "old", kind: "log", type: "pee", dogId: 1 })]);
+    await sessions().apply(HIRSCH, [cmd(0, { kind: "log", type: "poop", dogId: 1 })]);
     const ids = (await db().selectFrom("applied_command").select("id").execute()).map((r) => r.id);
     expect(ids).not.toContain("old");
     expect(ids).toHaveLength(1);
@@ -159,7 +159,7 @@ describe("walks", () => {
   test("late pipi after stop is a plain entry", async () => {
     const s = sessions();
     await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" }), cmd(30, { kind: "walk.stop", walkKey: "w" })]);
-    const pipi = cmd(40, { kind: "log", type: "pee" });
+    const pipi = cmd(40, { kind: "log", type: "pee", dogId: 1 });
     expect(await s.apply(HERZII, [pipi])).toEqual({ applied: [pipi.id], dropped: [] });
     const all = await entries();
     expect(all[0]).toMatchObject({ type: "pee", at: at(40), loggedBy: "bille" });
@@ -169,8 +169,8 @@ describe("walks", () => {
   test("applying a command id twice changes nothing", async () => {
     const s = sessions();
     const start = cmd(0, { kind: "walk.start", walkKey: "w" });
-    const pipi = cmd(5, { kind: "log", type: "pee" });
-    const treat = cmd(6, { kind: "log", type: "poop" });
+    const pipi = cmd(5, { kind: "log", type: "pee", dogId: 1 });
+    const treat = cmd(6, { kind: "log", type: "poop", dogId: 1 });
     await s.apply(HIRSCH, [start, pipi, treat]);
     const before = await entries();
     expect(await s.apply(HIRSCH, [start, pipi, treat])).toEqual({ applied: [start.id, pipi.id, treat.id], dropped: [] });
@@ -192,16 +192,46 @@ describe("walks", () => {
   test("summary counts pee/poop inside the walk's time only", async () => {
     const s = sessions();
     await s.apply(HIRSCH, [
-      cmd(0, { kind: "log", type: "pee" }),
+      cmd(0, { kind: "log", type: "pee", dogId: 1 }),
       cmd(1, { kind: "walk.start", walkKey: "w" }),
-      cmd(5, { kind: "log", type: "pee" }),
-      cmd(6, { kind: "log", type: "poop" }),
-      cmd(7, { kind: "log", type: "pee" }),
+      cmd(5, { kind: "log", type: "pee", dogId: 1 }),
+      cmd(6, { kind: "log", type: "poop", dogId: 1 }),
+      cmd(7, { kind: "log", type: "pee", dogId: 1 }),
       cmd(30, { kind: "walk.stop", walkKey: "w" }),
-      cmd(31, { kind: "log", type: "poop" }),
+      cmd(31, { kind: "log", type: "poop", dogId: 1 }),
     ]);
     const walk = (await entries()).find((e) => e.type === "walk")!;
     expect(await s.summary(walk.id)).toMatchObject({ pee: 2, poop: 1 });
+  });
+});
+
+describe("dogs", () => {
+  const addDog = async (name: string, archived = false) =>
+    (await db().insertInto("dog").values({ name, color: "#3a6fc0", archived: archived ? 1 : 0, created_at: "2026-01-01T00:00:00.000Z" }).returning("id").executeTakeFirstOrThrow()).id;
+
+  test("a walk without dogIds takes all active dogs; with dogIds just those", async () => {
+    const bruno = await addDog("Bruno");
+    await addDog("Alt", true);
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w1" })]);
+    expect((await s.current()).walk!.dogIds).toEqual([1, bruno]);
+    await s.apply(HIRSCH, [cmd(30, { kind: "walk.stop", walkKey: "w1" }), cmd(40, { kind: "walk.start", walkKey: "w2", dogIds: [bruno] })]);
+    expect((await s.current()).walk!.dogIds).toEqual([bruno]);
+  });
+
+  test("a log with an unknown or archived dog is dropped", async () => {
+    const old = await addDog("Alt", true);
+    const unknown = cmd(1, { kind: "log", type: "pee", dogId: 999 });
+    const archived = cmd(2, { kind: "log", type: "pee", dogId: old });
+    const fine = cmd(3, { kind: "log", type: "poop", dogId: 1 });
+    expect(await sessions().apply(HIRSCH, [unknown, archived, fine])).toEqual({ applied: [fine.id], dropped: [unknown.id, archived.id] });
+    expect((await entries()).map((e) => [e.type, e.dogIds])).toEqual([["poop", [1]]]);
+  });
+
+  test("unknown dogs in a start are left out; if none is left, all active dogs come", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "training.start", trainingKey: "t", dogIds: [999] })]);
+    expect((await s.current()).training!.dogIds).toEqual([1]);
   });
 });
 
@@ -209,7 +239,7 @@ describe("trainings", () => {
   test("training at home has no walkKey", async () => {
     const s = sessions();
     await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t" })]);
-    expect((await s.current()).training).toEqual({ key: "t", startedAt: at(0), walkKey: null, exercises: [], treats: {} });
+    expect((await s.current()).training).toEqual({ key: "t", startedAt: at(0), dogIds: [1], walkKey: null, exercises: [], treats: {} });
     await s.apply(HERZII, [cmd(12, { kind: "training.stop", trainingKey: "t" })]);
     expect(await s.current()).toEqual({ walk: null, training: null });
     expect((await entries())[0]).toMatchObject({ type: "training", durationMin: 12, loggedBy: "bille" });

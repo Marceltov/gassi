@@ -6,7 +6,7 @@ const memory = () => {
   const data = new Map<string, string>();
   return { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), data };
 };
-const pipi = (id: string): Command => ({ id, at: "2026-10-20T09:00:00.000Z", kind: "log", type: "pee" });
+const pipi = (id: string): Command => ({ id, at: "2026-10-20T09:00:00.000Z", kind: "log", type: "pee", dogId: 1 });
 const answer = (applied: string[], dropped: string[] = []): CommandAnswer => ({ applied, dropped, view: { walk: null, training: null } });
 
 test("keeps commands while sending fails, in storage, and sends them later", async () => {

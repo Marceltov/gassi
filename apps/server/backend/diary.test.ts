@@ -51,7 +51,7 @@ describe("today", () => {
     clock = new Date("2026-10-20T10:00:00Z");
     await new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"]]), now: () => clock }).apply(HIRSCH, [{ id: "c1", at: "2026-10-20T09:40:00.000Z", kind: "walk.start", walkKey: "w" }]);
     const today = await diary().today();
-    expect(today.sessions).toEqual({ walk: { key: "w", startedAt: "2026-10-20T09:40:00.000Z", walkers: [HIRSCH], pauses: [], paused: false }, training: null });
+    expect(today.sessions).toEqual({ walk: { key: "w", startedAt: "2026-10-20T09:40:00.000Z", dogIds: [1], walkers: [HIRSCH], pauses: [], paused: false }, training: null });
   });
 });
 
@@ -248,4 +248,26 @@ describe("walks that span days", () => {
 test("food keeps its kind when edited", async () => {
   const e = await diary().log(HIRSCH, { type: "food", foodKind: "wet", amountG: 200, at: "2026-10-20T09:00:00Z" });
   await expect(diary().edit(e.id, { at: e.at, amountG: 200, foodKind: "" })).rejects.toThrow(new InputError("Welche Futterart?"));
+});
+
+describe("entries and dogs", () => {
+  const addDog = async (name: string) => (await db().insertInto("dog").values({ name, color: "#3a6fc0", created_at: "2026-01-01T00:00:00.000Z" }).returning("id").executeTakeFirstOrThrow()).id;
+
+  test("with one dog, pee needs no dog named; with two it does", async () => {
+    expect(await diary().log(HIRSCH, { type: "pee", at: "2026-10-20T09:00:00Z" })).toMatchObject({ dogIds: [1] });
+    const bruno = await addDog("Bruno");
+    await expect(diary().log(HIRSCH, { type: "pee", at: "2026-10-20T09:05:00Z" })).rejects.toThrow(new InputError("Für welchen Hund?"));
+    expect(await diary().log(HIRSCH, { type: "pee", dogIds: [bruno], at: "2026-10-20T09:05:00Z" })).toMatchObject({ dogIds: [bruno] });
+    await expect(diary().log(HIRSCH, { type: "pee", dogIds: [1, bruno], at: "2026-10-20T09:06:00Z" })).rejects.toThrow(new InputError("Das geht nur für einen Hund."));
+    expect(await diary().log(HIRSCH, { type: "food", foodKind: "dry", amountG: 80, at: "2026-10-20T09:07:00Z" })).toMatchObject({ dogIds: [1, bruno] });
+    await expect(diary().log(HIRSCH, { type: "pee", dogIds: [999], at: "2026-10-20T09:08:00Z" })).rejects.toThrow(new InputError("Diesen Hund gibt es nicht."));
+  });
+
+  test("entries list filters by dog", async () => {
+    const bruno = await addDog("Bruno");
+    await diary().log(HIRSCH, { type: "pee", dogIds: [1], at: "2026-10-20T09:00:00Z" });
+    const his = await diary().log(HIRSCH, { type: "pee", dogIds: [bruno], at: "2026-10-20T09:01:00Z" });
+    expect(diary().filter({ dog: String(bruno) })).toEqual({ dog: bruno });
+    expect((await diary().history({ dog: bruno })).entries.map((e) => e.id)).toEqual([his.id]);
+  });
 });

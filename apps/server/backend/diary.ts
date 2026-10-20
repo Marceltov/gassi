@@ -3,7 +3,7 @@
 // validated here (zod); a problem is an InputError with a German message the screen can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { computeStock, dayBounds, dogRule, type Entry, entryFields, type EntryType, FOOD_KINDS, type FoodKind, isEntryType, latestByType, mondayOf, newEntryInput, type Stock, TILE_TYPES, weekBounds, type WeekInput, type WeekView, weekView } from "@gassi/domain";
+import { checkDogs, computeStock, dayBounds, dogRule, type Entry, entryFields, type EntryType, FOOD_KINDS, type FoodKind, isEntryType, latestByType, mondayOf, newEntryInput, type Stock, TILE_TYPES, weekBounds, type WeekInput, type WeekView, weekView } from "@gassi/domain";
 import type { User } from "./auth/session";
 import { config } from "./config";
 import { database, type DB } from "./db/open";
@@ -27,7 +27,7 @@ export type TodayView = {
   lastFood: Record<FoodKind, number | null>; // the usual portions, for the food sheet
 };
 
-export type HistoryFilter = { type?: EntryType; by?: string; day?: string };
+export type HistoryFilter = { type?: EntryType; by?: string; day?: string; dog?: number };
 export type HistoryPage = { entries: EntryView[]; more: boolean };
 
 export const HISTORY_PAGE = 50;
@@ -65,6 +65,7 @@ const stockInput = z.union([
 const weightInput = z.object({
   kg: z.preprocess((v) => (typeof v === "string" ? (v.trim() ? Number(v.trim().replace(",", ".")) : NaN) : v), z.number().min(0.5).max(100)),
   at: z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString()),
+  dogIds: z.array(z.number().int().positive()).optional(),
 });
 
 // Food, restocks and stock counts belong to one kind: without it they would count for neither stock.
@@ -97,18 +98,19 @@ export class Diary {
   }
 
   /** The history filter from untrusted values (search params, an action's argument): anything unknown is left out. */
-  filter(raw: { type?: unknown; by?: unknown; day?: unknown }): HistoryFilter {
+  filter(raw: { type?: unknown; by?: unknown; day?: unknown; dog?: unknown }): HistoryFilter {
     return {
       ...(isEntryType(raw.type) ? { type: raw.type } : {}),
       ...(typeof raw.by === "string" && this.deps.names.has(raw.by) ? { by: raw.by } : {}),
       ...(isDay(raw.day) ? { day: raw.day } : {}),
+      ...(/^[1-9]\d*$/.test(String(raw.dog ?? "")) ? { dog: Number(raw.dog) } : {}),
     };
   }
 
   async log(user: User, input: unknown): Promise<EntryView> {
     const fields = parse(newEntryInput, input);
     needsKind(fields.type, fields.foodKind);
-    return this.view1(await this.entries.create({ ...fields, dogIds: fields.dogIds ?? (await this.defaultDogs(fields.type)), loggedBy: user.id }));
+    return this.view1(await this.entries.create({ ...fields, dogIds: await this.dogsFor(fields.type, fields.dogIds), loggedBy: user.id }));
   }
 
   /** Logs on behalf of `loggedBy` (the API): someone who has signed in at least once. */
@@ -122,6 +124,7 @@ export class Diary {
     const fields = parse(entryFields, input);
     const before = await this.entries.get(id);
     if (before) needsKind(before.type, fields.foodKind);
+    if (before && fields.dogIds) fields.dogIds = await this.dogsFor(before.type, fields.dogIds);
     // without an end it would run again (it was started on the walk screen); a walk logged afterwards may lose its end
     if (before?.clientKey && before.endedAt && !fields.endedAt) throw new InputError(before.type === "walk" ? "Eine beendete Runde braucht ein Ende." : "Ein beendetes Training braucht ein Ende.");
     const entry = await this.entries.update(id, fields);
@@ -177,7 +180,7 @@ export class Diary {
     const r = weightInput.safeParse(input);
     if (!r.success) throw new InputError(r.error.issues[0]?.path[0] === "at" ? MESSAGES.at : "Das Gewicht muss zwischen 0,5 und 100 kg liegen.");
     const amountG = Math.round(r.data.kg * 10) * 100;
-    return this.view1(await this.entries.create({ type: "weight", at: r.data.at, endedAt: null, amountG, foodKind: null, unitG: null, note: null, dogIds: await this.defaultDogs("weight"), loggedBy: user.id }));
+    return this.view1(await this.entries.create({ type: "weight", at: r.data.at, endedAt: null, amountG, foodKind: null, unitG: null, note: null, dogIds: await this.dogsFor("weight", r.data.dogIds), loggedBy: user.id }));
   }
 
   async stock(): Promise<Stock> {
@@ -192,7 +195,7 @@ export class Diary {
 
   async history(filter: HistoryFilter, offset = 0): Promise<HistoryPage> {
     const day = filter.day ? dayBounds(Date.parse(`${filter.day}T12:00:00Z`), this.deps.timeZone) : null;
-    const rows = await this.entries.list({ type: filter.type, loggedBy: filter.by, ...(day ? { since: iso(day.start), until: iso(day.end), overlapping: true } : {}), offset, limit: HISTORY_PAGE + 1 });
+    const rows = await this.entries.list({ type: filter.type, loggedBy: filter.by, dogId: filter.dog, ...(day ? { since: iso(day.start), until: iso(day.end), overlapping: true } : {}), offset, limit: HISTORY_PAGE + 1 });
     return { entries: await this.views(rows.slice(0, HISTORY_PAGE)), more: rows.length > HISTORY_PAGE };
   }
 
@@ -223,12 +226,20 @@ export class Diary {
     return this.views(await this.entries.list({ ...query }));
   }
 
-  // Until entries name their dogs (step 1, task 7): every active dog, or the first for one-dog types.
-  private async defaultDogs(type: EntryType): Promise<number[]> {
+  /** The dogs an entry of `type` is for: the named ones (active, fitting the type), else the default: no dog for
+   * restocks and notes, all active dogs for walks, trainings and food, the only dog for pee/poop/weight if there is one. */
+  private async dogsFor(type: EntryType, requested: number[] | undefined): Promise<number[]> {
     const rule = dogRule(type);
-    if (rule === "none") return [];
-    const ids = await new DogRepository(this.deps.db).activeIds();
-    return rule === "one" ? ids.slice(0, 1) : ids;
+    const active = await new DogRepository(this.deps.db).activeIds();
+    if (requested === undefined) {
+      if (rule === "none") return [];
+      if (rule === "some" || active.length === 1) return active;
+      throw new InputError("Für welchen Hund?");
+    }
+    if (requested.some((id) => !active.includes(id))) throw new InputError("Diesen Hund gibt es nicht.");
+    const problem = checkDogs(type, requested);
+    if (problem) throw new InputError(problem);
+    return [...new Set(requested)];
   }
 
   private async view1(e: Entry): Promise<EntryView> {
