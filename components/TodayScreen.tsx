@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { IconChevronRight, IconTarget, IconWalk } from "@tabler/icons-react";
 import { logEntry } from "@/app/actions";
 import type { TodayView, User } from "@/backend";
@@ -10,6 +10,7 @@ import type { EntryType } from "@/shared/entryTypes";
 import { dayHeading } from "@/shared/time";
 import { TYPE_COLOR } from "./entryStyle";
 import { EntryList } from "./EntryList";
+import { FoodSheet } from "./FoodSheet";
 import { TodayTiles } from "./TodayTiles";
 import { useEntrySheet } from "./useEntrySheet";
 import { useLiveRefresh } from "./useLiveRefresh";
@@ -18,7 +19,7 @@ import { newId, useSessions } from "./useSessions";
 import { WalksSince } from "./WalksSince";
 
 // Heute: who is out with the dog right now, the tiles, "Training starten", then today's entries. The Gassi tile starts
-// a walk (or opens the running one); the other tiles log "now, by me". The page reloads its data after every change,
+// a walk (or opens the running one), Futter opens the food sheet; Pipi and Poopoo log "now, by me". The page reloads its data after every change,
 // when the app comes back to the foreground and every 30 s, so the other phone's walk shows up.
 export function TodayScreen({ view, user }: { view: TodayView; user: User }) {
   const router = useRouter();
@@ -27,6 +28,8 @@ export function TodayScreen({ view, user }: { view: TodayView; user: User }) {
   const sheet = useEntrySheet(view.timeZone);
   const sessions = useSessions(view.sessions, user, refresh);
   const [busy, startTransition] = useTransition();
+  const [foodOpen, setFoodOpen] = useState(false);
+  const closeFood = useCallback(() => setFoodOpen(false), []);
   useLiveRefresh();
   const { walk, training } = sessions.view;
 
@@ -35,6 +38,7 @@ export function TodayScreen({ view, user }: { view: TodayView; user: User }) {
       if (!walk) return void sessions.push({ kind: "walk.start", walkKey: newId() }).then(() => router.push("/runde"));
       return router.push("/runde");
     }
+    if (type === "food") return setFoodOpen(true);
     startTransition(async () => {
       const r = await logEntry({ type, at: new Date().toISOString() });
       if (r.ok) sheet.logged(r.value);
@@ -78,6 +82,16 @@ export function TodayScreen({ view, user }: { view: TodayView; user: User }) {
         </h2>
         {view.entries.length > 0 ? <EntryList entries={view.entries} timeZone={view.timeZone} onSelect={sheet.openEdit} /> : <p className="py-6 text-muted">Noch nichts eingetragen. Tipp oben auf eine Kachel, wenn etwas passiert.</p>}
       </section>
+      {foodOpen && (
+        <FoodSheet
+          lastFood={view.lastFood}
+          onClose={closeFood}
+          onLogged={(e) => {
+            setFoodOpen(false);
+            sheet.logged(e);
+          }}
+        />
+      )}
       {sheet.ui}
     </>
   );

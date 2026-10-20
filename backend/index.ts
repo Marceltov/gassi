@@ -29,3 +29,4 @@ export { catalog, type Exercise, type TreatKind } from "./catalog";
 
 // Walks and trainings while they run (the walk and training screens send their taps to `commands`).
 export { sessions, type SessionsView, type TrainingView, type WalkView, type WalkSummary } from "./sessions";
+export { type Stock } from "./stock";

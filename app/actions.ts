@@ -6,7 +6,7 @@ import { catalog, diary, type EntryView, type Exercise, type HistoryPage, InputE
 import { requireUser } from "@/app/_lib/session";
 import type { Result } from "@/shared/result";
 
-async function run<T>(act: () => Promise<T>, paths = ["/", "/verlauf"]): Promise<Result<T>> {
+async function run<T>(act: () => Promise<T>, paths = ["/", "/verlauf", "/vorrat", "/woche"]): Promise<Result<T>> {
   try {
     const value = await act();
     for (const p of paths) revalidatePath(p);
@@ -35,6 +35,18 @@ export async function editEntry(id: number, input: unknown): Promise<Result<Entr
 export async function deleteEntry(id: number): Promise<Result<null>> {
   await requireUser();
   return run(async () => ((await (await diary()).remove(id)) ? null : missing()));
+}
+
+/** Bought food: `{ foodKind: "wet", cans, unitG }` or `{ foodKind: "dry", grams }`. */
+export async function logRestock(input: unknown): Promise<Result<EntryView>> {
+  const user = await requireUser();
+  return run(async () => (await diary()).restock(user, input));
+}
+
+/** What is there now: `{ foodKind: "wet", cans }` or `{ foodKind: "dry", grams }`. */
+export async function correctStock(input: unknown): Promise<Result<EntryView>> {
+  const user = await requireUser();
+  return run(async () => (await diary()).correctStock(user, input));
 }
 
 /** The next page of the history ("Mehr laden"); `filter` is checked like the page's search params. */

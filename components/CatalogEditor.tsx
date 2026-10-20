@@ -4,6 +4,7 @@ import { type FormEvent, useState, useTransition } from "react";
 import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { addExercise, addTreatKind, archiveExercise, archiveTreatKind, renameExercise, updateTreatKind } from "@/app/actions";
 import type { Exercise, TreatKind } from "@/backend";
+import { parseDecimal } from "@/shared/food";
 import type { Result } from "@/shared/result";
 
 // The two lists on Einstellungen: exercises (add, rename, remove) and treat kinds (add, change, remove). Every change
@@ -13,8 +14,6 @@ const input = "min-h-12 w-full rounded-xl border border-line bg-bg px-3 text-lg 
 const primary = "flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-4 font-bold text-primary-ink disabled:opacity-60";
 const iconButton = "flex size-12 shrink-0 items-center justify-center rounded-full text-muted";
 
-/** "0,5" or "0.5" → 0.5; anything else → NaN (the server says what is wrong). */
-export const parseDecimal = (v: string) => Number(v.trim().replace(",", "."));
 const formatGrams = (g: number) => `${g.toLocaleString("de-DE", { maximumFractionDigits: 1 })} g`;
 
 function useAction() {
