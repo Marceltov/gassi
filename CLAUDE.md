@@ -11,9 +11,10 @@ commands once phase 1 (scaffold) lands.
 
 ## Repo layout
 
-This is its own git repo, nested inside the homelab `services` repo at `/root/services/gassi`. The parent
-`/root/services/CLAUDE.md` describes homelab conventions (gethomepage network, labels, ports); they apply to the
-deployment compose file, not to the app code here.
+This is its own git repo, checked out at `/root/services/gassi-dev`, a sibling folder the homelab `services` repo
+gitignores. `/root/services/gassi/` belongs to the `services` repo and only holds the deployment (compose file,
+`.env`, `./data`). The parent `/root/services/CLAUDE.md` describes homelab conventions (gethomepage network,
+labels, ports); they apply to that deployment folder, not to the app code here.
 
 ## Decisions to respect (from docs/PLAN.md)
 

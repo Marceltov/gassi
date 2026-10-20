@@ -163,8 +163,9 @@ Each phase ends with its checks passing and a commit. Don't start the next phase
 1. Review and merge the PR. CI pushes `ghcr.io/marceltov/gassi:main`.
 2. authentik: create an OAuth2/OpenID provider and application `gassi` (confidential client, redirect URI
    `https://<host>/api/oidc/callback`, scopes openid, profile, email), and bind it to Hirsch and Herzii.
-3. `services` repo: add the Gassi compose file (port `10038`, gethomepage network, homepage, kuma and dynacat
-   labels, `./data` volume gitignored, `.env` with the variables above). Watchtower stays on.
+3. `services` repo: add `gassi/docker-compose.yaml` (port `10038`, gethomepage network, homepage, kuma and
+   dynacat labels, `./data` volume gitignored, `.env` with the variables above). Watchtower stays on. The app checkout lives in the
+   gitignored sibling `gassi-dev/`, so it doesn't collide.
 4. Caddy: plain reverse proxy for the host, without forward auth.
 5. Switch the hostname over and retire Housetrained.
 
