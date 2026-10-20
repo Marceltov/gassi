@@ -29,7 +29,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       # Kept for a run that passed too: a test that failed once and passed on its retry leaves its trace only here.
       - uses: actions/upload-artifact@v4
@@ -51,18 +51,17 @@ jobs:
           load: true
           tags: gassi:smoke
           cache-from: type=gha
-      - name: Starts on the runner's folder, turns healthy and writes the database as the folder's owner
+      - name: Starts with nothing but PUBLIC_URL, turns healthy, prints the setup link and writes the database as the folder's owner
         run: |
           mkdir data
-          docker run -d --name gassi -p 3000:3000 -v "$PWD/data:/data" \
-            -e PUBLIC_URL=http://localhost:3000 -e SECRET=smoke-secret-0123456789abcdefghijkl \
-            -e OIDC_ISSUER=https://auth.example/application/o/gassi/ -e OIDC_CLIENT_ID=gassi -e OIDC_CLIENT_SECRET=smoke gassi:smoke
+          docker run -d --name gassi -p 3000:3000 -v "$PWD/data:/data" -e PUBLIC_URL=http://localhost:3000 gassi:smoke
           for i in $(seq 1 60); do
             [ "$(docker inspect -f '{{.State.Health.Status}}' gassi)" = healthy ] && break
             sleep 2
           done
           docker inspect -f '{{.State.Health.Status}}' gassi | grep -qx healthy || { docker logs gassi; exit 1; }
           curl -fsS http://localhost:3000/health
+          docker logs gassi 2>&1 | grep -q "Gassi einrichten: http://localhost:3000/l/" || { docker logs gassi; echo "::error::no setup link in the log"; exit 1; }
           owner=$(stat -c %u data/gassi.db)
           [ "$owner" = "$(id -u)" ] || { echo "::error::gassi.db belongs to uid $owner, not $(id -u)"; exit 1; }
 
