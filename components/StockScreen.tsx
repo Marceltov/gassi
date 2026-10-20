@@ -6,6 +6,7 @@ import type { Stock } from "@/backend";
 import { FOOD_KINDS, FOOD_LABEL, type FoodKind } from "@/shared/entryTypes";
 import { formatCans, formatWeight, parseDecimal } from "@/shared/food";
 import type { Result } from "@/shared/result";
+import { BackButton } from "./BackButton";
 import { TYPE_COLOR } from "./entryStyle";
 import { Toast, type ToastMessage } from "./Toast";
 
@@ -19,6 +20,7 @@ export function StockScreen({ stock }: { stock: Stock }) {
   return (
     <>
       <header className="mb-4">
+        <BackButton fallback="/" />
         <h1 className="text-3xl font-extrabold tracking-tight">Vorrat</h1>
         <p className="text-muted">Was noch da ist und wie lange es reicht.</p>
       </header>

@@ -105,10 +105,13 @@ export function TrainingScreen({ view: initial, user, timeZone, exercises, treat
         )}
       </section>
 
-      <button type="button" onClick={done} className="flex min-h-16 items-center justify-center gap-2 rounded-2xl bg-primary text-xl font-bold text-primary-ink">
-        <IconCheck size={26} aria-hidden /> Training fertig
-      </button>
-      <PendingHint count={pending} />
+      {/* always in reach, however long the lists above get */}
+      <div className="sticky bottom-[calc(var(--chrome)+env(safe-area-inset-bottom))] -mx-4 bg-bg/95 px-4 pt-2 pb-3 backdrop-blur">
+        <button type="button" onClick={done} className="flex min-h-16 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-xl font-bold text-primary-ink">
+          <IconCheck size={26} aria-hidden /> Training fertig
+        </button>
+        <PendingHint count={pending} />
+      </div>
     </div>
   );
 }

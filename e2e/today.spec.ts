@@ -5,19 +5,19 @@ test.beforeEach(async ({ page }) => signInAs(page, "marcel"));
 
 const todayList = (page: import("@playwright/test").Page) => page.getByRole("region", { name: /Was heute/ }).getByRole("listitem");
 
-test("tap Pipi: the tile says gerade eben · Hirsch, and undo removes it again", async ({ page }) => {
-  const tile = page.getByRole("button", { name: /^Pipi/ });
+test("Gassi is the big card and shows when Toffee last peed; Pipi in between is one tap, and undo removes it", async ({ page }) => {
+  const gassi = page.getByRole("button", { name: /^Gassi/ });
+  const between = page.getByRole("group", { name: "Zwischendurch" });
   const pees = todayList(page).filter({ hasText: /^\d\d:\d\dPipi/ });
-  const before = { text: await tile.textContent(), pees: await pees.count() };
+  const before = await pees.count();
 
-  await tile.click();
-  await expect(tile).toContainText("gerade eben · Hirsch");
+  await between.getByRole("button", { name: "Pipi", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Pipi eingetragen");
-  await expect(pees).toHaveCount(before.pees + 1);
+  await expect(gassi).toContainText("Pipi gerade eben");
+  await expect(pees).toHaveCount(before + 1);
 
   await page.getByRole("button", { name: "Rückgängig" }).click();
-  await expect(pees).toHaveCount(before.pees);
-  await expect(tile).toHaveText(before.text!);
+  await expect(pees).toHaveCount(before);
 });
 
 test("a past walk with its duration through the Gassi sheet", async ({ page }, info) => {

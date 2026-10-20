@@ -1,14 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
-import { IconChevronRight, IconTarget, IconWalk } from "@tabler/icons-react";
 import { logEntry } from "@/app/actions";
 import type { TodayView, User } from "@/backend";
 import type { EntryType } from "@/shared/entryTypes";
 import { dayHeading } from "@/shared/time";
-import { TYPE_COLOR } from "./entryStyle";
 import { EntryList } from "./EntryList";
 import { FoodSheet } from "./FoodSheet";
 import { TodayTiles } from "./TodayTiles";
@@ -16,9 +13,9 @@ import { useEntrySheet } from "./useEntrySheet";
 import { useLiveRefresh } from "./useLiveRefresh";
 import { useNow } from "./useNow";
 import { newId, useSessions } from "./useSessions";
-import { WalksSince } from "./WalksSince";
 
-// Heute: who is out with the dog right now, the tiles, "Training starten", then today's entries. The Gassi tile starts
+// Heute: the Gassi card, Futter and Training, Pipi and Poopoo in between, then today's entries; who is out with the
+// dog right now shows in the leash bar above the bottom nav. The Gassi tile starts
 // a walk (or opens the running one), Futter opens the food sheet; Pipi and Poopoo log "now, by me". The page reloads its data after every change,
 // when the app comes back to the foreground and every 30 s, so the other phone's walk shows up.
 export function TodayScreen({ view, user }: { view: TodayView; user: User }) {
@@ -57,25 +54,7 @@ export function TodayScreen({ view, user }: { view: TodayView; user: User }) {
         <h1 className="text-3xl font-extrabold tracking-tight">Heute</h1>
         <p className="text-muted">{dayHeading(now, view.timeZone)}</p>
       </header>
-      {walk && (
-        <Link href="/runde" className="mb-3 flex min-h-14 items-center gap-3 rounded-2xl bg-walk px-4 text-lg font-bold text-surface">
-          <IconWalk size={26} aria-hidden />
-          <span className="flex-1">
-            <WalksSince walk={walk} /> unterwegs
-          </span>
-          <IconChevronRight size={24} aria-hidden />
-        </Link>
-      )}
-      <TodayTiles tiles={view.tiles} walk={walk} now={now} busy={busy} onLog={quickLog} onDetails={sheet.openNew} />
-      <button
-        type="button"
-        onClick={startTraining}
-        className="mt-3 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border-2 border-(--c)/35 bg-[color-mix(in_oklab,var(--c)_13%,var(--surface))] text-lg font-bold"
-        style={{ "--c": TYPE_COLOR.training } as React.CSSProperties}
-      >
-        <IconTarget size={24} aria-hidden className="text-(--c)" />
-        {training ? `Training läuft seit ${Math.max(0, Math.floor((now - Date.parse(training.startedAt)) / 60_000))} Min.` : "Training starten"}
-      </button>
+      <TodayTiles tiles={view.tiles} walk={walk} training={training} onWalk={!!walk?.walkers.some((w) => w.username === user.username)} now={now} busy={busy} onLog={quickLog} onDetails={sheet.openNew} onTraining={startTraining} />
       <section aria-labelledby="today-list" className="mt-8">
         <h2 id="today-list" className="mb-2 text-xl font-bold">
           Was heute mit {view.dogName} war
