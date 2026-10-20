@@ -1,8 +1,6 @@
-import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-// Tests that check log lines capture them with logTo(); the rest print nothing.
+// One run over every workspace; each project keeps its own config.
 export default defineConfig({
-  test: { environment: "node", exclude: ["**/node_modules/**", ".next/**", "e2e/**"], env: { LOG_LEVEL: "silent" } },
-  resolve: { alias: { "@": fileURLToPath(new URL(".", import.meta.url)) } },
+  test: { projects: ["packages/*", "apps/server", { test: { name: "tooling", include: ["tooling/**/*.test.ts"] } }] },
 });
