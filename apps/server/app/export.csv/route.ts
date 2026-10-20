@@ -1,4 +1,4 @@
-import { exportCsv } from "@/backend";
+import { exportCsvRoute } from "@/backend";
 
 export const dynamic = "force-dynamic";
-export const GET = exportCsv;
+export const GET = exportCsvRoute;

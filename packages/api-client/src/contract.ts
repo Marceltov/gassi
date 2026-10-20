@@ -106,6 +106,33 @@ export const walkSummarySchema = z.object({
   poop: z.number(),
 });
 
+const exerciseSchema = z.object({ id: z.number(), name: z.string() });
+const treatKindSchema = z.object({ id: z.number(), name: z.string(), gramsPerPiece: z.number(), fromDry: z.boolean() });
+const treatKindInput = z.object({ name: z.string(), gramsPerPiece: z.number(), fromDry: z.boolean() });
+const kindStock = { grams: z.number().nullable(), daysLeft: z.number().nullable(), belowZero: z.boolean() };
+const stockSchema = z.object({ wet: z.object({ ...kindStock, cans: z.number().nullable(), canSizeG: z.number().nullable() }), dry: z.object(kindStock) });
+const personMinutes = z.array(z.object({ id: z.string(), name: z.string(), min: z.number() }));
+const weekSchema = z.object({
+  monday: z.string(),
+  days: z.array(
+    z.object({
+      date: z.string(),
+      bars: z.array(z.object({ type: z.enum(["walk", "training"]), startMin: z.number(), endMin: z.number() })),
+      ticks: z.array(z.object({ type: z.enum(["food", "pee", "poop"]), min: z.number() })),
+      walkMin: z.number(),
+      trainingMin: z.number(),
+    }),
+  ),
+  walkMinByPerson: personMinutes,
+  trainingMinByPerson: personMinutes,
+  exerciseCounts: z.array(z.object({ name: z.string(), count: z.number() })),
+  treats: z.number(),
+});
+// Checked by the server's use cases with German messages, like entries.
+const restockInput = z.custom<{ foodKind: "wet"; cans: number; unitG: number } | { foodKind: "dry"; grams: number }>(isObject);
+const correctInput = z.custom<{ foodKind: "wet"; cans: number } | { foodKind: "dry"; grams: number }>(isObject);
+const weightInput = z.custom<{ kg: number | string; at?: string; dogIds?: number[] }>(isObject);
+
 export const linkKinds = ["setup", "person", "device", "watch", "magic"] as const;
 const openLink = z.object({ id: z.number(), kind: z.enum(linkKinds), createdAt: z.string(), expiresAt: z.string() });
 
@@ -174,6 +201,24 @@ export const contract = {
     input: z.object({ id }),
     output: z.object({ summary: walkSummarySchema, track: z.object({ source: z.enum(["phone", "watch"]), points: z.array(trackPointSchema), metrics: metricsSchema }).nullable() }),
   }),
+  exercises: endpoint({ method: "GET", path: "/api/exercises", input: none, output: z.object({ exercises: z.array(exerciseSchema) }) }),
+  addExercise: endpoint({ method: "POST", path: "/api/exercises", input: z.object({ name: z.string() }), output: exerciseSchema }),
+  updateExercise: endpoint({ method: "PATCH", path: "/api/exercises/:id", input: z.object({ id, name: z.string().optional(), archived: z.literal(true).optional() }), output: z.object({ updated: z.literal(true) }) }),
+  treatKinds: endpoint({ method: "GET", path: "/api/treat-kinds", input: none, output: z.object({ treatKinds: z.array(treatKindSchema) }) }),
+  addTreatKind: endpoint({ method: "POST", path: "/api/treat-kinds", input: treatKindInput, output: treatKindSchema }),
+  updateTreatKind: endpoint({
+    method: "PATCH",
+    path: "/api/treat-kinds/:id",
+    input: z.union([treatKindInput.extend({ id }), z.object({ id, archived: z.literal(true) })]),
+    output: z.object({ updated: z.literal(true) }),
+  }),
+  stock: endpoint({ method: "GET", path: "/api/stock", input: none, output: stockSchema }),
+  restock: endpoint({ method: "POST", path: "/api/stock/restock", input: restockInput, output: entryViewSchema }),
+  correctStock: endpoint({ method: "POST", path: "/api/stock/correct", input: correctInput, output: entryViewSchema }),
+  lastFood: endpoint({ method: "GET", path: "/api/food/last", input: none, output: z.object({ wet: z.number().nullable(), dry: z.number().nullable() }) }),
+  weights: endpoint({ method: "GET", path: "/api/weight", input: none, output: z.object({ weights: z.array(entryViewSchema) }) }),
+  logWeight: endpoint({ method: "POST", path: "/api/weight", input: weightInput, output: entryViewSchema }),
+  week: endpoint({ method: "GET", path: "/api/week", input: z.object({ w: z.string().optional() }), output: weekSchema }),
   updateMe: endpoint({
     method: "PATCH",
     path: "/api/me",

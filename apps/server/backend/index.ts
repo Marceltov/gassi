@@ -5,7 +5,7 @@ import { database } from "./db/open";
 import { type Mailer, smtpMailer } from "./auth/mail";
 import { apiRouter } from "./http/api";
 import { type Landing, landing } from "./http/landing";
-import { exportRoute } from "./http/export";
+import { exportCsv } from "./http/export";
 import { healthRoute } from "./http/health";
 import { logged } from "./http/requestlog";
 import { logoutRoute, oidcCallbackRoute, oidcStartRoute } from "./oidc/routes";
@@ -20,7 +20,7 @@ export const health = logged(() => healthRoute());
 export const oidcStart = logged((req) => oidcStartRoute(req));
 export const oidcCallback = logged((req) => oidcCallbackRoute(req));
 export const logout = logged(() => logoutRoute());
-export const exportCsv = logged((req) => exportRoute(req));
+export const exportCsvRoute = logged(async (req) => exportCsv(req, { db: await database(), now: () => new Date(), timeZone: config().timeZone }));
 // One SMTP transport per process (it pools connections).
 let cachedMailer: { url: string; mailer: Mailer } | null = null;
 const mailer = (smtp: { url: string; from: string }): Mailer => (cachedMailer?.url === smtp.url ? cachedMailer : (cachedMailer = { url: smtp.url, mailer: smtpMailer(smtp) })).mailer;

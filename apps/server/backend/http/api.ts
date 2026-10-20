@@ -3,6 +3,7 @@ import { Devices } from "../auth/devices";
 import { appLink, INVITE_TTL, Links } from "../auth/links";
 import { type Mailer, sendMagicLink } from "../auth/mail";
 import { InputError } from "../errors";
+import { Catalog } from "../catalog";
 import { Diary } from "../diary";
 import { DogRepository } from "../dogs";
 import { PeopleRepository } from "../people";
@@ -63,6 +64,29 @@ const implementations: Implementations<ApiDeps> = {
     const [summary, track] = await Promise.all([(await sessions(deps)).summary(input.id), new Tracks(deps.db, deps.now).forWalk(input.id)]);
     return { summary, track };
   },
+  exercises: async ({ deps }) => ({ exercises: await new Catalog(deps.db).exercises() }),
+  addExercise: async ({ input, deps }) => new Catalog(deps.db).addExercise(input.name),
+  updateExercise: async ({ input, deps }) => {
+    const c = new Catalog(deps.db);
+    if (input.name !== undefined) await c.renameExercise(input.id, input.name);
+    if (input.archived) await c.archiveExercise(input.id);
+    return { updated: true as const };
+  },
+  treatKinds: async ({ deps }) => ({ treatKinds: await new Catalog(deps.db).treatKinds() }),
+  addTreatKind: async ({ input, deps }) => new Catalog(deps.db).addTreatKind(input),
+  updateTreatKind: async ({ input, deps }) => {
+    const c = new Catalog(deps.db);
+    if ("archived" in input) await c.archiveTreatKind(input.id);
+    else await c.updateTreatKind(input.id, input);
+    return { updated: true as const };
+  },
+  stock: async ({ deps }) => (await diary(deps)).stock(),
+  restock: async ({ input, auth, deps }) => (await diary(deps)).restock(auth.person, input),
+  correctStock: async ({ input, auth, deps }) => (await diary(deps)).correctStock(auth.person, input),
+  lastFood: async ({ deps }) => (await diary(deps)).lastFoodAmounts(),
+  weights: async ({ deps }) => ({ weights: await (await diary(deps)).all({ type: "weight" }) }),
+  logWeight: async ({ input, auth, deps }) => (await diary(deps)).logWeight(auth.person, { at: deps.now().toISOString(), ...input }),
+  week: async ({ input, deps }) => (await diary(deps)).week(input.w),
   updateMe: async ({ input, auth, deps }) => ({ person: await new PeopleRepository(deps.db, deps.now).update(auth.person.id, input) }),
   me: async ({ auth, deps }) => ({ person: auth.person, device: auth.device, household: { oidc: deps.oidc, mail: deps.mailer !== null } }),
   devices: async ({ auth, deps }) => ({
