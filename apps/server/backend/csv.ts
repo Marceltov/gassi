@@ -1,7 +1,6 @@
 // The CSV export: every entry, oldest first, ";"-separated (what German spreadsheets expect), UTF-8 with BOM (so Excel
 // reads the umlauts), CRLF lines, times in TZ, German headers.
-import { FOOD_LABEL, TYPE_LABEL } from "@gassi/domain";
-import { utcToLocal } from "@gassi/domain";
+import { FOOD_LABEL, TYPE_LABEL, utcToLocal } from "@gassi/domain";
 import type { EntryView } from "./diary";
 
 const HEADER = ["Datum", "Uhrzeit", "Art", "Ende", "Dauer (Min.)", "Pause (Min.)", "Futterart", "Menge (g)", "Übungen", "Leckerlis", "Notiz", "Von"];

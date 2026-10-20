@@ -1,9 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { dayBounds } from "@gassi/domain";
+import { dayBounds, type Entry, latestByType, type NewEntry } from "@gassi/domain";
 import { currentDog } from "../dogs";
 import { freshDatabase } from "../db/testing";
 import { openDatabase } from "../db/open";
-import { type Entry, latestByType, type NewEntry } from "./model";
 import { EntryRepository } from "./repository";
 
 const { db, dataDir } = freshDatabase();

@@ -1,8 +1,8 @@
 // An entry: who did what with which dog, when, with an optional end (walks and trainings; null while one runs), amount
 // in grams (food, restocks, weight), food kind, can size (restocks) and note. The input schemas are shared by the
-// server actions and the REST API.
+// server and its clients.
 import { z } from "zod";
-import { ENTRY_TYPES, type EntryType, FOOD_KINDS, type FoodKind, minutesBetween } from "@gassi/domain";
+import { ENTRY_TYPES, type EntryType, FOOD_KINDS, type FoodKind, minutesBetween } from "./entryTypes";
 
 export type Entry = {
   id: number;

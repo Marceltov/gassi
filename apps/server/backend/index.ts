@@ -29,5 +29,5 @@ export { catalog, type Exercise, type TreatKind } from "./catalog";
 
 // Walks and trainings while they run (the walk and training screens send their taps to `commands`).
 export { sessions, type SessionsView, type TrainingView, type WalkView, type WalkSummary } from "./sessions";
-export { type Stock } from "./stock";
-export { type WeekView, type WeekDay, addDays } from "./week";
+export type { Stock } from "@gassi/domain";
+export { type WeekView, type WeekDay, addDays } from "@gassi/domain";

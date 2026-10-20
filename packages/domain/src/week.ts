@@ -2,9 +2,10 @@
 // minutes since local midnight (clipped to the day, so a walk across midnight is a bar on both days), food, pee and
 // poop as ticks; above that the week's sums. A walk counts for each of its walkers, so the per-person sums can add up
 // to more than the total. A walk or training still running counts up to now.
-import { dayBounds, dayOf } from "@gassi/domain";
-import type { Entry } from "./entries/model";
-import type { Names } from "./people";
+import type { Entry } from "./entry";
+import { dayBounds, dayOf } from "./time";
+
+type Names = ReadonlyMap<string, string>;
 
 export type Bar = { type: "walk" | "training"; startMin: number; endMin: number };
 export type Tick = { type: "food" | "pee" | "poop"; min: number };

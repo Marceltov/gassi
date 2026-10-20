@@ -3,19 +3,16 @@
 // validated here (zod); a problem is an InputError with a German message the screen can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { type EntryType, FOOD_KINDS, type FoodKind, isEntryType, TILE_TYPES } from "@gassi/domain";
-import { dayBounds } from "@gassi/domain";
+import { computeStock, dayBounds, type Entry, entryFields, type EntryType, FOOD_KINDS, type FoodKind, isEntryType, latestByType, mondayOf, newEntryInput, type Stock, TILE_TYPES, weekBounds, type WeekInput, weekView, type WeekView } from "@gassi/domain";
 import type { User } from "./auth/session";
 import { config } from "./config";
 import { database, type DB } from "./db/open";
 import { currentDog, type Dog } from "./dogs";
-import { type Entry, entryFields, latestByType, newEntryInput } from "./entries/model";
 import { EntryRepository } from "./entries/repository";
 import { InputError } from "./errors";
 import { type Names, PeopleRepository } from "./people";
 import { pausedWithin, Sessions, type SessionsView } from "./sessions";
-import { computeStock, dryTreats, type Stock } from "./stock";
-import { mondayOf, weekBounds, type WeekInput, weekView, type WeekView } from "./week";
+import { dryTreats } from "./stock";
 
 /** An entry as the screens show it: with the display name of whoever logged it, and for walks the walkers' names and
  * minutes paused, for trainings the exercises practised and treats given. */

@@ -10,17 +10,14 @@
 //   alias of the running walk, so its later taps land there. A start arriving after the stop joins the walk that was
 //   running at its time. Trainings do the same; a training started on a walk that has since ended ends with it.
 import { sql, type Kysely } from "kysely";
-import type { Command } from "@gassi/domain";
-import { minutesBetween } from "@gassi/domain";
+import { type Command, type Entry, minutesBetween, type Person, type SessionsView, type TrainingView, type WalkView } from "@gassi/domain";
 import type { User } from "./auth/session";
 import { database, type DB } from "./db/open";
 import type { Schema } from "./db/schema";
 import { currentDog, type Dog } from "./dogs";
-import type { Entry } from "./entries/model";
 import { EntryRepository } from "./entries/repository";
 import { type Names, PeopleRepository } from "./people";
 
-import type { Person, SessionsView, TrainingView, WalkView } from "@gassi/domain";
 
 export type { Person, SessionsView, TrainingView, WalkView };
 

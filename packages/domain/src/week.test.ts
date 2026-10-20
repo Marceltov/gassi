@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Entry } from "./entries/model";
+import type { Entry } from "./entry";
 import { mondayOf, weekView } from "./week";
 
 const TZ = "Europe/Berlin";

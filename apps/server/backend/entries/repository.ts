@@ -1,8 +1,7 @@
 // The entry table. Newest first everywhere; ties on `at` break by id, so paging is stable.
-import { isEntryType, isFoodKind, minutesBetween } from "@gassi/domain";
+import { type Entry, type EntryFields, isEntryType, isFoodKind, minutesBetween, type NewEntry } from "@gassi/domain";
 import type { DB } from "../db/open";
 import type { EntryRow } from "../db/schema";
-import type { Entry, EntryFields, NewEntry } from "./model";
 
 export type EntryQuery = {
   dogId: number;
