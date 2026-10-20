@@ -54,7 +54,7 @@ Types: `walk`, `food`, `pee`, `poop`, `note`. Optional fields: `at` (ISO 8601, d
 ## Deploy
 
 CI pushes `ghcr.io/marceltov/gassi` on every push to `main` (`:main`, `:sha-<short>`, `:latest`) and on `v*` tags
-(semver tags), for amd64 and arm64.
+(semver tags), for amd64.
 
 ```yaml
 services:
