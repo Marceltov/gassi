@@ -2,6 +2,7 @@
 // (for magic links) and OIDC subject (for sign-in through the household's provider).
 import { randomBytes } from "node:crypto";
 import type { DB } from "./db/open";
+import { InputError } from "./errors";
 
 export type Person = { id: string; name: string };
 
@@ -28,6 +29,17 @@ export class PeopleRepository {
     if (!known) return this.add({ name, oidcSubject: subject });
     await this.db.updateTable("person").set({ name }).where("id", "=", known.id).execute();
     return { id: known.id, name };
+  }
+
+  /** Changes the name and/or e-mail address (null removes it); an address belongs to one person only. */
+  async update(id: string, change: { name?: string; email?: string | null }): Promise<{ id: string; name: string; email: string | null }> {
+    if (change.email) {
+      const owner = await this.db.selectFrom("person").select("id").where("email", "=", change.email.toLowerCase()).executeTakeFirst();
+      if (owner && owner.id !== id) throw new InputError("Diese E-Mail-Adresse gehört schon jemand anderem.");
+    }
+    const patch = { ...(change.name !== undefined ? { name: change.name } : {}), ...(change.email !== undefined ? { email: change.email?.toLowerCase() ?? null } : {}) };
+    if (Object.keys(patch).length) await this.db.updateTable("person").set(patch).where("id", "=", id).execute();
+    return this.db.selectFrom("person").select(["id", "name", "email"]).where("id", "=", id).executeTakeFirstOrThrow();
   }
 
   async get(id: string): Promise<Person | undefined> {

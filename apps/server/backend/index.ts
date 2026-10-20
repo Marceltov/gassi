@@ -3,6 +3,7 @@
 import { config } from "./config";
 import { database } from "./db/open";
 import { apiRouter } from "./http/api";
+import { type Landing, landing } from "./http/landing";
 import { commandsRoute } from "./http/commands";
 import { exportRoute } from "./http/export";
 import { healthRoute } from "./http/health";
@@ -36,3 +37,8 @@ export { catalog, type Exercise, type TreatKind } from "./catalog";
 export { sessions, type SessionsView, type TrainingView, type WalkView, type WalkSummary } from "./sessions";
 export type { Stock } from "@gassi/domain";
 export { type WeekView, type WeekDay, addDays } from "@gassi/domain";
+
+/** The page behind a setup, invite or magic link (/l/<token>). */
+export async function linkLanding(token: string): Promise<Landing> {
+  return landing(await database(), () => new Date(), config().publicUrl, token);
+}

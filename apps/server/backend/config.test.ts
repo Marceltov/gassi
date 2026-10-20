@@ -15,7 +15,7 @@ describe("parseConfig", () => {
       dataDir: "./data",
       timeZone: "Europe/Berlin",
       logLevel: "info",
-      logFile: null,
+      setupLinkFile: null,
     });
   });
 

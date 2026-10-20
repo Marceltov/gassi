@@ -31,7 +31,7 @@ const schema = z
     DATA_DIR: optional(z.string()).default("./data"),
     TZ: optional(z.string().refine(validTimeZone, "is not a time zone")).default("Europe/Berlin"),
     LOG_LEVEL: optional(z.enum(LOG_LEVELS)).default("info"),
-    LOG_FILE: optional(z.string()),
+    SETUP_LINK_FILE: optional(z.string()),
   })
   .refine((c) => !c.OIDC_ISSUER || (c.OIDC_CLIENT_ID && c.OIDC_CLIENT_SECRET), { path: ["OIDC_ISSUER"], message: "OIDC_CLIENT_ID and OIDC_CLIENT_SECRET are needed with OIDC_ISSUER" });
 
@@ -45,7 +45,7 @@ export type Config = {
   dataDir: string;
   timeZone: string;
   logLevel: (typeof LOG_LEVELS)[number];
-  logFile: string | null; // a copy of the log, for the e2e tests to read the setup link
+  setupLinkFile: string | null; // where the setup link is also written (the e2e tests read it there)
 };
 
 export function parseConfig(env: Record<string, string | undefined>): Config {
@@ -64,7 +64,7 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
     dataDir: c.DATA_DIR,
     timeZone: c.TZ,
     logLevel: c.LOG_LEVEL,
-    logFile: c.LOG_FILE ?? null,
+    setupLinkFile: c.SETUP_LINK_FILE ?? null,
   };
 }
 

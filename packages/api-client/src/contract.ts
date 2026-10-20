@@ -25,7 +25,37 @@ export const personSchema = z.object({ id: z.string(), name: z.string() });
 export const deviceKinds = ["phone", "watch", "web", "script"] as const;
 export const deviceSchema = z.object({ id: z.number(), kind: z.enum(deviceKinds), name: z.string() });
 
+export const linkKinds = ["setup", "person", "device", "watch", "magic"] as const;
+const openLink = z.object({ id: z.number(), kind: z.enum(linkKinds), createdAt: z.string(), expiresAt: z.string() });
+
 export const contract = {
+  redeem: endpoint({
+    method: "POST",
+    path: "/api/auth/redeem",
+    auth: false,
+    input: z.object({
+      token: z.string().min(1).max(100),
+      deviceKind: z.enum(deviceKinds),
+      deviceName: z.string().trim().min(1).max(60),
+      personName: z.string().optional(),
+      dogName: z.string().optional(),
+    }),
+    output: z.object({ deviceToken: z.string(), person: personSchema, device: deviceSchema }),
+  }),
+  createInvite: endpoint({
+    method: "POST",
+    path: "/api/invites",
+    input: z.object({ kind: z.enum(["person", "device", "watch"]) }),
+    output: z.object({ id: z.number(), url: z.string(), appLink: z.string(), expiresAt: z.string() }),
+  }),
+  invites: endpoint({ method: "GET", path: "/api/invites", input: none, output: z.object({ invites: z.array(openLink) }) }),
+  revokeInvite: endpoint({ method: "DELETE", path: "/api/invites/:id", input: z.object({ id }), output: z.object({ revoked: z.literal(true) }) }),
+  updateMe: endpoint({
+    method: "PATCH",
+    path: "/api/me",
+    input: z.object({ name: z.string().trim().min(1).max(40).optional(), email: z.email().nullable().optional() }),
+    output: z.object({ person: personSchema.extend({ email: z.string().nullable() }) }),
+  }),
   me: endpoint({
     method: "GET",
     path: "/api/me",

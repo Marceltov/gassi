@@ -13,23 +13,25 @@
     "oidc-stub": "node --experimental-strip-types --no-warnings -e \"import('./e2e/oidc-stub.ts').then((m) => m.startOidcStub())\""
   },
   "dependencies": {
+    "@gassi/api-client": "*",
+    "@gassi/domain": "*",
     "better-sqlite3": "^13.0.3",
     "kysely": "^0.29.6",
     "next": "16.3.8",
     "pino": "^10.3.1",
+    "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "zod": "^4.6.5",
-    "@gassi/domain": "*",
-    "@gassi/api-client": "*"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/better-sqlite3": "^9.6.0",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint-config-next": "16.3.8",
-    "tailwindcss": "^4",
-    "@playwright/test": "^1.63.0"
+    "tailwindcss": "^4"
   }
 }

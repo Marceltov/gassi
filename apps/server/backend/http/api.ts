@@ -1,11 +1,29 @@
 // The implementations of the API contract, each a thin call into a use case.
 import { Devices } from "../auth/devices";
+import { appLink, INVITE_TTL, Links } from "../auth/links";
+import { InputError } from "../errors";
+import { PeopleRepository } from "../people";
 import type { DB } from "../db/open";
 import { type Implementations, NotFound, router } from "./router";
 
 export type ApiDeps = { db: DB; now: () => Date; publicUrl: string; oidc: boolean; mail: boolean };
 
+const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl);
+
 const implementations: Implementations<ApiDeps> = {
+  redeem: async ({ input, deps }) => links(deps).redeem(input.token, input),
+  createInvite: async ({ input, auth, deps }) => {
+    // with an OIDC provider, the provider decides who is in: invites only add devices of existing members
+    if (input.kind === "person" && deps.oidc) throw new InputError("Neue Personen kommen über die Anmeldung herein.");
+    const link = await links(deps).create({ kind: input.kind, personId: input.kind === "person" ? null : auth.person.id, createdBy: auth.person.id, ttlMs: INVITE_TTL });
+    return { id: link.id, url: link.url, appLink: appLink(deps.publicUrl, link.token), expiresAt: link.expiresAt };
+  },
+  invites: async ({ auth, deps }) => ({ invites: await links(deps).open(auth.person.id) }),
+  revokeInvite: async ({ input, auth, deps }) => {
+    if (!(await links(deps).revoke(auth.person.id, input.id))) throw new NotFound("Diese Einladung gibt es nicht.");
+    return { revoked: true as const };
+  },
+  updateMe: async ({ input, auth, deps }) => ({ person: await new PeopleRepository(deps.db, deps.now).update(auth.person.id, input) }),
   me: async ({ auth, deps }) => ({ person: auth.person, device: auth.device, household: { oidc: deps.oidc, mail: deps.mail } }),
   devices: async ({ auth, deps }) => ({
     devices: (await new Devices(deps.db, deps.now).list(auth.person.id)).map((d) => ({ ...d, current: d.id === auth.device.id })),
