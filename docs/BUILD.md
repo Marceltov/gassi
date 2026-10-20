@@ -135,8 +135,8 @@ As in PLAN.md "Tests". Concretely:
 
 Jobs `check` (lint, typecheck, unit), `e2e` (installs Chromium and WebKit, uploads the report), `image-smoke`,
 and `image` (needs `check` and `image-smoke`; on `main` pushes and `v*` tags). `image` pushes
-`ghcr.io/marceltov/gassi` with tags `main`, `sha-<short>`, semver on tags and `latest`, for linux/amd64 and
-arm64. Actions versions as in notefeed.
+`ghcr.io/marceltov/gassi` with tags `main`, `sha-<short>`, semver on tags and `latest`, for linux/amd64 (see the
+decision below). Actions versions as in notefeed.
 
 ## Phases
 
@@ -210,3 +210,8 @@ Each phase ends with its checks passing and a commit. Don't start the next phase
   page. Whoever authentik signs in is a user; the display name is the id_token's `name` (else the username), kept
   in the session cookie and recorded in a `person` table at each sign-in, so entries, the CSV and the person filter
   show names. The API's `loggedBy` must be someone who has signed in. Set display names (e.g. "Hirsch") in authentik.
+- **amd64 only (changed after the first deploy, on request):** building arm64 under QEMU made the `image` job take
+  12.5 minutes instead of about 2, and the homelab host is x86_64. Add arm64 back with a native arm runner if an ARM
+  host ever runs Gassi.
+- **The image package is public** on GHCR (the repo is private): the host pulls it without a login, like the other
+  ghcr images there, and Watchtower updates it. The image holds only app code; secrets stay in the deployment `.env`.
