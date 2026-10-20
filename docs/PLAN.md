@@ -63,21 +63,40 @@ The REST API (if any) uses a static bearer token from env, and its path is exclu
 
 ## Stack
 
-Same as Healthy (`Marceltov/Healthy`), so nothing new to learn:
+Modelled on notefeed (`notefeed/notefeed`), so it's built the way we already build things:
 
-- **Next.js** (App Router) with server actions, TypeScript
-- **Prisma** with **SQLite**
-- **Tailwind** for styling
-- PWA manifest and service worker
-- Tests: Vitest for logic, Playwright for one end-to-end "log a walk" flow
+- **Next.js** (App Router, `output: "standalone"`), React 19, TypeScript, Node 22
+- **SQLite** through **better-sqlite3** and **Kysely**: a typed query builder with code migrations, and no
+  generated client or ORM. Prisma isn't needed.
+- **zod** for request validation, **pino** for logging
+- **Tailwind 4** and **lucide-react** icons
+- `app/manifest.ts` for the PWA
+- Tests: **Vitest** (unit, next to the code as `*.test.ts`), **Playwright** e2e for the "log a walk" flow.
+  Broad runs go through `scripts/quiet.sh`, as in notefeed.
 
-Considered and rejected for v1: a separate API and SPA (twice the moving parts), Postgres (one household doesn't
-need it).
+Considered and rejected for v1: Prisma (codegen and an engine for one table), a separate API and SPA (twice the
+moving parts), Postgres (one household doesn't need it).
+
+## Architecture (notefeed's conventions)
+
+- `app/` holds the UI and routes only. All server logic lives in `backend/` behind one boundary module
+  (`backend/index.ts`), and code used by both lives in `shared/` (notefeed ADR 0003).
+- **One write path:** every POST is a backend route handler, and the UI uses plain forms that work without
+  JavaScript (notefeed ADR 0005). No server actions.
+- `backend/db.ts`: the Kysely instance and migrations, run at startup. `backend/config.ts`: the only place that
+  reads environment variables (`DATA_DIR`, `USERS`, `TRUSTED_PROXY`, `API_TOKEN`).
+- `GET /health` returns 503 when the DB isn't usable. It's used by the Docker healthcheck.
+- Repo docs as in notefeed: `CLAUDE.md` and `AGENTS.md` (commands, rules), `CONTEXT.md` (domain words:
+  entry, dog, walker...), ADRs in `docs/adr/`.
 
 ## Deployment
 
-- `Dockerfile` in this repo. GitHub Actions builds and pushes `ghcr.io/marceltov/gassi` on every push to `main`
-  (tags: `main`, the short sha) and on version tags.
+- `Dockerfile` as in notefeed: build on `node:22-trixie-slim` (`npm ci --ignore-scripts`, since better-sqlite3
+  ships prebuilt binaries), run on **distroless** `nodejs22` with only the standalone output, `/data` as the
+  volume, a healthcheck through `node -e fetch(/health)`, and an entrypoint that switches to the owner of `/data`.
+- GitHub Actions: lint, typecheck, unit and e2e tests, an image smoke test, then build and push
+  `ghcr.io/marceltov/gassi` (amd64 and arm64) on every push to `main` (tags: `main`, the short sha) and on
+  `vX.Y.Z` tags. The package has to be set to public once, or the homelab needs a pull token.
 - `services` repo: new `gassi/docker-compose.yaml` following the homelab conventions (gethomepage network,
   homepage, kuma and dynacat labels, healthcheck, `./data` volume gitignored). Watchtower updates it.
 - Hostname: reuse `housetrained.herziis.de` (DNS, Caddy route and authentik provider already exist) or move to
@@ -87,7 +106,8 @@ need it).
 
 ## Milestones
 
-1. Skeleton: Next.js, Prisma and SQLite, Dockerfile, CI image build, header auth, healthcheck endpoint
+1. Skeleton: Next.js, Kysely and SQLite with the first migration, `backend/` boundary, Dockerfile (distroless),
+   CI with image build, header auth, `/health`
 2. Logging and Today screen
 3. History with edit and delete, CSV export
 4. PWA polish, German texts, dark mode
