@@ -6,14 +6,24 @@ import { TYPE_COLOR } from "./entryStyle";
 type Person = { username: string; name: string };
 
 const href = (f: HistoryFilter) => {
-  const q = new URLSearchParams({ ...(f.type ? { type: f.type } : {}), ...(f.by ? { by: f.by } : {}) });
+  const q = new URLSearchParams({ ...(f.type ? { type: f.type } : {}), ...(f.by ? { by: f.by } : {}), ...(f.day ? { day: f.day } : {}) });
   return q.size ? `/verlauf?${q}` : "/verlauf";
 };
 
-// Two rows of chips, by type and by person; each is a link, so a filter is a URL that can be bookmarked.
+const dayLabel = (day: string) => new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" }).format(Date.parse(`${day}T12:00:00Z`));
+
+// Two rows of chips, by type and by person; each is a link, so a filter is a URL that can be bookmarked. A day picked
+// on the Woche page shows as one more chip that clears it.
 export function HistoryFilters({ filter, people }: { filter: HistoryFilter; people: Person[] }) {
   return (
     <div className="flex flex-col gap-2">
+      {filter.day && (
+        <div className="flex">
+          <Chip href={href({ ...filter, day: undefined })} active>
+            Tag: {dayLabel(filter.day)} ✕
+          </Chip>
+        </div>
+      )}
       <ChipRow label="Nach Art">
         <Chip href={href({ ...filter, type: undefined })} active={!filter.type}>
           Alle

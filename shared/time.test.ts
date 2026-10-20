@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { clockTime, dayBounds, dayOf, formatAgo, formatElapsed, localToUtc, utcToLocal } from "./time";
+import { clockTime, dayBounds, dayOf, formatAgo, formatElapsed, formatMinutes, localToUtc, utcToLocal } from "./time";
 
 const TZ = "Europe/Berlin";
 const at = (iso: string) => Date.parse(iso);
@@ -72,4 +72,11 @@ test("formatElapsed shows a running clock: m:ss below an hour, then h:mm:ss", ()
   expect(formatElapsed(52 * 60_000 + 13_000)).toBe("52:13");
   expect(formatElapsed(62 * 60_000 + 5_000)).toBe("1:02:05");
   expect(formatElapsed(-5_000)).toBe("0:00");
+});
+
+test("formatMinutes: Min. below an hour, then Std. and Min.", () => {
+  expect(formatMinutes(0)).toBe("0 Min.");
+  expect(formatMinutes(52)).toBe("52 Min.");
+  expect(formatMinutes(60)).toBe("1 Std.");
+  expect(formatMinutes(200)).toBe("3 Std. 20 Min.");
 });

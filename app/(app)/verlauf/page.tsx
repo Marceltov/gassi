@@ -18,7 +18,7 @@ export default async function History({ searchParams }: PageProps<"/verlauf">) {
       </header>
       <HistoryFilters filter={filter} people={d.people()} />
       {/* A new filter starts the list afresh. */}
-      <HistoryScreen key={`${filter.type ?? ""}:${filter.by ?? ""}`} filter={filter} first={first} timeZone={d.timeZone} now={new Date().toISOString()} />
+      <HistoryScreen key={`${filter.type ?? ""}:${filter.by ?? ""}:${filter.day ?? ""}`} filter={filter} first={first} timeZone={d.timeZone} now={new Date().toISOString()} />
     </>
   );
 }

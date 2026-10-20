@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { IconAdjustments, IconDownload, IconHistory, IconHome, IconLogout, IconMenu2, IconX } from "@tabler/icons-react";
+import { IconAdjustments, IconCalendarWeek, IconDownload, IconHistory, IconHome, IconLogout, IconMenu2, IconX } from "@tabler/icons-react";
 
 const LINKS = [
   { href: "/", label: "Heute", Icon: IconHome },
   { href: "/verlauf", label: "Verlauf", Icon: IconHistory },
+  { href: "/woche", label: "Woche", Icon: IconCalendarWeek },
 ] as const;
 
 const item = "flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-sm font-semibold";
 
-// Heute and Verlauf, plus a menu with who is signed in, the household's lists, the CSV export and Abmelden.
+// Heute, Verlauf and Woche, plus a menu with who is signed in, the household's lists, the CSV export and Abmelden.
 export function BottomNav({ userName }: { userName: string }) {
   const path = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);

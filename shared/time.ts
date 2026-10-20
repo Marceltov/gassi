@@ -73,3 +73,9 @@ export function formatElapsed(ms: number): string {
   const [h, m, sec] = [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60];
   return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
 }
+
+/** A duration in German: "52 Min.", "1 Std.", "3 Std. 20 Min.". */
+export function formatMinutes(min: number): string {
+  if (min < 60) return `${min} Min.`;
+  return `${Math.floor(min / 60)} Std.${min % 60 ? ` ${min % 60} Min.` : ""}`;
+}

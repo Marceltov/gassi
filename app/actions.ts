@@ -56,7 +56,7 @@ export async function logWeight(input: unknown): Promise<Result<EntryView>> {
 }
 
 /** The next page of the history ("Mehr laden"); `filter` is checked like the page's search params. */
-export async function loadHistory(filter: { type?: unknown; by?: unknown }, offset: number): Promise<HistoryPage> {
+export async function loadHistory(filter: { type?: unknown; by?: unknown; day?: unknown }, offset: number): Promise<HistoryPage> {
   await requireUser();
   const d = await diary();
   return d.history(d.filter(filter), Math.max(0, Math.trunc(offset) || 0));

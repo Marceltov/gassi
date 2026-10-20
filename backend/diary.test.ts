@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { freshDatabase } from "./db/testing";
 import { Diary, HISTORY_PAGE, InputError } from "./diary";
+import { Catalog } from "./catalog";
 import { Sessions } from "./sessions";
 
 const { db } = freshDatabase();
@@ -138,5 +139,42 @@ describe("weight", () => {
   test("stays between 0.5 and 100 kg", async () => {
     await expect(diary().logWeight(HIRSCH, { kg: "0,4", at: "2026-10-03T08:00:00Z" })).rejects.toThrow(new InputError("Das Gewicht muss zwischen 0,5 und 100 kg liegen."));
     await expect(diary().logWeight(HIRSCH, { kg: "", at: "2026-10-03T08:00:00Z" })).rejects.toThrow(InputError);
+  });
+});
+
+describe("day filter and week", () => {
+  test("the history filter takes a day and lists only that day in Berlin", async () => {
+    const d = diary();
+    expect(d.filter({ day: "2026-10-20" })).toEqual({ day: "2026-10-20" });
+    expect(d.filter({ day: "20.10.2026" })).toEqual({});
+    await d.log(HIRSCH, { type: "pee", at: "2026-10-19T21:59:00Z" }); // 23:59 on the 19th
+    const inside = await d.log(HIRSCH, { type: "pee", at: "2026-10-19T22:00:00Z" }); // 00:00 on the 20th
+    await d.log(HIRSCH, { type: "pee", at: "2026-10-20T22:00:00Z" }); // 00:00 on the 21st
+    expect((await d.history({ day: "2026-10-20" })).entries.map((e) => e.id)).toEqual([inside.id]);
+  });
+
+  test("the week has the walkers of joint walks and what trainings practised", async () => {
+    clock = new Date("2026-10-22T12:00:00Z");
+    const s = new Sessions({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), now: () => clock });
+    const sitz = await new Catalog(db()).addExercise("Sitz");
+    const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
+    await s.apply(HIRSCH, [{ id: "1", at: "2026-10-21T08:00:00.000Z", kind: "walk.start", walkKey: "w" }]);
+    await s.apply({ username: "bille", name: "Herzii" }, [
+      { id: "2", at: "2026-10-21T08:01:00.000Z", kind: "walk.join", walkKey: "w" },
+      { id: "3", at: "2026-10-21T08:10:00.000Z", kind: "training.start", trainingKey: "t", walkKey: "w" },
+      { id: "4", at: "2026-10-21T08:11:00.000Z", kind: "training.exercise", trainingKey: "t", exerciseId: sitz.id, on: true },
+      { id: "5", at: "2026-10-21T08:12:00.000Z", kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: 1 },
+      { id: "6", at: "2026-10-21T08:40:00.000Z", kind: "walk.stop", walkKey: "w" },
+    ]);
+    const w = await diary().week("2026-10-19");
+    expect(w.monday).toBe("2026-10-19");
+    expect(w.walkMinByPerson).toEqual([
+      { username: "bille", name: "Herzii", min: 40 },
+      { username: "marcel", name: "Hirsch", min: 40 },
+    ]);
+    expect(w.exerciseCounts).toEqual([{ name: "Sitz", count: 1 }]);
+    expect(w.treats).toBe(1);
+    expect((await diary().week("bogus")).monday).toBe("2026-10-19"); // this week
+    expect((await diary().week("2026-10-21")).monday).toBe("2026-10-19"); // any day → its Monday
   });
 });

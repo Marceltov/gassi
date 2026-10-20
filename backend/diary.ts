@@ -14,6 +14,7 @@ import { InputError } from "./errors";
 import { type Names, PeopleRepository } from "./people";
 import { Sessions, type SessionsView } from "./sessions";
 import { computeStock, dryTreats, type Stock } from "./stock";
+import { mondayOf, weekBounds, type WeekInput, weekView, type WeekView } from "./week";
 
 /** An entry as the screens show it: with the display name of whoever logged it. */
 export type EntryView = Entry & { byName: string };
@@ -28,7 +29,7 @@ export type TodayView = {
   lastFood: Record<FoodKind, number | null>; // the usual portions, for the food sheet
 };
 
-export type HistoryFilter = { type?: EntryType; by?: string };
+export type HistoryFilter = { type?: EntryType; by?: string; day?: string };
 export type HistoryPage = { entries: EntryView[]; more: boolean };
 
 export const HISTORY_PAGE = 50;
@@ -97,10 +98,11 @@ export class Diary {
   }
 
   /** The history filter from untrusted values (search params, an action's argument): anything unknown is left out. */
-  filter(raw: { type?: unknown; by?: unknown }): HistoryFilter {
+  filter(raw: { type?: unknown; by?: unknown; day?: unknown }): HistoryFilter {
     return {
       ...(isEntryType(raw.type) ? { type: raw.type } : {}),
       ...(typeof raw.by === "string" && this.deps.names.has(raw.by) ? { by: raw.by } : {}),
+      ...(isDay(raw.day) ? { day: raw.day } : {}),
     };
   }
 
@@ -184,8 +186,32 @@ export class Diary {
   }
 
   async history(filter: HistoryFilter, offset = 0): Promise<HistoryPage> {
-    const rows = await this.entries.list({ dogId: this.deps.dog.id, type: filter.type, loggedBy: filter.by, offset, limit: HISTORY_PAGE + 1 });
+    const day = filter.day ? dayBounds(Date.parse(`${filter.day}T12:00:00Z`), this.deps.timeZone) : null;
+    const rows = await this.entries.list({ dogId: this.deps.dog.id, type: filter.type, loggedBy: filter.by, ...(day ? { since: iso(day.start), until: iso(day.end) } : {}), offset, limit: HISTORY_PAGE + 1 });
     return { entries: rows.slice(0, HISTORY_PAGE).map((e) => this.view(e)), more: rows.length > HISTORY_PAGE };
+  }
+
+  /** The week starting on the Monday of `day` ("2026-10-21" → that week), this week for anything else. */
+  async week(day: unknown): Promise<WeekView> {
+    const { db, timeZone, names } = this.deps;
+    const now = this.deps.now().getTime();
+    const monday = isDay(day) ? mondayOf(Date.parse(`${day}T12:00:00Z`), timeZone) : mondayOf(now, timeZone);
+    const { start, end } = weekBounds(monday, timeZone);
+    // a day earlier too, for walks that began before Monday and went on past midnight
+    const entries = await this.entries.list({ dogId: this.deps.dog.id, since: iso(start - 86_400_000), until: iso(end) });
+    const ids = (type: EntryType) => entries.filter((e) => e.type === type).map((e) => e.id);
+    const [walkIds, trainingIds] = [ids("walk"), ids("training")];
+    const [walkerRows, exerciseRows, treatRows] = await Promise.all([
+      walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "username"]).where("entry_id", "in", walkIds).execute() : [],
+      trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name"]).where("entry_id", "in", trainingIds).execute() : [],
+      trainingIds.length ? db.selectFrom("training_treat").select(["entry_id", "count"]).where("entry_id", "in", trainingIds).execute() : [],
+    ]);
+    const walkers: WeekInput["walkers"] = {};
+    for (const r of walkerRows) (walkers[r.entry_id] ??= []).push(r.username);
+    const trainings: WeekInput["trainings"] = Object.fromEntries(trainingIds.map((id) => [id, { exercises: [] as string[], treats: 0 }]));
+    for (const r of exerciseRows) trainings[r.entry_id].exercises.push(r.name);
+    for (const r of treatRows) trainings[r.entry_id].treats += r.count;
+    return weekView({ entries, walkers, trainings, names, monday, timeZone, now });
   }
 
   async all(query: { type?: EntryType; since?: string } = {}): Promise<EntryView[]> {
@@ -198,6 +224,8 @@ export class Diary {
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();
+
+const isDay = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T12:00:00Z`));
 
 /** The diary for one request, on the configured database and dog, with the names as they are now. */
 export async function diary(): Promise<Diary> {
