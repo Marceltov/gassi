@@ -284,3 +284,12 @@ Built from a local spec and plan (brainstormed on 2026-10-20); the lasting decis
 - **Tests:** Vitest over all workspaces (`tooling/` checks the package boundaries); e2e starts a server with only
   `PUBLIC_URL`, sets it up from the printed link and drives the API through the typed client, plus the link page in
   Chromium; the image smoke test expects the setup link in the log.
+- **After the step's review:** the schema migration is named `0.3_schema` (0.2's was `001_schema`), and a database
+  with migrations this version doesn't know stops the start with instructions (the homelab's 0.2 database must be
+  moved aside at the 0.3 deploy). OIDC is all three variables or none, app-only until the dashboard (the cookie
+  session, logout and `safeNext` are gone; failures end in `gassi://join?error=signin`); with OIDC no setup link is
+  printed and the first sign-in creates the first dog (`DOG_NAME`, else "Mein Hund"); the last active dog can't be
+  archived. Entry, restock, stock-count and weight inputs are domain schemas with German messages per field, checked
+  by the client before sending, by the router and by the use cases. The pure session rules (`isOver`,
+  `joinsEndedSession`, `startedTrainingEndsAt`, `resolveDogs`, `pausedWithin`) live in `packages/domain`. Magic links
+  answer without waiting for the mail, at most one a minute per person.

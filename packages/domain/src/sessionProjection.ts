@@ -1,6 +1,7 @@
 // What a running walk and training look like, and the same view with the taps that have not reached the server yet
 // laid over it. The server's view is the truth; the projection only lets the screens answer a tap at once (and keep
-// answering without reception). It applies the commands the way backend/sessions.ts does, simplified for display.
+// answering without reception). It shows only the running walk and training, so the rules for taps after an end and
+// for which dogs a start takes (sessionRules.ts) are applied by the server, whose answer replaces this view.
 import type { Command } from "./commands";
 
 export type Person = { id: string; name: string };

@@ -10,6 +10,7 @@ export * from "./food";
 export * from "./inputs";
 export * from "./result";
 export * from "./sessionProjection";
+export * from "./sessionRules";
 export * from "./stock";
 export * from "./time";
 export * from "./track";

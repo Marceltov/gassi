@@ -10,7 +10,7 @@
 //   alias of the running walk, so its later taps land there. A start arriving after the stop joins the walk that was
 //   running at its time. Trainings do the same; a training started on a walk that has since ended ends with it.
 import { sql, type Kysely } from "kysely";
-import { type Command, type Entry, minutesBetween, type Person, type SessionsView, type TrainingView, type WalkView } from "@gassi/domain";
+import { type Command, type Entry, isOver, joinsEndedSession, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView } from "@gassi/domain";
 import type { DB } from "./db/open";
 import type { Schema } from "./db/schema";
 import { DogRepository } from "./dogs";
@@ -40,14 +40,7 @@ export type SessionsDeps = { db: DB; names: Names; now: () => Date };
 type Tx = Kysely<Schema>;
 type Outcome = "applied" | "dropped";
 
-/** Ms paused between `from` and `to` (a walk's start and end); parts of a pause outside them don't count. */
-export function pausedWithin(pauses: readonly { startedAt: string; endedAt: string | null }[], from: string, to: string): number {
-  return pauses.reduce((sum, p) => sum + Math.max(0, Date.parse(earlier(p.endedAt ?? to, to)) - Date.parse(later(p.startedAt, from))), 0);
-}
-
-const isOver = (e: Entry, at: string) => e.endedAt !== null && at >= e.endedAt;
 const later = (a: string, b: string) => (a > b ? a : b);
-const earlier = (a: string, b: string) => (a < b ? a : b);
 const byTime = (a: Command, b: Command) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
 
 export class Sessions {
@@ -188,9 +181,9 @@ class Step {
         return this.stopWalk(c.walkKey, c.at);
       case "training.start": {
         const walk = c.walkKey ? await this.find(c.walkKey, "walk") : undefined;
-        if (c.walkKey && (!walk || isOver(walk, c.at))) return "dropped";
+        if (c.walkKey && (!walk || isOver(walk.endedAt, c.at))) return "dropped";
         // started before the walk ended but arriving after the stop: it ended with the walk
-        return this.start("training", c.trainingKey, c.at, walk?.endedAt ?? null, c.dogIds);
+        return this.start("training", c.trainingKey, c.at, startedTrainingEndsAt(walk), c.dogIds);
       }
       case "training.stop": {
         const t = await this.find(c.trainingKey, "training");
@@ -219,11 +212,8 @@ class Step {
     return new DogRepository(this.tx).activeIds();
   }
 
-  /** The named dogs that are active; none named, or none of them active: every active dog. */
   private async dogsFor(requested: readonly number[] | undefined): Promise<number[]> {
-    const active = await this.activeDogs();
-    const named = (requested ?? []).filter((id) => active.includes(id));
-    return named.length ? named : active;
+    return resolveDogs(requested, await this.activeDogs());
   }
 
   private create(type: Entry["type"], at: string, clientKey: string | null, dogIds: number[]): Promise<Entry> {
@@ -234,7 +224,7 @@ class Step {
   // reception that arrives after the stop); only otherwise does it begin a new one.
   private async start(type: "walk" | "training", key: string, at: string, endedAt: string | null, dogIds: readonly number[] | undefined): Promise<Outcome> {
     let e = await this.find(key, type);
-    if (e && isOver(e, at)) return "dropped";
+    if (e && isOver(e.endedAt, at)) return "dropped";
     if (!e) {
       e = (await this.entries.running(type)) ?? (await this.endedAround(type, at));
       if (e) {
@@ -254,30 +244,24 @@ class Step {
     return "applied";
   }
 
+  // The walk/training a late start joins (joinsEndedSession); the query only narrows the candidates.
   private async endedAround(type: "walk" | "training", at: string): Promise<Entry | undefined> {
-    const row = await this.tx
-      .selectFrom("entry")
-      .select("id")
-      .where("type", "=", type)
-      .where("client_key", "is not", null)
-      .where("at", "<=", at)
-      .where("ended_at", ">", at)
-      .where("ended_at", "<=", this.deps.now().toISOString()) // a real stop, not an end edited into the future
-      .orderBy("at", "desc")
-      .executeTakeFirst();
-    return row && this.entries.get(row.id);
+    const rows = await this.tx.selectFrom("entry").select(["id", "at", "ended_at"]).where("type", "=", type).where("client_key", "is not", null).where("at", "<=", at).where("ended_at", ">", at).orderBy("at", "desc").execute();
+    const now = this.deps.now().toISOString();
+    const hit = rows.find((r) => joinsEndedSession({ at: r.at, endedAt: r.ended_at }, at, now));
+    return hit && this.entries.get(hit.id);
   }
 
   private async onWalk(key: string, at: string, act: (w: Entry) => Promise<void>): Promise<Outcome> {
     const w = await this.find(key, "walk");
-    if (!w || isOver(w, at)) return "dropped";
+    if (!w || isOver(w.endedAt, at)) return "dropped";
     await act(w);
     return "applied";
   }
 
   private async onTraining(key: string, at: string, act: (t: Entry) => Promise<Outcome>): Promise<Outcome> {
     const t = await this.find(key, "training");
-    if (!t || isOver(t, at)) return "dropped";
+    if (!t || isOver(t.endedAt, at)) return "dropped";
     return act(t);
   }
 

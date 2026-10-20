@@ -3,13 +3,12 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryFields, type EntryType, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, RESTOCK_MESSAGES, restockInput, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
+import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryFields, type EntryType, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, RESTOCK_MESSAGES, restockInput, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
 import { InputError } from "./errors";
 import type { Names, Person } from "./people";
-import { pausedWithin } from "./sessions";
 import { dryTreats } from "./stock";
 
 /** An entry as the screens show it: with the display name of whoever logged it, and for walks the walkers' names and
