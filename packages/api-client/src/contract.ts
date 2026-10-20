@@ -76,6 +76,36 @@ const trainingView = z.object({
 });
 export const sessionsViewSchema = z.object({ walk: walkView.nullable(), training: trainingView.nullable() });
 
+export const trackPointSchema = z.object({
+  t: z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString()),
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180),
+  ele: z.number().min(-500).max(9000).nullable(),
+  acc: z.number().min(0).max(10_000).nullable(),
+});
+const metricsSchema = z.object({
+  distanceM: z.number(),
+  durationS: z.number(),
+  movingS: z.number(),
+  paceSPerKm: z.number().nullable(),
+  ascentM: z.number(),
+  descentM: z.number(),
+  bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).nullable(),
+});
+export const walkSummarySchema = z.object({
+  id: z.number(),
+  note: z.string().nullable(),
+  startedAt: z.string(),
+  endedAt: z.string().nullable(),
+  totalMin: z.number(),
+  pauseMin: z.number(),
+  pauseCount: z.number(),
+  walkers: z.array(personSchema),
+  trainings: z.array(z.object({ min: z.number(), exercises: z.array(z.string()), treats: z.array(z.object({ name: z.string(), count: z.number() })) })),
+  pee: z.number(),
+  poop: z.number(),
+});
+
 export const linkKinds = ["setup", "person", "device", "watch", "magic"] as const;
 const openLink = z.object({ id: z.number(), kind: z.enum(linkKinds), createdAt: z.string(), expiresAt: z.string() });
 
@@ -132,6 +162,18 @@ export const contract = {
   logEntry: endpoint({ method: "POST", path: "/api/entries", input: entryWrite, output: entryViewSchema }),
   editEntry: endpoint({ method: "PATCH", path: "/api/entries/:id", input: entryEdit, output: entryViewSchema }),
   deleteEntry: endpoint({ method: "DELETE", path: "/api/entries/:id", input: z.object({ id }), output: z.object({ deleted: z.literal(true) }) }),
+  uploadTrack: endpoint({
+    method: "POST",
+    path: "/api/tracks",
+    input: z.object({ trackId: z.string().min(1).max(64), walkKey: z.string().min(1).max(64), source: z.enum(["phone", "watch"]), seq: z.number().int().min(0), points: z.array(trackPointSchema).min(1).max(2000) }),
+    output: z.object({ stored: z.boolean() }),
+  }),
+  walk: endpoint({
+    method: "GET",
+    path: "/api/walks/:id",
+    input: z.object({ id }),
+    output: z.object({ summary: walkSummarySchema, track: z.object({ source: z.enum(["phone", "watch"]), points: z.array(trackPointSchema), metrics: metricsSchema }).nullable() }),
+  }),
   updateMe: endpoint({
     method: "PATCH",
     path: "/api/me",

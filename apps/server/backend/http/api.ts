@@ -7,6 +7,7 @@ import { Diary } from "../diary";
 import { DogRepository } from "../dogs";
 import { PeopleRepository } from "../people";
 import { Sessions } from "../sessions";
+import { Tracks } from "../tracks";
 import type { DB } from "../db/open";
 import { type Implementations, NotFound, router } from "./router";
 
@@ -55,6 +56,13 @@ const implementations: Implementations<ApiDeps> = {
   logEntry: async ({ input, auth, deps }) => (await diary(deps)).log(auth.person, { at: deps.now().toISOString(), ...input }),
   editEntry: async ({ input: { id, ...fields }, deps }) => (await (await diary(deps)).edit(id, fields)) ?? missing("Diesen Eintrag gibt es nicht."),
   deleteEntry: async ({ input, deps }) => ((await (await diary(deps)).remove(input.id)) ? { deleted: true as const } : missing("Diesen Eintrag gibt es nicht.")),
+  uploadTrack: async ({ input, auth, deps }) => new Tracks(deps.db, deps.now).addBatch(auth.device.id, input),
+  walk: async ({ input, deps }) => {
+    const entry = await deps.db.selectFrom("entry").select("type").where("id", "=", input.id).executeTakeFirst();
+    if (entry?.type !== "walk") throw new NotFound("Diese Runde gibt es nicht.");
+    const [summary, track] = await Promise.all([(await sessions(deps)).summary(input.id), new Tracks(deps.db, deps.now).forWalk(input.id)]);
+    return { summary, track };
+  },
   updateMe: async ({ input, auth, deps }) => ({ person: await new PeopleRepository(deps.db, deps.now).update(auth.person.id, input) }),
   me: async ({ auth, deps }) => ({ person: auth.person, device: auth.device, household: { oidc: deps.oidc, mail: deps.mailer !== null } }),
   devices: async ({ auth, deps }) => ({

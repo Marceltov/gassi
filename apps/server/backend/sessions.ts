@@ -153,7 +153,7 @@ export class Sessions {
 }
 
 /** The walk or training started with `key`, or the running one that a second start with `key` joined. */
-async function findByKey(db: Tx, key: string, type: "walk" | "training"): Promise<Entry | undefined> {
+export async function findByKey(db: Tx, key: string, type: "walk" | "training"): Promise<Entry | undefined> {
   const entries = new EntryRepository(db);
   let e = await entries.byClientKey(key);
   if (!e) {

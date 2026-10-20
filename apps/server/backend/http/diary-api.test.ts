@@ -55,3 +55,31 @@ describe("entries over the API", () => {
     expect(await json("/api/entries", { method: "POST", token, body: { type: "food", amountG: 200 } })).toEqual({ status: 400, body: { error: "Welche Futterart?" } });
   });
 });
+
+describe("tracks over the API", () => {
+  const point = (s: number, north: number) => ({ t: new Date(Date.parse("2026-10-20T09:00:00Z") + s * 1000).toISOString(), lat: 48.137 + north / 111_195, lon: 11.575, ele: 520, acc: 4 });
+
+  test("the phone uploads its track in batches; the walk shows it with metrics", async () => {
+    const token = await tokenFor(HIRSCH.id);
+    await json("/api/commands", { method: "POST", token, body: { commands: [{ id: "s", at: "2026-10-20T09:00:00.000Z", kind: "walk.start", walkKey: "w" }, { id: "e", at: "2026-10-20T09:10:00.000Z", kind: "walk.stop", walkKey: "w" }] } });
+    const batch = { trackId: "t1", walkKey: "w", source: "phone", seq: 0, points: [point(0, 0), point(300, 500), point(600, 1000)] };
+    expect((await json("/api/tracks", { method: "POST", token, body: batch })).body).toEqual({ stored: true });
+    expect((await json("/api/tracks", { method: "POST", token, body: batch })).body).toEqual({ stored: false });
+    const { body: entries } = await json("/api/entries?type=walk", { token });
+    const { status, body } = await json(`/api/walks/${entries.entries[0].id}`, { token });
+    expect(status).toBe(200);
+    expect(body.summary).toMatchObject({ totalMin: 10, walkers: [HIRSCH] });
+    expect(body.track).toMatchObject({ source: "phone", metrics: { durationS: 600, paceSPerKm: 600 } });
+    expect(Math.round(body.track.metrics.distanceM)).toBe(1000);
+  });
+
+  test("a point out of range or too many points are refused; a walk id that isn't a walk is 404", async () => {
+    const token = await tokenFor(HIRSCH.id);
+    const bad = { trackId: "t", walkKey: "w", source: "phone", seq: 0, points: [{ ...point(0, 0), lat: 91 }] };
+    expect((await json("/api/tracks", { method: "POST", token, body: bad })).status).toBe(400);
+    const many = { ...bad, points: Array.from({ length: 2001 }, (_, i) => point(i, i)) };
+    expect((await json("/api/tracks", { method: "POST", token, body: many })).status).toBe(400);
+    const { body: pee } = await json("/api/entries", { method: "POST", token, body: { type: "pee", at: "2026-10-20T08:00:00Z" } });
+    expect((await json(`/api/walks/${pee.id}`, { token })).status).toBe(404);
+  });
+});

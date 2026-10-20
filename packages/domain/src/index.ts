@@ -11,4 +11,5 @@ export * from "./result";
 export * from "./sessionProjection";
 export * from "./stock";
 export * from "./time";
+export * from "./track";
 export * from "./week";
