@@ -128,3 +128,15 @@ describe("food and stock", () => {
     expect(await d.stock()).toMatchObject({ wet: { grams: 2000, cans: 5 }, dry: { grams: 0 } });
   });
 });
+
+describe("weight", () => {
+  test("is logged in kg with one decimal and stored in grams", async () => {
+    expect(await diary().logWeight(HIRSCH, { kg: "12,4", at: "2026-10-03T08:00:00Z" })).toMatchObject({ type: "weight", amountG: 12_400, at: "2026-10-03T08:00:00.000Z" });
+    expect(await diary().logWeight(HIRSCH, { kg: 12.46, at: "2026-10-04T08:00:00Z" })).toMatchObject({ amountG: 12_500 });
+  });
+
+  test("stays between 0.5 and 100 kg", async () => {
+    await expect(diary().logWeight(HIRSCH, { kg: "0,4", at: "2026-10-03T08:00:00Z" })).rejects.toThrow(new InputError("Das Gewicht muss zwischen 0,5 und 100 kg liegen."));
+    await expect(diary().logWeight(HIRSCH, { kg: "", at: "2026-10-03T08:00:00Z" })).rejects.toThrow(InputError);
+  });
+});

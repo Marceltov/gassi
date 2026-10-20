@@ -49,6 +49,12 @@ export async function correctStock(input: unknown): Promise<Result<EntryView>> {
   return run(async () => (await diary()).correctStock(user, input));
 }
 
+/** `{ kg, at }`: Toffee's weight, kg as "12,4" or 12.4. */
+export async function logWeight(input: unknown): Promise<Result<EntryView>> {
+  const user = await requireUser();
+  return run(async () => (await diary()).logWeight(user, input), ["/gewicht", "/verlauf"]);
+}
+
 /** The next page of the history ("Mehr laden"); `filter` is checked like the page's search params. */
 export async function loadHistory(filter: { type?: unknown; by?: unknown }, offset: number): Promise<HistoryPage> {
   await requireUser();

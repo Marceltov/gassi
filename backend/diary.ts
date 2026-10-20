@@ -63,6 +63,11 @@ const stockInput = z.union([
   z.object({ foodKind: z.literal("dry"), grams: z.coerce.number().int().min(0).max(1_000_000) }),
 ]);
 
+const weightInput = z.object({
+  kg: z.preprocess((v) => (typeof v === "string" ? (v.trim() ? Number(v.trim().replace(",", ".")) : NaN) : v), z.number().min(0.5).max(100)),
+  at: z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString()),
+});
+
 const foodKindOf = (input: unknown): FoodKind => {
   const kind = (input as { foodKind?: unknown } | null)?.foodKind;
   if (!FOOD_KINDS.includes(kind as FoodKind)) throw new InputError("Diese Futterart gibt es nicht.");
@@ -158,6 +163,14 @@ export class Diary {
       grams = Math.round(r.data.cans * canSizeG);
     } else grams = r.data.grams;
     return this.create(user, { type: "stockcheck", foodKind: kind, amountG: grams, unitG: null });
+  }
+
+  /** Toffee's weight in kg (one decimal), stored as grams. */
+  async logWeight(user: User, input: unknown): Promise<EntryView> {
+    const r = weightInput.safeParse(input);
+    if (!r.success) throw new InputError(r.error.issues[0]?.path[0] === "at" ? MESSAGES.at : "Das Gewicht muss zwischen 0,5 und 100 kg liegen.");
+    const amountG = Math.round(r.data.kg * 10) * 100;
+    return this.view(await this.entries.create({ type: "weight", at: r.data.at, endedAt: null, amountG, foodKind: null, unitG: null, note: null, dogId: this.deps.dog.id, loggedBy: user.username }));
   }
 
   async stock(): Promise<Stock> {
