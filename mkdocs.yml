@@ -1,0 +1,52 @@
+site_name: Gassi
+site_description: A small self-hosted dog diary for one household.
+repo_url: https://github.com/Marceltov/gassi
+repo_name: Marceltov/gassi
+edit_uri: edit/main/docs/
+
+# ADRs are for working on the code, not for readers of the site.
+exclude_docs: |
+  adr/
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: brown
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: brown
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    logo: material/dog-side
+  features:
+    - content.code.copy
+    - navigation.footer
+    - search.highlight
+    - navigation.sections
+    - navigation.indexes
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Plan: PLAN.md
+  - Alternatives: ALTERNATIVES.md
