@@ -78,3 +78,11 @@ test("broken storage starts empty", () => {
   storage.setItem("gassi.commands", "{nope");
   expect(createCommandQueue({ storage, send: async () => answer([]) }).pending()).toEqual([]);
 });
+
+test("each person has their own queue under their own key", async () => {
+  const storage = memory();
+  const q = createCommandQueue({ storage, key: "gassi.commands.bille", send: async () => Promise.reject(new Error("offline")) });
+  await q.push(pipi("a"));
+  expect(storage.data.has("gassi.commands")).toBe(false);
+  expect(JSON.parse(storage.data.get("gassi.commands.bille")!)).toHaveLength(1);
+});

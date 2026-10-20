@@ -14,28 +14,32 @@ type Listener = (pending: Command[], view?: SessionsView) => void;
 export type CommandQueue = {
   push(cmd: Command): Promise<void>;
   flush(): Promise<void>;
-  pending(): Command[];
+  /** The unsent commands; the same array until the queue changes (for useSyncExternalStore). */
+  pending(): readonly Command[];
   subscribe(fn: Listener): () => void;
 };
 
-function load(storage: Storage): Command[] {
+function load(storage: Storage, key: string): Command[] {
   try {
-    const v = JSON.parse(storage.getItem(STORAGE_KEY) ?? "[]");
+    const v = JSON.parse(storage.getItem(key) ?? "[]");
     return Array.isArray(v) ? v : [];
   } catch {
     return [];
   }
 }
 
-export function createCommandQueue({ storage, send }: { storage: Storage; send: (commands: Command[]) => Promise<CommandAnswer> }): CommandQueue {
-  let queue = load(storage);
+type Options = { storage: Storage; send: (commands: Command[]) => Promise<CommandAnswer>; key?: string };
+
+/** `key`: where in `storage` the queue lives; one per person, so taps never go out under someone else's session. */
+export function createCommandQueue({ storage, send, key = STORAGE_KEY }: Options): CommandQueue {
+  let queue = load(storage, key);
   const listeners = new Set<Listener>();
   let inFlight: Promise<void> | null = null;
   let again = false;
 
   const save = (view?: SessionsView) => {
     try {
-      storage.setItem(STORAGE_KEY, JSON.stringify(queue));
+      storage.setItem(key, JSON.stringify(queue));
     } catch {
       // storage full or blocked: the queue still lives in memory for this page
     }
@@ -79,7 +83,7 @@ export function createCommandQueue({ storage, send }: { storage: Storage; send: 
       return flush();
     },
     flush,
-    pending: () => [...queue],
+    pending: () => queue,
     subscribe(fn) {
       listeners.add(fn);
       return () => listeners.delete(fn);

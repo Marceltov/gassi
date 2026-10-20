@@ -27,8 +27,18 @@ describe("walks", () => {
     await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" }), cmd(20, { kind: "walk.pause", walkKey: "w" }), cmd(28, { kind: "walk.resume", walkKey: "w" }), cmd(52, { kind: "walk.stop", walkKey: "w" })]);
     const [walk] = await entries();
     expect(walk).toMatchObject({ type: "walk", at: at(0), endedAt: at(52), durationMin: 52, loggedBy: "marcel" });
-    expect(await s.summary(walk.id)).toMatchObject({ startedAt: at(0), endedAt: at(52), totalMin: 52, pauseMin: 8, walkers: [HIRSCH] });
+    expect(await s.summary(walk.id)).toMatchObject({ startedAt: at(0), endedAt: at(52), totalMin: 52, pauseMin: 8, pauseCount: 1, walkers: [HIRSCH] });
     expect(await s.current()).toEqual({ walk: null, training: null });
+  });
+
+  test("the summary is found by any key of the walk and carries the entry's id and note", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w1" })]);
+    await s.apply(HERZII, [cmd(1, { kind: "walk.start", walkKey: "w2" }), cmd(30, { kind: "walk.stop", walkKey: "w2" })]);
+    const walk = (await entries())[0];
+    expect(await s.summaryFor("w2")).toMatchObject({ id: walk.id, note: null, totalMin: 30, walkers: [HIRSCH, HERZII] });
+    expect(await s.summaryFor("w1")).toMatchObject({ id: walk.id });
+    expect(await s.summaryFor("nope")).toBeNull();
   });
 
   test("a running walk shows who walks, since when and whether it is paused", async () => {

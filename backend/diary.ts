@@ -12,6 +12,7 @@ import { type Entry, entryFields, latestByType, newEntryInput } from "./entries/
 import { EntryRepository } from "./entries/repository";
 import { InputError } from "./errors";
 import { type Names, PeopleRepository } from "./people";
+import { Sessions, type SessionsView } from "./sessions";
 
 /** An entry as the screens show it: with the display name of whoever logged it. */
 export type EntryView = Entry & { byName: string };
@@ -22,6 +23,7 @@ export type TodayView = {
   now: string;
   tiles: Record<(typeof TILE_TYPES)[number], EntryView | null>;
   entries: EntryView[];
+  sessions: SessionsView; // the walk and training running now
 };
 
 export type HistoryFilter = { type?: EntryType; by?: string };
@@ -106,7 +108,8 @@ export class Diary {
     const entries = (await this.entries.list({ dogId: this.deps.dog.id, since: iso(start), until: iso(end) })).map((e) => this.view(e));
     const latest = latestByType(entries);
     const tiles = Object.fromEntries(TILE_TYPES.map((t) => [t, (latest[t] as EntryView | undefined) ?? null])) as TodayView["tiles"];
-    return { dogName: this.deps.dog.name, timeZone: this.deps.timeZone, now: now.toISOString(), tiles, entries };
+    const sessions = await new Sessions(this.deps).current();
+    return { dogName: this.deps.dog.name, timeZone: this.deps.timeZone, now: now.toISOString(), tiles, entries, sessions };
   }
 
   async history(filter: HistoryFilter, offset = 0): Promise<HistoryPage> {

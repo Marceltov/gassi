@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { freshDatabase } from "./db/testing";
 import { Diary, HISTORY_PAGE, InputError } from "./diary";
+import { Sessions } from "./sessions";
 
 const { db } = freshDatabase();
 const HIRSCH = { username: "marcel", name: "Hirsch" };
@@ -41,6 +42,13 @@ describe("today", () => {
     expect(today.entries.map((e) => e.id)).toEqual([pee2.id, pee1.id]);
     expect(today.tiles).toEqual({ walk: null, food: null, pee: pee2, poop: null });
     expect(today).toMatchObject({ dogName: "Toffee", timeZone: "Europe/Berlin", now: clock.toISOString() });
+  });
+
+  test("shows the walk that runs now", async () => {
+    clock = new Date("2026-10-20T10:00:00Z");
+    await new Sessions({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"]]), now: () => clock }).apply(HIRSCH, [{ id: "c1", at: "2026-10-20T09:40:00.000Z", kind: "walk.start", walkKey: "w" }]);
+    const today = await diary().today();
+    expect(today.sessions).toEqual({ walk: { key: "w", startedAt: "2026-10-20T09:40:00.000Z", walkers: [HIRSCH], pauses: [], paused: false }, training: null });
   });
 });
 

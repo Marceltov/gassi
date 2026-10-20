@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { clockTime, dayBounds, dayOf, formatAgo, localToUtc, utcToLocal } from "./time";
+import { clockTime, dayBounds, dayOf, formatAgo, formatElapsed, localToUtc, utcToLocal } from "./time";
 
 const TZ = "Europe/Berlin";
 const at = (iso: string) => Date.parse(iso);
@@ -65,4 +65,11 @@ describe("formatAgo", () => {
   test("a time in the future reads as just now", () => {
     expect(formatAgo(now + 60_000, now)).toBe("gerade eben");
   });
+});
+
+test("formatElapsed shows a running clock: m:ss below an hour, then h:mm:ss", () => {
+  expect(formatElapsed(0)).toBe("0:00");
+  expect(formatElapsed(52 * 60_000 + 13_000)).toBe("52:13");
+  expect(formatElapsed(62 * 60_000 + 5_000)).toBe("1:02:05");
+  expect(formatElapsed(-5_000)).toBe("0:00");
 });

@@ -28,7 +28,13 @@ function initialFields(target: SheetTarget, timeZone: string): Fields {
   return { at: utcToLocal(Date.parse(e.at), timeZone), durationMin: e.durationMin?.toString() ?? "", amountG: e.amountG?.toString() ?? "", note: e.note ?? "" };
 }
 
-const toInput = (f: Fields, timeZone: string) => ({ at: new Date(localToUtc(f.at, timeZone)).toISOString(), durationMin: f.durationMin, amountG: f.amountG, note: f.note });
+// A walk's duration becomes its end; an empty one leaves the walk without an end (a moment, as in v1).
+function toInput(f: Fields, timeZone: string) {
+  const at = localToUtc(f.at, timeZone);
+  const minutes = Number(f.durationMin);
+  const endedAt = f.durationMin.trim() && Number.isFinite(minutes) && minutes > 0 ? new Date(at + Math.round(minutes) * 60_000).toISOString() : null;
+  return { at: new Date(at).toISOString(), endedAt, amountG: f.amountG, note: f.note };
+}
 
 // A bottom sheet with time (default now), duration (walks), amount in grams (food) and note; for an existing entry
 // also "Löschen", which asks once more.

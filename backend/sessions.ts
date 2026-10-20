@@ -25,10 +25,13 @@ export type { Person, SessionsView, TrainingView, WalkView };
 
 export type TrainingSummary = { min: number; exercises: string[]; treats: { name: string; count: number }[] };
 export type WalkSummary = {
+  id: number; // the walk's entry
+  note: string | null;
   startedAt: string;
   endedAt: string | null;
   totalMin: number;
   pauseMin: number;
+  pauseCount: number;
   walkers: Person[];
   trainings: TrainingSummary[];
   pee: number;
@@ -85,15 +88,24 @@ export class Sessions {
     const pauseMs = pauses.reduce((sum, p) => sum + Math.max(0, Date.parse(p.endedAt ?? end) - Date.parse(later(p.startedAt, walk.at))), 0);
     const trainings = during.filter((e) => e.type === "training").reverse();
     return {
+      id: walk.id,
+      note: walk.note,
       startedAt: walk.at,
       endedAt: walk.endedAt,
       totalMin: minutesBetween(walk.at, end)!,
       pauseMin: Math.round(pauseMs / 60_000),
+      pauseCount: pauses.length,
       walkers: await this.walkers(walk.id),
       trainings: await Promise.all(trainings.map((t) => this.trainingSummary(t, end))),
       pee: during.filter((e) => e.type === "pee").length,
       poop: during.filter((e) => e.type === "poop").length,
     };
+  }
+
+  /** The summary of the walk started (or joined) with `key`, or null when the server doesn't know that key yet. */
+  async summaryFor(key: string): Promise<WalkSummary | null> {
+    const walk = await findByKey(this.deps.db, key, "walk");
+    return walk ? this.summary(walk.id) : null;
   }
 
   private async walkers(entryId: number): Promise<Person[]> {
@@ -130,6 +142,17 @@ export class Sessions {
     ]);
     return { min: minutesBetween(t.at, t.endedAt ?? walkEnd)!, exercises: exercises.map((r) => r.name), treats };
   }
+}
+
+/** The walk or training started with `key`, or the running one that a second start with `key` joined. */
+async function findByKey(db: Tx, key: string, type: "walk" | "training"): Promise<Entry | undefined> {
+  const entries = new EntryRepository(db);
+  let e = await entries.byClientKey(key);
+  if (!e) {
+    const alias = await db.selectFrom("session_alias").select("entry_id").where("key", "=", key).executeTakeFirst();
+    e = alias && (await entries.get(alias.entry_id));
+  }
+  return e?.type === type ? e : undefined;
 }
 
 // One command inside its transaction.
@@ -179,14 +202,8 @@ class Step {
     }
   }
 
-  /** The walk or training started with `key`, or one whose running instance `key` joined. */
-  private async find(key: string, type: "walk" | "training"): Promise<Entry | undefined> {
-    let e = await this.entries.byClientKey(key);
-    if (!e) {
-      const alias = await this.tx.selectFrom("session_alias").select("entry_id").where("key", "=", key).executeTakeFirst();
-      e = alias && (await this.entries.get(alias.entry_id));
-    }
-    return e?.type === type ? e : undefined;
+  private find(key: string, type: "walk" | "training"): Promise<Entry | undefined> {
+    return findByKey(this.tx, key, type);
   }
 
   private create(type: Entry["type"], at: string, clientKey: string | null): Promise<Entry> {
