@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { diary, historyFilter } from "@/backend";
+import { diary } from "@/backend";
 import { HistoryFilters } from "@/components/HistoryFilters";
 import { HistoryScreen } from "@/components/HistoryScreen";
 
@@ -7,8 +7,8 @@ export const metadata: Metadata = { title: "Verlauf" };
 export const dynamic = "force-dynamic";
 
 export default async function History({ searchParams }: PageProps<"/verlauf">) {
-  const filter = historyFilter(await searchParams);
   const d = await diary();
+  const filter = d.filter(await searchParams);
   const first = await d.history(filter);
   return (
     <>

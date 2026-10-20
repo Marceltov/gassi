@@ -1,6 +1,5 @@
 import { expect, test } from "vitest";
 import { sessionCookie } from "../auth/session";
-import { parseUsers } from "../config";
 import { freshDatabase } from "../db/testing";
 import { Diary } from "../diary";
 import { withEnv } from "../testing/env";
@@ -9,8 +8,8 @@ import { exportRoute } from "./export";
 withEnv();
 const { db } = freshDatabase();
 const NOW = Date.parse("2026-10-20T10:00:00Z");
-const open = async () => new Diary({ db: db(), dog: { id: 1, name: "Toffee" }, users: parseUsers("marcel:Hirsch"), timeZone: "Europe/Berlin", now: () => new Date(NOW) });
-const signedIn = () => ({ cookie: sessionCookie("marcel", NOW).split(";")[0] });
+const open = async () => new Diary({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"]]), timeZone: "Europe/Berlin", now: () => new Date(NOW) });
+const signedIn = () => ({ cookie: sessionCookie({ username: "marcel", name: "Hirsch" }, NOW).split(";")[0] });
 
 test("401 without a session", async () => {
   expect((await exportRoute(new Request("https://gassi.example/export.csv"), open, NOW)).status).toBe(401);

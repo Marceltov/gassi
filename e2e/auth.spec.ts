@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openMenu, signIn, signInAs } from "./helpers";
+import { openMenu, signInAs } from "./helpers";
 
 test("signed out, a page sends you to the login page and back after signing in", async ({ page }) => {
   await page.goto("/verlauf");
@@ -18,9 +18,8 @@ test("sign in as marcel, see Hirsch, log out", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test("someone not in USERS sees the 403 page", async ({ page }) => {
-  await signIn(page, "mallory");
-  await expect(page.getByRole("heading", { name: "Kein Zugang" })).toBeVisible();
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/login$/);
+test("anyone authentik signs in gets in, under the name authentik gives", async ({ page }) => {
+  await signInAs(page, "gast");
+  await openMenu(page);
+  await expect(page.getByText("Angemeldet als gast")).toBeVisible();
 });

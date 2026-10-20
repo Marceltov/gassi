@@ -30,7 +30,6 @@ export default defineConfig({
       OIDC_ISSUER: STUB_ISSUER,
       OIDC_CLIENT_ID: STUB_CLIENT_ID,
       OIDC_CLIENT_SECRET: "e2e-client-secret",
-      USERS: "marcel:Hirsch,bille:Herzii",
       API_TOKEN: E2E_API_TOKEN,
       DATA_DIR: "test-results/data",
       TZ: "Europe/Berlin",

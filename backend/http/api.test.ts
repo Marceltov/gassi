@@ -1,5 +1,4 @@
 import { describe, expect, test } from "vitest";
-import { parseUsers } from "../config";
 import { freshDatabase } from "../db/testing";
 import { Diary } from "../diary";
 import { setEnv, withEnv } from "../testing/env";
@@ -9,7 +8,7 @@ const TOKEN = "api-token-".padEnd(32, "z");
 withEnv({ API_TOKEN: TOKEN });
 const { db } = freshDatabase();
 const NOW = new Date("2026-10-20T10:00:00Z");
-const open = async () => new Diary({ db: db(), dog: { id: 1, name: "Toffee" }, users: parseUsers("marcel:Hirsch,bille:Herzii"), timeZone: "Europe/Berlin", now: () => NOW });
+const open = async () => new Diary({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), timeZone: "Europe/Berlin", now: () => NOW });
 
 const URL_ = "https://gassi.example/api/v1/entries";
 const auth = (token = TOKEN) => ({ authorization: `Bearer ${token}` });

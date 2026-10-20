@@ -8,6 +8,9 @@ export const STUB_PORT = 3199;
 export const STUB_ISSUER = `http://127.0.0.1:${STUB_PORT}`;
 export const STUB_CLIENT_ID = "gassi";
 
+// The display names authentik would send as `name`; anyone else is named by their username.
+const NAMES: Record<string, string> = { marcel: "Hirsch", bille: "Herzii" };
+
 const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
 
 function cookie(req: IncomingMessage, name: string): string | undefined {
@@ -36,7 +39,7 @@ function authorize(req: IncomingMessage, res: ServerResponse, url: URL) {
 
 async function token(req: IncomingMessage, res: ServerResponse) {
   const { user, nonce } = JSON.parse(Buffer.from((await body(req)).get("code") ?? "", "base64url").toString() || "{}");
-  const claims = { iss: STUB_ISSUER, aud: STUB_CLIENT_ID, exp: Math.floor(Date.now() / 1000) + 300, nonce, preferred_username: user };
+  const claims = { iss: STUB_ISSUER, aud: STUB_CLIENT_ID, exp: Math.floor(Date.now() / 1000) + 300, nonce, preferred_username: user, name: NAMES[user] ?? user };
   res.setHeader("content-type", "application/json");
   res.end(JSON.stringify({ access_token: "stub", token_type: "Bearer", id_token: `${b64({ alg: "none" })}.${b64(claims)}.` }));
 }

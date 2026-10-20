@@ -1,12 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { parseUsers } from "./config";
 import { freshDatabase } from "./db/testing";
-import { Diary, HISTORY_PAGE, historyFilter, InputError } from "./diary";
+import { Diary, HISTORY_PAGE, InputError } from "./diary";
 
 const { db } = freshDatabase();
 const HIRSCH = { username: "marcel", name: "Hirsch" };
 let clock = new Date("2026-10-20T10:00:00Z");
-const diary = () => new Diary({ db: db(), dog: { id: 1, name: "Toffee" }, users: parseUsers("marcel:Hirsch,bille:Herzii"), timeZone: "Europe/Berlin", now: () => clock });
+const diary = () => new Diary({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), timeZone: "Europe/Berlin", now: () => clock });
 
 describe("log", () => {
   test("logs for the signed-in user and shows their display name", async () => {
@@ -24,7 +23,7 @@ describe("log", () => {
     await expect(diary().log(HIRSCH, input)).rejects.toThrow(message);
   });
 
-  test("logAs takes only people in USERS", async () => {
+  test("logAs takes only people who have signed in", async () => {
     expect(await diary().logAs("bille", { type: "pee", at: "2026-10-20T09:00:00Z" })).toMatchObject({ byName: "Herzii" });
     await expect(diary().logAs("mallory", { type: "pee", at: "2026-10-20T09:00:00Z" })).rejects.toThrow(InputError);
   });
@@ -67,9 +66,15 @@ test("history pages by 50 and says when there is more", async () => {
   expect((await d.history({ type: "food" })).entries[0].byName).toBe("Herzii");
 });
 
-test("historyFilter keeps only known types and people", () => {
-  const users = parseUsers("marcel:Hirsch");
-  expect(historyFilter({ type: "walk", by: "marcel" }, users)).toEqual({ type: "walk", by: "marcel" });
-  expect(historyFilter({ type: "bark", by: "mallory" }, users)).toEqual({});
-  expect(historyFilter({ type: ["walk"], by: 1 }, users)).toEqual({});
+test("filter keeps only known types and people", () => {
+  const d = diary();
+  expect(d.filter({ type: "walk", by: "marcel" })).toEqual({ type: "walk", by: "marcel" });
+  expect(d.filter({ type: "bark", by: "mallory" })).toEqual({});
+  expect(d.filter({ type: ["walk"], by: 1 })).toEqual({});
+});
+
+test("an entry by someone without a remembered name shows their username", async () => {
+  const d = diary();
+  await d.log({ username: "gast", name: "Gast" }, { type: "pee", at: "2026-10-20T09:00:00Z" });
+  expect((await d.all())[0].byName).toBe("gast");
 });

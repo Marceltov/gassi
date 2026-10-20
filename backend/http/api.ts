@@ -1,5 +1,5 @@
 // The REST API, only while API_TOKEN is set (404 otherwise): GET /api/v1/entries?type=&since= lists entries newest
-// first, POST /api/v1/entries logs one on behalf of `loggedBy` (a USERS username). Bearer token auth, JSON in and out.
+// first, POST /api/v1/entries logs one on behalf of `loggedBy` (someone who has signed in). Bearer token auth, JSON in and out.
 import { z } from "zod";
 import { safeEqual } from "../auth/signed";
 import { config } from "../config";

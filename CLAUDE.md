@@ -43,8 +43,8 @@ labels, ports); they apply to that deployment folder, not to the app code here.
   entries sharing a timestamp, not nested.
 - **Auth is a real OIDC client of authentik**, modelled on `notefeed/notefeed` (`backend/oidc/`): code flow +
   PKCE, state/nonce in a short-lived signed cookie, id_token claims checked, signed session cookie with expiry.
-  No auth library, no forward-auth header. Users come from `USERS=marcel:Hirsch,bille:Herzii` (keyed by
-  `preferred_username`); anyone else gets 403, never a new account.
+  No auth library, no forward-auth header. authentik's application bindings decide who gets in; users are keyed by
+  `preferred_username` and shown by the `name` claim (recorded in the `person` table at sign-in).
 - **Stack and tests follow `notefeed/notefeed`** (not Healthy): Next.js App Router + server actions, TypeScript,
   Kysely on better-sqlite3, Tailwind, pino, zod, PWA. Vitest for units with injected `fetch`/`now` instead of
   mocks; Playwright against `next start` with phone projects and a stub OIDC issuer; an image smoke test in CI.

@@ -35,7 +35,6 @@ same test layers). Copy its patterns, not its features.
 | `SECRET` | yes | | at least 32 chars, HMAC key for cookies |
 | `OIDC_ISSUER` | yes | | e.g. `https://auth.herziis.de/application/o/gassi/` |
 | `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | yes | | from the authentik provider |
-| `USERS` | yes | | `marcel:Hirsch,bille:Herzii` (`preferred_username:Display name`) |
 | `DOG_NAME` | no | `Toffee` | name of the dog created on first start |
 | `DATA_DIR` | no | `./data` (`/data` in the image) | holds `gassi.db` |
 | `TZ` | no | `Europe/Berlin` | what "today" and displayed times mean |
@@ -61,9 +60,9 @@ Port of notefeed `backend/oidc/` reduced to a single provider:
   `nonce`, scope `openid profile email`. The flight (state, nonce, verifier, next) goes in the signed cookie
   `gassi_oidc` (path `/api/oidc`, 10 min).
 - `GET /api/oidc/callback` → check state against the flight, exchange the code, check the id_token's `iss`,
-  `aud`/`azp`, `exp` and `nonce` (signature not verified, see PLAN.md), look up `preferred_username` in `USERS`.
+  `aud`/`azp`, `exp` and `nonce` (signature not verified, see PLAN.md), take `preferred_username` and `name`.
   On success it sets `gassi_session` (signed `{username, exp}`, 30 days, HttpOnly, SameSite=Lax, Secure when
-  `PUBLIC_URL` is https) and redirects to a same-origin `next` only. An unknown user gets a German 403 page.
+  `PUBLIC_URL` is https) and redirects to a same-origin `next` only. Who may sign in is decided in authentik.
 - `POST /logout` clears the session and redirects to `/login`.
 - `/login` is a page with one button "Anmelden" that starts the flow.
 - Failures log the reason, never the person's address or tokens.
@@ -94,7 +93,7 @@ Port of notefeed `backend/oidc/` reduced to a single provider:
 ### API (only when `API_TOKEN` is set)
 
 - `GET /api/v1/entries?type=&since=` and `POST /api/v1/entries` with `Authorization: Bearer <API_TOKEN>`, JSON
-  validated with zod, `loggedBy` given in the body and checked against `USERS`. Without `API_TOKEN` these answer
+  validated with zod, `loggedBy` given in the body and checked against the people who have signed in. Without `API_TOKEN` these answer
   404.
 
 ### Operations
@@ -109,7 +108,7 @@ Port of notefeed `backend/oidc/` reduced to a single provider:
 
 As in PLAN.md "Tests". Concretely:
 
-- **Unit (Vitest)**: config parsing (`USERS`, missing vars), cookie sign/verify/expiry/tamper, OIDC discover,
+- **Unit (Vitest)**: config parsing (missing and invalid vars), cookie sign/verify/expiry/tamper, OIDC discover,
   authorize URL and exchange against a stub issuer passed as `fetch` (every id_token check has a failing case),
   callback handling (state mismatch, unknown user, open redirect in `next`), entry repository on a temp
   `DATA_DIR` (create, list today in `TZ` across midnight UTC, edit, delete, last-per-type), "vor …" formatting,
@@ -118,8 +117,8 @@ As in PLAN.md "Tests". Concretely:
   `globalSetup`, is a minimal issuer (discovery, authorize that redirects straight back with a code for the user
   named in a query param or cookie, token endpoint returning an unsigned id_token). Projects: desktop Chromium,
   `iPhone 13` (WebKit), `Pixel 7` (Chromium). Specs:
-  - `auth.spec.ts`: signed out goes to `/login`, sign in as marcel, see "Hirsch", log out; an unknown user sees
-    403.
+  - `auth.spec.ts`: signed out goes to `/login`, sign in as marcel, see "Hirsch", log out; someone new signs in
+    under the name authentik gives.
   - `today.spec.ts`: tap Gassi, the tile says "gerade eben · Hirsch", undo removes it; log food with 200 g
     through the sheet.
   - `history.spec.ts`: entries by both users, filter by person, edit a time, delete.
@@ -148,7 +147,7 @@ Each phase ends with its checks passing and a commit. Don't start the next phase
    Check: `npm run lint`, `npm run typecheck`, `npm test` pass; `npm run dev` serves a page.
 2. **Data**: Kysely, migrations, dog seed, entry repository, `/health`. Check: unit tests for the repository and
    health pass.
-3. **Sign-in**: cookies, OIDC flow, `proxy.ts`, login, logout, 403 page, OIDC stub, `auth.spec.ts`. Check: unit
+3. **Sign-in**: cookies, OIDC flow, `proxy.ts`, login, logout, OIDC stub, `auth.spec.ts`. Check: unit
    tests and `auth.spec.ts` pass in all three projects.
 4. **Today**: tiles, quick log, undo, detail sheet, today list. Check: `today.spec.ts` green on the phones.
 5. **History and export**: list, filters, paging, edit, delete, CSV, API. Check: `history.spec.ts`,
@@ -189,8 +188,6 @@ Each phase ends with its checks passing and a commit. Don't start the next phase
 - **Look:** gravel-sage background with a colour per entry type (walk green, food ochre, pee mustard, poop brown,
   note slate) used for tile, list dot and filter chip; Atkinson Hyperlegible Next as the only typeface (legible in
   sunlight); the time since the last entry is the largest text on a tile.
-- **Unknown-user 403** is an HTML response from the callback route (`backend/http/responses.ts`), not a Next page,
-  so it can carry the status code.
 - **History paging** uses offset/limit (51 rows fetched to know whether there is more). Pages loaded with "Mehr
   laden" stay in the browser and are patched on edit/delete; the first page is refreshed by the server action.
 - **Filters are links** (`/verlauf?type=walk&by=bille`); unknown values are ignored, not an error.
@@ -200,7 +197,7 @@ Each phase ends with its checks passing and a commit. Don't start the next phase
 - **API:** `API_TOKEN` must be at least 16 characters; `POST` defaults `at` to now and answers 201 with the entry;
   `since` is inclusive.
 - **Proxy:** only GET/HEAD page requests are redirected; server actions and route handlers check the session
-  themselves. A session counts only while its username is still in `USERS`.
+  themselves.
 - **Startup:** `instrumentation.ts` checks the config and opens the database; on failure it prints the reason
   (every missing variable by name) and exits 1, so the container stops instead of answering errors.
 - **Service worker** caches successful page loads for the offline fallback and never touches server actions, the
@@ -209,3 +206,7 @@ Each phase ends with its checks passing and a commit. Don't start the next phase
   `image` also tags `sha-<short>`.
 - **`npm run oidc-stub`** runs the e2e stub issuer for local development without authentik.
 - **Image:** `TZ=Europe/Berlin` is set as the image default; `public/` is copied next to the standalone server.
+- **authentik decides who gets in (changed at deployment, on request):** there is no `USERS` allow-list and no 403
+  page. Whoever authentik signs in is a user; the display name is the id_token's `name` (else the username), kept
+  in the session cookie and recorded in a `person` table at each sign-in, so entries, the CSV and the person filter
+  show names. The API's `loggedBy` must be someone who has signed in. Set display names (e.g. "Hirsch") in authentik.

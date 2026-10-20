@@ -20,9 +20,16 @@ export interface EntryTable {
   updated_at: string;
 }
 
+export interface PersonTable {
+  username: string;
+  name: string;
+  updated_at: string;
+}
+
 export interface Schema {
   dog: DogTable;
   entry: EntryTable;
+  person: PersonTable;
 }
 
 export type EntryRow = Selectable<EntryTable>;

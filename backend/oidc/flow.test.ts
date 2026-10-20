@@ -46,16 +46,21 @@ test("authorizeUrl asks for a code with PKCE S256, state, nonce and the scopes",
 });
 
 describe("exchange", () => {
-  test("sends the code with the verifier and returns the preferred_username", async () => {
+  test("sends the code with the verifier and returns the preferred_username and name", async () => {
     const f = stubIssuer(P.nonce);
-    expect(await exchange(CLIENT, META, P, f, NOW)).toEqual({ username: "marcel" });
+    expect(await exchange(CLIENT, META, P, f, NOW)).toEqual({ username: "marcel", name: "Hirsch" });
     const [, init] = f.mock.calls[0];
     expect(Object.fromEntries(new URLSearchParams(String(init!.body)))).toMatchObject({ grant_type: "authorization_code", code: "the-code", code_verifier: "the-verifier", client_id: "gassi", client_secret: "client-secret", redirect_uri: P.redirectUri });
   });
 
   test("several audiences need azp to name this client", async () => {
     const f = stubIssuer(P.nonce, { claims: (n) => goodClaims(n, { aud: ["gassi", "other"], azp: "gassi" }) });
-    expect(await exchange(CLIENT, META, P, f, NOW)).toEqual({ username: "marcel" });
+    expect(await exchange(CLIENT, META, P, f, NOW)).toMatchObject({ username: "marcel" });
+  });
+
+  test.each([undefined, "", "  "])("without a name (%j) the username is the name", async (name) => {
+    const f = stubIssuer(P.nonce, { claims: (n) => goodClaims(n, { name }) });
+    expect(await exchange(CLIENT, META, P, f, NOW)).toEqual({ username: "marcel", name: "marcel" });
   });
 
   test.each<[string, Record<string, unknown>]>([

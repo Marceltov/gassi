@@ -3,21 +3,7 @@
 import { z } from "zod";
 import { processState } from "./state";
 
-export type Users = ReadonlyMap<string, string>;
-
 const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace", "silent"] as const;
-
-// "marcel:Hirsch,bille:Herzii" → username → display name.
-export function parseUsers(raw: string): Users {
-  const users = new Map<string, string>();
-  for (const pair of raw.split(",").map((p) => p.trim()).filter(Boolean)) {
-    const [username, name, ...rest] = pair.split(":").map((s) => s.trim());
-    if (!username || !name || rest.length > 0) throw new Error(`"${pair}" is not username:Display name`);
-    users.set(username, name);
-  }
-  if (users.size === 0) throw new Error("names no user");
-  return users;
-}
 
 const validTimeZone = (tz: string) => {
   try {
@@ -38,14 +24,6 @@ const schema = z.object({
   OIDC_ISSUER: required.pipe(z.url()),
   OIDC_CLIENT_ID: required,
   OIDC_CLIENT_SECRET: required,
-  USERS: required.transform((raw, ctx) => {
-    try {
-      return parseUsers(raw);
-    } catch (e) {
-      ctx.addIssue({ code: "custom", message: (e as Error).message });
-      return z.NEVER;
-    }
-  }),
   DOG_NAME: optional(z.string().trim()).default("Toffee"),
   DATA_DIR: optional(z.string()).default("./data"),
   TZ: optional(z.string().refine(validTimeZone, "is not a time zone")).default("Europe/Berlin"),
@@ -57,7 +35,6 @@ export type Config = {
   publicUrl: string;
   secret: string;
   oidc: { issuer: string; clientId: string; clientSecret: string };
-  users: Users;
   dogName: string;
   dataDir: string;
   timeZone: string;
@@ -76,7 +53,6 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
     publicUrl: c.PUBLIC_URL,
     secret: c.SECRET,
     oidc: { issuer: c.OIDC_ISSUER, clientId: c.OIDC_CLIENT_ID, clientSecret: c.OIDC_CLIENT_SECRET },
-    users: c.USERS,
     dogName: c.DOG_NAME,
     dataDir: c.DATA_DIR,
     timeZone: c.TZ,

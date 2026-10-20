@@ -1,15 +1,16 @@
 // The use cases the screens, the export and the API call: log, edit and delete entries, the today view and the
-// history. It hides the database, the one dog of v1, the time zone and display names. Input from outside is
+// history. It hides the database, the one dog of v1, the time zone and display names (of everyone who has signed in). Input from outside is
 // validated here (zod); a problem is an InputError with a German message the screen can show.
 import { z } from "zod";
 import { type EntryType, isEntryType, TILE_TYPES } from "../shared/entryTypes";
 import { dayBounds } from "../shared/time";
 import type { User } from "./auth/session";
-import { config, type Users } from "./config";
+import { config } from "./config";
 import { database, type DB } from "./db/open";
 import { currentDog, type Dog } from "./dogs";
 import { type Entry, entryFields, latestByType, newEntryInput } from "./entries/model";
 import { EntryRepository } from "./entries/repository";
+import { type Names, PeopleRepository } from "./people";
 
 /** An entry as the screens show it: with the display name of whoever logged it. */
 export type EntryView = Entry & { byName: string };
@@ -27,13 +28,6 @@ export type HistoryPage = { entries: EntryView[]; more: boolean };
 
 export const HISTORY_PAGE = 50;
 
-/** The history filter from untrusted values (search params, an action's argument): anything unknown is left out. */
-export function historyFilter(raw: { type?: unknown; by?: unknown }, users: Users = config().users): HistoryFilter {
-  return {
-    ...(isEntryType(raw.type) ? { type: raw.type } : {}),
-    ...(typeof raw.by === "string" && users.has(raw.by) ? { by: raw.by } : {}),
-  };
-}
 
 export class InputError extends Error {
   constructor(message: string) {
@@ -57,7 +51,7 @@ function parse<S extends z.ZodType>(schema: S, input: unknown): z.output<S> {
   throw new InputError(MESSAGES[field] ?? "Die Eingabe stimmt nicht.");
 }
 
-export type DiaryDeps = { db: DB; dog: Dog; users: Users; timeZone: string; now: () => Date };
+export type DiaryDeps = { db: DB; dog: Dog; names: Names; timeZone: string; now: () => Date };
 
 export class Diary {
   private readonly entries: EntryRepository;
@@ -74,9 +68,17 @@ export class Diary {
     return this.deps.timeZone;
   }
 
-  /** Display names by username, for the person filter. */
+  /** Everyone who has signed in, for the person filter. */
   people(): { username: string; name: string }[] {
-    return [...this.deps.users].map(([username, name]) => ({ username, name }));
+    return [...this.deps.names].map(([username, name]) => ({ username, name }));
+  }
+
+  /** The history filter from untrusted values (search params, an action's argument): anything unknown is left out. */
+  filter(raw: { type?: unknown; by?: unknown }): HistoryFilter {
+    return {
+      ...(isEntryType(raw.type) ? { type: raw.type } : {}),
+      ...(typeof raw.by === "string" && this.deps.names.has(raw.by) ? { by: raw.by } : {}),
+    };
   }
 
   async log(user: User, input: unknown): Promise<EntryView> {
@@ -84,9 +86,9 @@ export class Diary {
     return this.view(await this.entries.create({ ...fields, dogId: this.deps.dog.id, loggedBy: user.username }));
   }
 
-  /** Logs on behalf of `loggedBy` (the API), which must be in USERS. */
+  /** Logs on behalf of `loggedBy` (the API): someone who has signed in at least once. */
   async logAs(loggedBy: string, input: unknown): Promise<EntryView> {
-    const name = this.deps.users.get(loggedBy);
+    const name = this.deps.names.get(loggedBy);
     if (!name) throw new InputError("Diese Person gibt es nicht.");
     return this.log({ username: loggedBy, name }, input);
   }
@@ -119,15 +121,15 @@ export class Diary {
   }
 
   private view(e: Entry): EntryView {
-    return { ...e, byName: this.deps.users.get(e.loggedBy) ?? e.loggedBy };
+    return { ...e, byName: this.deps.names.get(e.loggedBy) ?? e.loggedBy };
   }
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** The process's diary, on the configured database and dog. */
+/** The diary for one request, on the configured database and dog, with the names as they are now. */
 export async function diary(): Promise<Diary> {
   const db = await database();
-  const { users, timeZone } = config();
-  return new Diary({ db, dog: await currentDog(db), users, timeZone, now: () => new Date() });
+  const [dog, names] = await Promise.all([currentDog(db), new PeopleRepository(db).names()]);
+  return new Diary({ db, dog, names, timeZone: config().timeZone, now: () => new Date() });
 }

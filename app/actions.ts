@@ -2,7 +2,7 @@
 // The server actions behind the screens. Each checks the session itself (the proxy only guards page loads), calls
 // one use case and refreshes the screens that show entries.
 import { revalidatePath } from "next/cache";
-import { diary, type EntryView, historyFilter, type HistoryPage, InputError } from "@/backend";
+import { diary, type EntryView, type HistoryPage, InputError } from "@/backend";
 import { requireUser } from "@/app/_lib/session";
 import type { Result } from "@/shared/result";
 
@@ -41,5 +41,6 @@ export async function deleteEntry(id: number): Promise<Result<null>> {
 /** The next page of the history ("Mehr laden"); `filter` is checked like the page's search params. */
 export async function loadHistory(filter: { type?: unknown; by?: unknown }, offset: number): Promise<HistoryPage> {
   await requireUser();
-  return (await diary()).history(historyFilter(filter), Math.max(0, Math.trunc(offset) || 0));
+  const d = await diary();
+  return d.history(d.filter(filter), Math.max(0, Math.trunc(offset) || 0));
 }

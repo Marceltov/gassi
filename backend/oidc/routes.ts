@@ -1,17 +1,25 @@
 // GET /api/oidc/start, GET /api/oidc/callback and POST /logout. What a sign-in in flight needs (state, nonce, PKCE
 // verifier, where to go next) rides in a short-lived signed cookie that only /api/oidc receives, so nothing is stored.
-// Success sets the session cookie; someone not in USERS gets a 403 page, never an account.
+// authentik decides who may sign in (its application bindings): whoever it signs in gets the session cookie, and their
+// display name is remembered for the entries they log.
 import { createHash, randomBytes } from "node:crypto";
 import { clearCookie, readCookie, setCookie } from "../auth/cookies";
-import { endSessionCookie, knownUser, sessionCookie } from "../auth/session";
+import { endSessionCookie, sessionCookie, type User } from "../auth/session";
 import { safeEqual, signer } from "../auth/signed";
 import { config } from "../config";
-import { htmlPage, safeNext, seeOther } from "../http/responses";
+import { database } from "../db/open";
+import { safeNext, seeOther } from "../http/responses";
+import { PeopleRepository } from "../people";
 import { authorizeUrl, type Client, discover, exchange } from "./flow";
 import { AuthError, errorCode, fail, log } from "./log";
 
-export type OidcDeps = { fetch: typeof fetch; now: () => number };
-const defaultDeps: OidcDeps = { fetch: (...args) => fetch(...args), now: () => Date.now() };
+/** Outside calls: the provider (`fetch`), the clock, and where a signed-in person's name is kept. */
+export type OidcDeps = { fetch: typeof fetch; now: () => number; remember: (user: User) => Promise<void> };
+const defaultDeps: OidcDeps = {
+  fetch: (...args) => fetch(...args),
+  now: () => Date.now(),
+  remember: async (user) => new PeopleRepository(await database()).remember(user),
+};
 
 type Flight = { state: string; nonce: string; verifier: string; next: string };
 
@@ -47,37 +55,29 @@ export async function oidcStartRoute(req: Request, deps: OidcDeps = defaultDeps)
   return seeOther(to, { "Set-Cookie": flightCookie(signer(config().secret).sign("oidc", flight, FLIGHT_TTL, deps.now())) });
 }
 
-// Throws AuthError (logging why) unless the provider's answer matches the flight; returns the id_token's username.
-async function signIn(params: URLSearchParams, flight: Flight | null, deps: OidcDeps): Promise<string> {
+// Throws AuthError (logging why) unless the provider's answer matches the flight; returns who the id_token names.
+async function signIn(params: URLSearchParams, flight: Flight | null, deps: OidcDeps): Promise<User> {
   const [state, code] = [params.get("state"), params.get("code")];
   if (params.has("error")) fail("provider denied the sign-in", errorCode(params.get("error")));
   if (!flight || state === null || !safeEqual(state, flight.state)) fail("state mismatch or missing sign-in cookie");
   if (!code) fail("no code in the callback");
   const meta = await discover(client(), deps.fetch, deps.now());
-  const { username } = await exchange(client(), meta, { code, redirectUri: redirectUri(), verifier: flight.verifier, nonce: flight.nonce }, deps.fetch, deps.now());
-  return username;
-}
-
-function forbidden(): Response {
-  log.warn("person not in USERS"); // never who
-  const res = htmlPage(403, "Kein Zugang", "Dieses Konto darf Gassi nicht benutzen. Frag im Haushalt nach, ob du in die Liste aufgenommen werden sollst.", { href: "/login", label: "Zurück zur Anmeldung" });
-  res.headers.append("Set-Cookie", noFlightCookie());
-  return res;
+  return exchange(client(), meta, { code, redirectUri: redirectUri(), verifier: flight.verifier, nonce: flight.nonce }, deps.fetch, deps.now());
 }
 
 export async function oidcCallbackRoute(req: Request, deps: OidcDeps = defaultDeps): Promise<Response> {
   const flight = signer(config().secret).verify<Flight>("oidc", readCookie(req.headers, FLIGHT_COOKIE) ?? "", deps.now());
   const next = safeNext(flight?.next);
-  let username: string;
+  let user: User;
   try {
-    username = await signIn(new URL(req.url).searchParams, flight, deps);
+    user = await signIn(new URL(req.url).searchParams, flight, deps);
   } catch (e) {
     if (e instanceof AuthError) return loginFailed(next);
     throw e;
   }
-  if (!knownUser(username)) return forbidden();
-  log.info("sign-in succeeded");
-  const res = seeOther(next, { "Set-Cookie": sessionCookie(username, deps.now()) });
+  await deps.remember(user);
+  log.info("sign-in succeeded"); // never who
+  const res = seeOther(next, { "Set-Cookie": sessionCookie(user, deps.now()) });
   res.headers.append("Set-Cookie", noFlightCookie());
   return res;
 }

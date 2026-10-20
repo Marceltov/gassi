@@ -20,4 +20,4 @@ export const exportCsv = logged((req) => exportRoute(req));
 export const apiEntries = logged((req) => apiEntriesRoute(req));
 
 // The use cases (backend/diary.ts) and what they hand out.
-export { diary, HISTORY_PAGE, historyFilter, InputError, type EntryView, type HistoryFilter, type HistoryPage, type TodayView } from "./diary";
+export { diary, HISTORY_PAGE, InputError, type EntryView, type HistoryFilter, type HistoryPage, type TodayView } from "./diary";

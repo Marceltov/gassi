@@ -97,8 +97,11 @@ function checkClaims(client: Client, c: Record<string, unknown>, meta: Meta, non
 
 export type ExchangeParams = { code: string; redirectUri: string; verifier: string; nonce: string };
 
-/** Trades the code for an id_token and returns its checked `preferred_username`. */
-export async function exchange(client: Client, meta: Meta, p: ExchangeParams, fetchFn: Fetch = fetch, now = Date.now()): Promise<{ username: string }> {
+// The display name: authentik's `name`, else the username.
+const displayName = (c: Record<string, unknown>, username: string) => (typeof c.name === "string" && c.name.trim() ? c.name.trim() : username);
+
+/** Trades the code for an id_token and returns who it names: `preferred_username` and the display name. */
+export async function exchange(client: Client, meta: Meta, p: ExchangeParams, fetchFn: Fetch = fetch, now = Date.now()): Promise<{ username: string; name: string }> {
   const body = new URLSearchParams({ grant_type: "authorization_code", code: p.code, redirect_uri: p.redirectUri, code_verifier: p.verifier, client_id: client.clientId, client_secret: client.clientSecret });
   const headers = { accept: "application/json", "content-type": "application/x-www-form-urlencoded" };
   const res = await getJson(fetchFn, meta.token_endpoint, { method: "POST", headers, body }, "token request rejected");
@@ -108,5 +111,5 @@ export async function exchange(client: Client, meta: Meta, p: ExchangeParams, fe
   checkClaims(client, claims, meta, p.nonce, now);
   const username = claims.preferred_username;
   if (typeof username !== "string" || username === "") fail("id_token has no preferred_username");
-  return { username };
+  return { username, name: displayName(claims, username) };
 }

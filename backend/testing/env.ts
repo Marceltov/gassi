@@ -8,7 +8,6 @@ export const TEST_ENV = {
   OIDC_ISSUER: "https://idp.example/application/o/gassi/",
   OIDC_CLIENT_ID: "gassi",
   OIDC_CLIENT_SECRET: "client-secret",
-  USERS: "marcel:Hirsch,bille:Herzii",
   TZ: "Europe/Berlin",
 };
 

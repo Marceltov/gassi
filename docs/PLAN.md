@@ -62,11 +62,11 @@ notefeed's sign-in (`notefeed/notefeed`, `backend/oidc/`) without an auth librar
   is not verified, since it comes straight from the token endpoint over TLS (OIDC Core 3.1.3.7).
 - Success sets a signed, HttpOnly `SameSite=Lax` session cookie (HMAC with `SECRET`) naming the user, with an
   expiry (notefeed's has none). Logout clears it.
-- No user management in the app. Known users and their display names come from config, keyed by the
-  `preferred_username` claim, for example `USERS=marcel:Hirsch,bille:Herzii`. Anyone else gets a 403, not a new
-  account.
+- No user management in the app: authentik decides who gets in (the `gassi` application's bindings). Whoever it
+  signs in is a user, keyed by the `preferred_username` claim and shown by the `name` claim (else the username);
+  each sign-in records that name so entries and filters can show it.
 
-Config: `PUBLIC_URL`, `SECRET`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `USERS`. The redirect URI
+Config: `PUBLIC_URL`, `SECRET`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`. The redirect URI
 is `${PUBLIC_URL}/api/oidc/callback`. Caddy only reverse-proxies; no forward auth.
 
 The REST API (if any) uses a static bearer token from env.

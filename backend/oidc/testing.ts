@@ -7,7 +7,7 @@ export const META = { issuer: ISSUER, authorization_endpoint: "https://idp.examp
 export const CLIENT = { issuer: ISSUER, clientId: "gassi", clientSecret: "client-secret" };
 export const NOW = 1_800_000_000_000;
 
-export const goodClaims = (nonce: string, more: Record<string, unknown> = {}) => ({ iss: ISSUER, aud: "gassi", exp: NOW / 1000 + 300, nonce, preferred_username: "marcel", ...more });
+export const goodClaims = (nonce: string, more: Record<string, unknown> = {}) => ({ iss: ISSUER, aud: "gassi", exp: NOW / 1000 + 300, nonce, preferred_username: "marcel", name: "Hirsch", ...more });
 
 const b64 = (v: unknown) => Buffer.from(JSON.stringify(v)).toString("base64url");
 export const jwt = (claims: unknown) => `${b64({ alg: "RS256" })}.${b64(claims)}.c2ln`;

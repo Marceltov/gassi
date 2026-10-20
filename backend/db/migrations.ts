@@ -30,6 +30,17 @@ const migrations: Record<string, Migration> = {
       await db.schema.createIndex("entry_by_dog_and_time").on("entry").columns(["dog_id", sql`at desc` as any]).execute();
     },
   },
+  // Who has signed in, with the display name authentik last gave: the names shown for entries and in the filters.
+  "002_person": {
+    async up(db: Kysely<any>) {
+      await db.schema
+        .createTable("person")
+        .addColumn("username", "text", (c) => c.primaryKey())
+        .addColumn("name", "text", (c) => c.notNull())
+        .addColumn("updated_at", "text", (c) => c.notNull())
+        .execute();
+    },
+  },
 };
 
 const provider: MigrationProvider = { getMigrations: async () => migrations };

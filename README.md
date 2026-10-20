@@ -30,9 +30,10 @@ authentik, run the e2e stub issuer (`npm run oidc-stub`) and set `OIDC_ISSUER=ht
 ## Configure
 
 Every variable, with its default, is in [.env.example](.env.example). Required: `PUBLIC_URL`, `SECRET` (32+
-characters), `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `USERS` (`marcel:Hirsch,bille:Herzii`, keyed by
-the `preferred_username` claim; anyone else gets a 403). Gassi refuses to start and names the variable when one is
-missing or wrong.
+characters), `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`. Gassi refuses to start and names the variable when one is missing or wrong.
+
+Who may use Gassi is decided in authentik, by binding users or groups to the `gassi` application. Gassi shows people
+by authentik's `name` (set it to "Hirsch", "Herzii", …), falling back to the username.
 
 Optional: `DOG_NAME` (`Toffee`, used when the database is created), `DATA_DIR` (`./data`, `/data` in the image),
 `TZ` (`Europe/Berlin`: what "today" means), `API_TOKEN` (enables the REST API), `LOG_LEVEL` (`info`).
@@ -48,7 +49,7 @@ curl -H "Authorization: Bearer $API_TOKEN" -H 'Content-Type: application/json' \
 ```
 
 Types: `walk`, `food`, `pee`, `poop`, `note`. Optional fields: `at` (ISO 8601, default now), `durationMin`, `amountG`,
-`note`. `loggedBy` must be a username from `USERS`.
+`note`. `loggedBy` must be the username of someone who has signed in.
 
 ## Deploy
 
