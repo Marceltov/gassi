@@ -1,6 +1,7 @@
 // The use cases the screens, the export and the API call: log, edit and delete entries, the today view and the
 // history. It hides the database, the one dog of v1, the time zone and display names (of everyone who has signed in). Input from outside is
 // validated here (zod); a problem is an InputError with a German message the screen can show.
+import { sql } from "kysely";
 import { z } from "zod";
 import { type EntryType, FOOD_KINDS, type FoodKind, isEntryType, TILE_TYPES } from "../shared/entryTypes";
 import { dayBounds } from "../shared/time";
@@ -16,8 +17,9 @@ import { Sessions, type SessionsView } from "./sessions";
 import { computeStock, dryTreats, type Stock } from "./stock";
 import { mondayOf, weekBounds, type WeekInput, weekView, type WeekView } from "./week";
 
-/** An entry as the screens show it: with the display name of whoever logged it. */
-export type EntryView = Entry & { byName: string };
+/** An entry as the screens show it: with the display name of whoever logged it, and for walks the walkers' names and
+ * minutes paused, for trainings the exercises practised and treats given. */
+export type EntryView = Entry & { byName: string; walkers: string[]; pauseMin: number | null; exercises: string[]; treats: number | null };
 
 export type TodayView = {
   dogName: string;
@@ -108,7 +110,7 @@ export class Diary {
 
   async log(user: User, input: unknown): Promise<EntryView> {
     const fields = parse(newEntryInput, input);
-    return this.view(await this.entries.create({ ...fields, dogId: this.deps.dog.id, loggedBy: user.username }));
+    return this.view1(await this.entries.create({ ...fields, dogId: this.deps.dog.id, loggedBy: user.username }));
   }
 
   /** Logs on behalf of `loggedBy` (the API): someone who has signed in at least once. */
@@ -120,7 +122,7 @@ export class Diary {
 
   async edit(id: number, input: unknown): Promise<EntryView | null> {
     const entry = await this.entries.update(id, parse(entryFields, input));
-    return entry ? this.view(entry) : null;
+    return entry ? this.view1(entry) : null;
   }
 
   remove(id: number): Promise<boolean> {
@@ -130,7 +132,7 @@ export class Diary {
   async today(): Promise<TodayView> {
     const now = this.deps.now();
     const { start, end } = dayBounds(now.getTime(), this.deps.timeZone);
-    const entries = (await this.entries.list({ dogId: this.deps.dog.id, since: iso(start), until: iso(end) })).map((e) => this.view(e));
+    const entries = await this.views(await this.entries.list({ dogId: this.deps.dog.id, since: iso(start), until: iso(end) }));
     const latest = latestByType(entries);
     const tiles = Object.fromEntries(TILE_TYPES.map((t) => [t, (latest[t] as EntryView | undefined) ?? null])) as TodayView["tiles"];
     const [sessions, lastFood] = await Promise.all([new Sessions(this.deps).current(), this.lastFoodAmounts()]);
@@ -172,7 +174,7 @@ export class Diary {
     const r = weightInput.safeParse(input);
     if (!r.success) throw new InputError(r.error.issues[0]?.path[0] === "at" ? MESSAGES.at : "Das Gewicht muss zwischen 0,5 und 100 kg liegen.");
     const amountG = Math.round(r.data.kg * 10) * 100;
-    return this.view(await this.entries.create({ type: "weight", at: r.data.at, endedAt: null, amountG, foodKind: null, unitG: null, note: null, dogId: this.deps.dog.id, loggedBy: user.username }));
+    return this.view1(await this.entries.create({ type: "weight", at: r.data.at, endedAt: null, amountG, foodKind: null, unitG: null, note: null, dogId: this.deps.dog.id, loggedBy: user.username }));
   }
 
   async stock(): Promise<Stock> {
@@ -182,13 +184,13 @@ export class Diary {
 
   private async create(user: User, e: { type: EntryType; foodKind: FoodKind; amountG: number; unitG: number | null }): Promise<EntryView> {
     const at = this.deps.now().toISOString();
-    return this.view(await this.entries.create({ ...e, at, endedAt: null, note: null, dogId: this.deps.dog.id, loggedBy: user.username }));
+    return this.view1(await this.entries.create({ ...e, at, endedAt: null, note: null, dogId: this.deps.dog.id, loggedBy: user.username }));
   }
 
   async history(filter: HistoryFilter, offset = 0): Promise<HistoryPage> {
     const day = filter.day ? dayBounds(Date.parse(`${filter.day}T12:00:00Z`), this.deps.timeZone) : null;
     const rows = await this.entries.list({ dogId: this.deps.dog.id, type: filter.type, loggedBy: filter.by, ...(day ? { since: iso(day.start), until: iso(day.end) } : {}), offset, limit: HISTORY_PAGE + 1 });
-    return { entries: rows.slice(0, HISTORY_PAGE).map((e) => this.view(e)), more: rows.length > HISTORY_PAGE };
+    return { entries: await this.views(rows.slice(0, HISTORY_PAGE)), more: rows.length > HISTORY_PAGE };
   }
 
   /** The week starting on the Monday of `day` ("2026-10-21" → that week), this week for anything else. */
@@ -215,12 +217,39 @@ export class Diary {
   }
 
   async all(query: { type?: EntryType; since?: string } = {}): Promise<EntryView[]> {
-    return (await this.entries.list({ dogId: this.deps.dog.id, ...query })).map((e) => this.view(e));
+    return this.views(await this.entries.list({ dogId: this.deps.dog.id, ...query }));
   }
 
-  private view(e: Entry): EntryView {
-    return { ...e, byName: this.deps.names.get(e.loggedBy) ?? e.loggedBy };
+  private async view1(e: Entry): Promise<EntryView> {
+    return (await this.views([e]))[0];
   }
+
+  // Loads the walkers, pauses, exercises and treats of the walks and trainings among `entries` in one go.
+  private async views(entries: Entry[]): Promise<EntryView[]> {
+    const { db, names } = this.deps;
+    const ids = (type: EntryType) => entries.filter((e) => e.type === type).map((e) => e.id);
+    const [walkIds, trainingIds] = [ids("walk"), ids("training")];
+    const [walkers, pauses, exercises, treats] = await Promise.all([
+      walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "username"]).where("entry_id", "in", walkIds).orderBy(sql`rowid`).execute() : [],
+      walkIds.length ? db.selectFrom("walk_pause").select(["entry_id", "started_at", "ended_at"]).where("entry_id", "in", walkIds).execute() : [],
+      trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute() : [],
+      trainingIds.length ? db.selectFrom("training_treat").select(["entry_id", "count"]).where("entry_id", "in", trainingIds).execute() : [],
+    ]);
+    const now = this.deps.now().toISOString();
+    return entries.map((e) => {
+      const isWalk = e.type === "walk";
+      const pauseMs = pauses.filter((p) => p.entry_id === e.id).reduce((sum, p) => sum + Math.max(0, Date.parse(p.ended_at ?? e.endedAt ?? now) - Date.parse(p.started_at)), 0);
+      return {
+        ...e,
+        byName: names.get(e.loggedBy) ?? e.loggedBy,
+        walkers: walkers.filter((w) => w.entry_id === e.id).map((w) => names.get(w.username) ?? w.username),
+        pauseMin: isWalk && pauses.some((p) => p.entry_id === e.id) ? Math.round(pauseMs / 60_000) : isWalk && e.clientKey ? 0 : null,
+        exercises: exercises.filter((x) => x.entry_id === e.id).map((x) => x.name),
+        treats: e.type === "training" ? treats.filter((t) => t.entry_id === e.id).reduce((n, t) => n + t.count, 0) : null,
+      };
+    });
+  }
+
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();

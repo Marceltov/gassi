@@ -6,7 +6,6 @@ test("the week shows today's walk as a bar, and a day opens its Verlauf", async 
   await signInAs(page, "marcel");
   await page.getByRole("button", { name: "Details für Gassi" }).click();
   const sheet = page.getByRole("dialog", { name: "Gassi eintragen" });
-  await sheet.getByLabel("Zeit").fill(`${berlinDay()}T00:05`);
   await sheet.getByLabel("Dauer (Min.)").fill("40");
   await sheet.getByLabel("Notiz").fill(note);
   await sheet.getByRole("button", { name: "Eintragen" }).click();

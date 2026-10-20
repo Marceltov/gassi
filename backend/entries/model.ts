@@ -28,7 +28,7 @@ const instant = z.iso.datetime({ offset: true }).transform((v) => new Date(v).to
 const fieldShape = {
   at: instant,
   endedAt: z.preprocess(blankToNull, instant.nullable()),
-  amountG: z.preprocess(blankToNull, z.coerce.number().int().min(1).max(1_000_000).nullable()),
+  amountG: z.preprocess(blankToNull, z.coerce.number().int().min(0).max(1_000_000).nullable()), // 0: a stock counted empty
   foodKind: z.preprocess(blankToNull, z.enum(FOOD_KINDS).nullable()),
   unitG: z.preprocess(blankToNull, z.coerce.number().int().min(1).max(10_000).nullable()),
   note: z.preprocess(blankToNull, z.string().trim().max(1000).nullable()).transform((v) => v || null),

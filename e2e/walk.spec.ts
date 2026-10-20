@@ -55,3 +55,23 @@ test("taps without reception wait on the phone and are sent later", async ({ pag
   await page.goto("/verlauf");
   await expect(page.getByRole("listitem").filter({ hasText: /Poopoo von Hirsch/ }).first()).toBeVisible();
 });
+
+test("a walk someone forgot to stop is ended afterwards in the Verlauf", async ({ page }, info) => {
+  const note = `Vergessen ${info.project.name}`;
+  await signInAs(page, "marcel");
+  await page.getByRole("button", { name: /^Gassi/ }).click();
+  await expect(page.getByRole("button", { name: "Zuhause" })).toBeVisible();
+  await expect(unsent(page)).toHaveCount(0);
+
+  await page.goto("/verlauf");
+  await page.getByRole("listitem").filter({ hasText: "Gassi, läuft" }).first().click();
+  const sheet = page.getByRole("dialog", { name: "Gassi bearbeiten" });
+  const start = await sheet.getByLabel("Zeit").inputValue(); // "2026-10-20T14:05", wall time
+  const end = new Date(Date.parse(`${start}:00Z`) + 30 * 60_000).toISOString().slice(0, 16);
+  await sheet.getByLabel("Ende").fill(end);
+  await sheet.getByLabel("Notiz").fill(note);
+  await sheet.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByRole("listitem").filter({ hasText: note })).toContainText("Gassi, 30 Min. Hirsch");
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /^Gassi/ })).not.toContainText("läuft");
+});

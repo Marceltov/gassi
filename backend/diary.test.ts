@@ -178,3 +178,30 @@ describe("day filter and week", () => {
     expect((await diary().week("2026-10-21")).monday).toBe("2026-10-19"); // any day → its Monday
   });
 });
+
+describe("entries carry their walk and training details", () => {
+  test("walkers and pause of a walk, exercises and treats of a training", async () => {
+    clock = new Date("2026-10-20T12:00:00Z");
+    const s = new Sessions({ db: db(), dog: { id: 1, name: "Toffee" }, names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), now: () => clock });
+    const sitz = await new Catalog(db()).addExercise("Sitz");
+    const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
+    await s.apply(HIRSCH, [
+      { id: "1", at: "2026-10-20T08:00:00.000Z", kind: "walk.start", walkKey: "w" },
+      { id: "2", at: "2026-10-20T08:10:00.000Z", kind: "walk.pause", walkKey: "w" },
+      { id: "3", at: "2026-10-20T08:18:00.000Z", kind: "walk.resume", walkKey: "w" },
+    ]);
+    await s.apply({ username: "bille", name: "Herzii" }, [
+      { id: "4", at: "2026-10-20T08:20:00.000Z", kind: "walk.join", walkKey: "w" },
+      { id: "5", at: "2026-10-20T08:52:00.000Z", kind: "walk.stop", walkKey: "w" },
+      { id: "6", at: "2026-10-20T09:00:00.000Z", kind: "training.start", trainingKey: "t" },
+      { id: "7", at: "2026-10-20T09:01:00.000Z", kind: "training.exercise", trainingKey: "t", exerciseId: sitz.id, on: true },
+      ...[8, 9, 10].map((n) => ({ id: `${n}`, at: `2026-10-20T09:0${n - 6}:00.000Z`, kind: "training.treat" as const, trainingKey: "t", treatKindId: kaese.id, delta: 1 as const })),
+      { id: "11", at: "2026-10-20T09:12:00.000Z", kind: "training.stop", trainingKey: "t" },
+    ]);
+    const [training, walk] = (await diary().history({})).entries;
+    expect(walk).toMatchObject({ type: "walk", durationMin: 52, pauseMin: 8, walkers: ["Hirsch", "Herzii"], exercises: [], treats: null });
+    expect(training).toMatchObject({ type: "training", durationMin: 12, pauseMin: null, walkers: [], exercises: ["Sitz"], treats: 3 });
+    const pee = await diary().log(HIRSCH, { type: "pee", at: "2026-10-20T10:00:00Z" });
+    expect(pee).toMatchObject({ walkers: [], pauseMin: null, exercises: [], treats: null });
+  });
+});

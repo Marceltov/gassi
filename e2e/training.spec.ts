@@ -36,7 +36,7 @@ test("training at home: exercises and treats, then back to Heute", async ({ page
   await expect(page.getByRole("heading", { name: "Heute", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Training starten" })).toBeVisible();
   await page.goto("/verlauf");
-  await expect(page.getByRole("listitem").filter({ hasText: /Training/ }).filter({ hasText: "von Herzii" }).first()).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: exercise }).first()).toContainText(`Training, 0 Min.: ${exercise}, 2 Leckerlis von Herzii`);
 });
 
 test("training on a walk returns to the walk", async ({ page }) => {

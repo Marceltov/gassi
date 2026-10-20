@@ -1,10 +1,10 @@
 // The CSV export: every entry, oldest first, ";"-separated (what German spreadsheets expect), UTF-8 with BOM (so Excel
 // reads the umlauts), CRLF lines, times in TZ, German headers.
-import { TYPE_LABEL } from "../shared/entryTypes";
+import { FOOD_LABEL, TYPE_LABEL } from "../shared/entryTypes";
 import { utcToLocal } from "../shared/time";
 import type { EntryView } from "./diary";
 
-const HEADER = ["Datum", "Uhrzeit", "Art", "Dauer (Min.)", "Menge (g)", "Notiz", "Von"];
+const HEADER = ["Datum", "Uhrzeit", "Art", "Ende", "Dauer (Min.)", "Pause (Min.)", "Futterart", "Menge (g)", "Übungen", "Leckerlis", "Notiz", "Von"];
 
 /** A field quoted when it holds the separator, a quote or a line break; quotes inside are doubled. */
 export function csvField(value: string | number | null): string {
@@ -14,7 +14,10 @@ export function csvField(value: string | number | null): string {
 
 function row(e: EntryView, timeZone: string): string[] {
   const [date, time] = utcToLocal(Date.parse(e.at), timeZone).split("T");
-  return [date, time, TYPE_LABEL[e.type], String(e.durationMin ?? ""), String(e.amountG ?? ""), e.note ?? "", e.byName];
+  const end = e.endedAt ? utcToLocal(Date.parse(e.endedAt), timeZone).replace("T", " ") : "";
+  const by = e.walkers.length ? e.walkers.join(" + ") : e.byName;
+  const n = (v: number | null) => (v === null ? "" : String(v));
+  return [date, time, TYPE_LABEL[e.type], end, n(e.durationMin), e.pauseMin ? String(e.pauseMin) : "", e.foodKind ? FOOD_LABEL[e.foodKind] : "", n(e.amountG), e.exercises.join(", "), e.treats ? String(e.treats) : "", e.note ?? "", by];
 }
 
 /** `entries` newest first, as the diary lists them. */
