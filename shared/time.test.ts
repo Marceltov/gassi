@@ -1,0 +1,68 @@
+import { describe, expect, test } from "vitest";
+import { clockTime, dayBounds, dayOf, formatAgo, localToUtc, utcToLocal } from "./time";
+
+const TZ = "Europe/Berlin";
+const at = (iso: string) => Date.parse(iso);
+
+describe("localToUtc and utcToLocal", () => {
+  test("summer time is UTC+2, winter time UTC+1", () => {
+    expect(new Date(localToUtc("2026-07-01T14:05", TZ)).toISOString()).toBe("2026-07-01T12:05:00.000Z");
+    expect(new Date(localToUtc("2026-12-01T14:05", TZ)).toISOString()).toBe("2026-12-01T13:05:00.000Z");
+  });
+
+  test("round-trips", () => {
+    for (const iso of ["2026-03-29T00:30:00Z", "2026-10-25T01:30:00Z", "2026-06-15T22:59:00Z"]) {
+      expect(localToUtc(utcToLocal(at(iso), TZ), TZ)).toBe(at(iso));
+    }
+  });
+
+  test("the hour that repeats when summer time ends resolves to its second pass", () => {
+    expect(new Date(localToUtc("2026-10-25T02:30", TZ)).toISOString()).toBe("2026-10-25T01:30:00.000Z");
+  });
+
+  test("rejects anything that isn't a local date-time", () => {
+    expect(() => localToUtc("2026-07-01 14:05", TZ)).toThrow();
+  });
+});
+
+describe("dayOf and dayBounds", () => {
+  test("late evening UTC is already tomorrow in Berlin", () => {
+    expect(dayOf(at("2026-10-20T22:30:00Z"), TZ)).toBe("2026-10-21");
+    expect(dayOf(at("2026-10-20T21:59:00Z"), TZ)).toBe("2026-10-20");
+  });
+
+  test("a day runs from local midnight to local midnight", () => {
+    const { start, end } = dayBounds(at("2026-10-20T10:00:00Z"), TZ);
+    expect(new Date(start).toISOString()).toBe("2026-10-19T22:00:00.000Z");
+    expect(new Date(end).toISOString()).toBe("2026-10-20T22:00:00.000Z");
+  });
+
+  test("the day summer time ends has 25 hours", () => {
+    const { start, end } = dayBounds(at("2026-10-25T10:00:00Z"), TZ);
+    expect((end - start) / 3_600_000).toBe(25);
+  });
+});
+
+test("clockTime shows the local time", () => {
+  expect(clockTime(at("2026-10-20T12:05:00Z"), TZ)).toBe("14:05");
+});
+
+describe("formatAgo", () => {
+  const now = at("2026-10-20T12:00:00Z");
+  test.each([
+    [0, "gerade eben"],
+    [59, "gerade eben"],
+    [60, "vor 1 Min."],
+    [59 * 60, "vor 59 Min."],
+    [2 * 3600, "vor 2 Std."],
+    [2 * 3600 + 5 * 60, "vor 2 Std. 5 Min."],
+    [24 * 3600, "vor 1 Tag"],
+    [3 * 24 * 3600, "vor 3 Tagen"],
+  ])("%i s ago is %j", (seconds, text) => {
+    expect(formatAgo(now - seconds * 1000, now)).toBe(text);
+  });
+
+  test("a time in the future reads as just now", () => {
+    expect(formatAgo(now + 60_000, now)).toBe("gerade eben");
+  });
+});
