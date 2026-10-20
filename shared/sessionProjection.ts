@@ -14,9 +14,13 @@ function step(v: SessionsView, c: Command, user: Person): SessionsView {
   const { walk, training } = v;
   switch (c.kind) {
     case "walk.start":
-    case "walk.join":
+    case "walk.join": {
       if (!walk) return c.kind === "walk.start" ? { ...v, walk: { key: c.walkKey, startedAt: c.at, walkers: [user], pauses: [], paused: false } } : v;
-      return walk.walkers.some((w) => w.username === user.username) ? v : { ...v, walk: { ...walk, walkers: [...walk.walkers, user] } };
+      // A start from this phone lends its key: the server joins it to the walk that really runs, and if the shown walk
+      // is an old one (a page cached by the service worker), the taps still reach the walk just started.
+      const keyed = c.kind === "walk.start" ? { ...walk, key: c.walkKey } : walk;
+      return walk.walkers.some((w) => w.username === user.username) ? { ...v, walk: keyed } : { ...v, walk: { ...keyed, walkers: [...walk.walkers, user] } };
+    }
     case "walk.pause":
       return !walk || walk.paused ? v : { ...v, walk: { ...walk, paused: true, pauses: [...walk.pauses, { startedAt: c.at, endedAt: null }] } };
     case "walk.resume":
@@ -24,7 +28,7 @@ function step(v: SessionsView, c: Command, user: Person): SessionsView {
     case "walk.stop":
       return { walk: null, training: training?.walkKey ? null : training };
     case "training.start":
-      return training ? v : { ...v, training: { key: c.trainingKey, startedAt: c.at, walkKey: c.walkKey ?? null, exercises: [], treats: {} } };
+      return training ? { ...v, training: { ...training, key: c.trainingKey } } : { ...v, training: { key: c.trainingKey, startedAt: c.at, walkKey: c.walkKey ?? null, exercises: [], treats: {} } };
     case "training.stop":
       return { ...v, training: null };
     case "training.exercise": {

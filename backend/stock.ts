@@ -1,7 +1,8 @@
 // How much food is left. Per kind (wet in cans, dry by weight) the count starts at the latest "stockcheck" (the stock
 // corrected by hand), else at the first restock ever entered (from 0), else it is unknown. Later restocks add, later
 // feedings subtract, and for dry food so do treats that come out of it. A count below zero shows as 0 and asks for a
-// correction. "Reicht noch" divides what is left by the average use of the last 14 days.
+// correction. "Reicht noch" divides what is left by the average daily use of the last 14 days (of fewer while the
+// count is younger than that).
 import type { FoodKind } from "../shared/entryTypes";
 import type { DB } from "./db/open";
 import type { Entry } from "./entries/model";
@@ -17,8 +18,11 @@ function kindStock(entries: readonly Entry[], treats: readonly Treat[], now: num
   const check = sorted.filter((e) => e.type === "stockcheck").at(-1);
   const firstRestock = sorted.find((e) => e.type === "restock");
   const use = [...sorted.filter((e) => e.type === "food").map((e) => ({ at: e.at, grams: e.amountG ?? 0 })), ...treats];
-  const windowStart = new Date(now - WINDOW_MS).toISOString();
-  const used = use.filter((u) => u.at >= windowStart && u.at <= new Date(now).toISOString()).reduce((sum, u) => sum + u.grams, 0);
+  // the average over the days the count covers: 14, or fewer right after the first restock/check (at least one day)
+  const countStart = check?.at ?? firstRestock?.at;
+  const from = new Date(Math.max(now - WINDOW_MS, countStart ? Date.parse(countStart) : 0)).toISOString();
+  const used = use.filter((u) => u.at >= from && u.at <= new Date(now).toISOString()).reduce((sum, u) => sum + u.grams, 0);
+  const coveredDays = Math.min(14, Math.max(1, (now - Date.parse(from)) / 86_400_000));
 
   let grams: number;
   if (check) {
@@ -32,7 +36,7 @@ function kindStock(entries: readonly Entry[], treats: readonly Treat[], now: num
     return { grams: null, daysLeft: null, belowZero: false };
   }
   const left = Math.max(0, grams);
-  return { grams: left, daysLeft: used > 0 ? Math.floor(left / (used / 14)) : null, belowZero: grams < 0 };
+  return { grams: left, daysLeft: used > 0 ? Math.floor(left / (used / coveredDays)) : null, belowZero: grams < 0 };
 }
 
 const sum = (xs: readonly { amountG?: number | null; grams?: number }[]) => xs.reduce((s, x) => s + (x.grams ?? x.amountG ?? 0), 0);

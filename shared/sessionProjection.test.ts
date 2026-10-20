@@ -39,3 +39,10 @@ test("pending exercise and treat taps show, treats never below 0, in time order"
   );
   expect(v.training).toMatchObject({ exercises: [5], treats: { 7: 0 } });
 });
+
+test("a pending start from this phone gives its key to the walk and training shown (a cached page may hold an old one)", () => {
+  const cached: SessionsView = { walk: { key: "old", startedAt: "2026-10-19T09:00:00.000Z", walkers: [HIRSCH], pauses: [], paused: false }, training: { key: "old-t", startedAt: "2026-10-19T09:05:00.000Z", walkKey: "old", exercises: [3], treats: {} } };
+  const v = project(cached, [c("00", { kind: "walk.start", walkKey: "new" }), c("01", { kind: "training.start", trainingKey: "new-t", walkKey: "new" })], HIRSCH);
+  expect(v.walk!.key).toBe("new");
+  expect(v.training!.key).toBe("new-t");
+});

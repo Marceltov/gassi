@@ -7,7 +7,8 @@
 // - a pee/poop always becomes an entry at its own time, inside the walk or not;
 // - a pause, resume, join, training start or training tap at or after the end of its walk/training is dropped;
 // - a second "start" while a walk runs joins that walk (both people tapped Gassi at the door); its key becomes an
-//   alias of the running walk, so its later taps land there. Trainings do the same.
+//   alias of the running walk, so its later taps land there. A start arriving after the stop joins the walk that was
+//   running at its time. Trainings do the same; a training started on a walk that has since ended ends with it.
 import { sql, type Kysely } from "kysely";
 import type { Command } from "../shared/commands";
 import { minutesBetween } from "../shared/entryTypes";
@@ -180,11 +181,10 @@ class Step {
       case "walk.stop":
         return this.stopWalk(c.walkKey, c.at);
       case "training.start": {
-        if (c.walkKey) {
-          const walk = await this.find(c.walkKey, "walk");
-          if (!walk || isOver(walk, c.at)) return "dropped";
-        }
-        return this.start("training", c.trainingKey, c.at);
+        const walk = c.walkKey ? await this.find(c.walkKey, "walk") : undefined;
+        if (c.walkKey && (!walk || isOver(walk, c.at))) return "dropped";
+        // started before the walk ended but arriving after the stop: it ended with the walk
+        return this.start("training", c.trainingKey, c.at, walk?.endedAt ?? null);
       }
       case "training.stop": {
         const t = await this.find(c.trainingKey, "training");
@@ -210,16 +210,35 @@ class Step {
     return this.entries.create({ type, at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: null, dogId: this.deps.dog.id, loggedBy: this.user.username, clientKey });
   }
 
-  private async start(type: "walk" | "training", key: string, at: string): Promise<Outcome> {
+  // A start joins the walk/training that runs now, or the one that was running at the tap's time (a start queued without
+  // reception that arrives after the stop); only otherwise does it begin a new one.
+  private async start(type: "walk" | "training", key: string, at: string, endedAt: string | null = null): Promise<Outcome> {
     let e = await this.find(key, type);
     if (e && isOver(e, at)) return "dropped";
     if (!e) {
-      e = await this.entries.running(type);
+      e = (await this.entries.running(type)) ?? (await this.endedAround(type, at));
       if (e) await this.tx.insertInto("session_alias").values({ key, entry_id: e.id }).execute();
-      else e = await this.create(type, at, key);
+      else {
+        e = await this.create(type, at, key);
+        if (endedAt) await this.end(e, endedAt);
+      }
     }
     if (type === "walk") await this.addWalker(e.id);
     return "applied";
+  }
+
+  private async endedAround(type: "walk" | "training", at: string): Promise<Entry | undefined> {
+    const row = await this.tx
+      .selectFrom("entry")
+      .select("id")
+      .where("type", "=", type)
+      .where("client_key", "is not", null)
+      .where("at", "<=", at)
+      .where("ended_at", ">", at)
+      .where("ended_at", "<=", this.deps.now().toISOString()) // a real stop, not an end edited into the future
+      .orderBy("at", "desc")
+      .executeTakeFirst();
+    return row && this.entries.get(row.id);
   }
 
   private async onWalk(key: string, at: string, act: (w: Entry) => Promise<void>): Promise<Outcome> {

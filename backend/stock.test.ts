@@ -68,6 +68,13 @@ describe("computeStock", () => {
     expect(s.wet).toMatchObject({ grams: 0, cans: 0, belowZero: true });
   });
 
+  test("in the first days, days left divide by the days covered, not by 14", () => {
+    // restocked 2 days ago, 200 g a day since: 7600 g left lasts 38 days, not 7600 / (400 / 14) = 266
+    const s = stock([restockWet(day(2, 12), 20, 400), feed(day(1), "wet", 200), feed(day(0, 9), "wet", 200)]);
+    expect(s.wet.grams).toBe(7600);
+    expect(s.wet.daysLeft).toBe(38);
+  });
+
   test("days left from the last 14 days", () => {
     // 14 days × 200 g = 2800 g used in the window → 200 g a day; one older feeding doesn't count
     const feedings = Array.from({ length: 14 }, (_, d) => feed(day(d, 9), "wet", 200));

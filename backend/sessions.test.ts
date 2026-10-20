@@ -56,6 +56,34 @@ describe("walks", () => {
     expect(walk).toMatchObject({ key: "w1", walkers: [HIRSCH, HERZII], paused: true });
   });
 
+  test("a start that arrives after the walk ended joins that walk", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w1" }), cmd(40, { kind: "walk.stop", walkKey: "w1" })]);
+    await s.apply(HERZII, [cmd(1, { kind: "walk.start", walkKey: "w2" }), cmd(5, { kind: "log", type: "pee" })]); // queued without reception
+    expect((await entries()).filter((e) => e.type === "walk")).toHaveLength(1);
+    expect(await s.current()).toEqual({ walk: null, training: null });
+    expect(await s.summaryFor("w2")).toMatchObject({ totalMin: 40, walkers: [HIRSCH, HERZII], pee: 1 });
+  });
+
+  test("a start does not join a walk whose end was edited into the future", async () => {
+    const s = sessions(); // now is 12:00
+    await s.apply(HIRSCH, [cmd("2026-10-20T11:50:00.000Z", { kind: "walk.start", walkKey: "w1" })]);
+    const first = (await entries())[0];
+    await new EntryRepository(db()).update(first.id, { at: first.at, endedAt: "2026-10-20T12:20:00.000Z", amountG: null, foodKind: null, unitG: null, note: null });
+    await s.apply(HERZII, [cmd("2026-10-20T11:59:00.000Z", { kind: "walk.start", walkKey: "w2" })]);
+    expect((await s.current()).walk).toMatchObject({ key: "w2", walkers: [HERZII] });
+  });
+
+  test("a late training start on an ended walk ends with the walk", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" }), cmd(40, { kind: "walk.stop", walkKey: "w" })]);
+    await s.apply(HERZII, [cmd(10, { kind: "training.start", trainingKey: "t", walkKey: "w" })]);
+    expect(await s.current()).toEqual({ walk: null, training: null });
+    expect((await entries()).find((e) => e.type === "training")).toMatchObject({ at: at(10), endedAt: at(40) });
+    await s.apply(HERZII, [cmd(50, { kind: "training.stop", trainingKey: "t" })]);
+    expect((await entries()).find((e) => e.type === "training")).toMatchObject({ endedAt: at(40) });
+  });
+
   test("join adds a walker once", async () => {
     const s = sessions();
     await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" })]);
