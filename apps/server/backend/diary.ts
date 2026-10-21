@@ -3,7 +3,7 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryFields, type EntryType, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, RESTOCK_MESSAGES, restockInput, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
+import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, RESTOCK_MESSAGES, restockInput, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
@@ -13,7 +13,7 @@ import { dryTreats } from "./stock";
 
 /** An entry as the screens show it: with the display name of whoever logged it, and for walks the walkers' names and
  * minutes paused, for trainings the exercises practised and treats given. */
-export type EntryView = Entry & { byName: string; walkers: string[]; pauseMin: number | null; exercises: string[]; treats: number | null };
+export type EntryView = Entry & { byName: string; walkers: string[]; pauseMin: number | null; exercises: ExerciseTotal[]; treats: number | null };
 
 
 export type HistoryFilter = { type?: EntryType; by?: string; day?: string; dog?: number };
@@ -142,13 +142,13 @@ export class Diary {
     const [walkIds, trainingIds] = [ids("walk"), ids("training")];
     const [walkerRows, exerciseRows, treatRows] = await Promise.all([
       walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "person_id"]).where("entry_id", "in", walkIds).execute() : [],
-      trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name"]).where("entry_id", "in", trainingIds).execute() : [],
+      trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute() : [],
       trainingIds.length ? db.selectFrom("training_treat").select(["entry_id", "count"]).where("entry_id", "in", trainingIds).execute() : [],
     ]);
     const walkers: WeekInput["walkers"] = {};
     for (const r of walkerRows) (walkers[r.entry_id] ??= []).push(r.person_id);
-    const trainings: WeekInput["trainings"] = Object.fromEntries(trainingIds.map((id) => [id, { exercises: [] as string[], treats: 0 }]));
-    for (const r of exerciseRows) trainings[r.entry_id].exercises.push(r.name);
+    const trainings: WeekInput["trainings"] = Object.fromEntries(trainingIds.map((id) => [id, { exercises: [] as ExerciseTotal[], treats: 0 }]));
+    for (const [id, t] of Object.entries(trainings)) t.exercises = exerciseTotals(exerciseRows.filter((r) => r.entry_id === Number(id)).map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count })));
     for (const r of treatRows) trainings[r.entry_id].treats += r.count;
     return weekView({ entries, walkers, trainings, names, monday, timeZone, now });
   }
@@ -186,7 +186,7 @@ export class Diary {
     const [walkers, pauses, exercises, treats] = await Promise.all([
       walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "person_id"]).where("entry_id", "in", walkIds).orderBy(sql`rowid`).execute() : [],
       walkIds.length ? db.selectFrom("walk_pause").select(["entry_id", "started_at", "ended_at"]).where("entry_id", "in", walkIds).execute() : [],
-      trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute() : [],
+      trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute() : [],
       trainingIds.length ? db.selectFrom("training_treat").select(["entry_id", "count"]).where("entry_id", "in", trainingIds).execute() : [],
     ]);
     const now = this.deps.now().toISOString();
@@ -202,7 +202,7 @@ export class Diary {
         byName: names.get(e.loggedBy) ?? e.loggedBy,
         walkers: walkers.filter((w) => w.entry_id === e.id).map((w) => names.get(w.person_id) ?? w.person_id),
         pauseMin: isWalk && pauses.some((p) => p.entry_id === e.id) ? Math.round(pauseMs / 60_000) : isWalk && e.clientKey ? 0 : null,
-        exercises: exercises.filter((x) => x.entry_id === e.id).map((x) => x.name),
+        exercises: exerciseTotals(exercises.filter((x) => x.entry_id === e.id).map((x) => ({ name: x.name, ok: x.ok_count, fail: x.fail_count }))),
         treats: e.type === "training" ? treats.filter((t) => t.entry_id === e.id).reduce((n, t) => n + t.count, 0) : null,
       };
     });

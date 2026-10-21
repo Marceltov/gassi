@@ -6,7 +6,9 @@ import type { Command } from "./commands";
 
 export type Person = { id: string; name: string };
 export type WalkView = { key: string; startedAt: string; dogIds: number[]; walkers: Person[]; pauses: { startedAt: string; endedAt: string | null }[]; paused: boolean };
-export type TrainingView = { key: string; startedAt: string; dogIds: number[]; walkKey: string | null; exercises: number[]; treats: Record<number, number> };
+/** How often an exercise went well (`ok`) and badly (`fail`) with one dog. */
+export type Rep = { exerciseId: number; dogId: number; ok: number; fail: number };
+export type TrainingView = { key: string; startedAt: string; dogIds: number[]; walkKey: string | null; reps: Rep[]; treats: Record<number, number> };
 export type SessionsView = { walk: WalkView | null; training: TrainingView | null };
 
 const byTime = (a: Command, b: Command) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
@@ -29,13 +31,17 @@ function step(v: SessionsView, c: Command, user: Person): SessionsView {
     case "walk.stop":
       return { walk: null, training: training?.walkKey ? null : training };
     case "training.start":
-      return training ? { ...v, training: { ...training, key: c.trainingKey } } : { ...v, training: { key: c.trainingKey, startedAt: c.at, dogIds: c.dogIds ?? [], walkKey: c.walkKey ?? null, exercises: [], treats: {} } };
+      return training ? { ...v, training: { ...training, key: c.trainingKey } } : { ...v, training: { key: c.trainingKey, startedAt: c.at, dogIds: c.dogIds ?? [], walkKey: c.walkKey ?? null, reps: [], treats: {} } };
     case "training.stop":
       return { ...v, training: null };
-    case "training.exercise": {
-      if (!training) return v;
-      const others = training.exercises.filter((id) => id !== c.exerciseId);
-      return { ...v, training: { ...training, exercises: c.on ? [...others, c.exerciseId] : others } };
+    case "training.rep": {
+      // like the server, a rep for a dog that is not in the training is dropped (an empty list: the server picks the dogs)
+      if (!training || (training.dogIds.length && !training.dogIds.includes(c.dogId))) return v;
+      const found = training.reps.find((r) => r.exerciseId === c.exerciseId && r.dogId === c.dogId);
+      const field = c.ok ? "ok" : "fail";
+      const next = { exerciseId: c.exerciseId, dogId: c.dogId, ok: found?.ok ?? 0, fail: found?.fail ?? 0 };
+      next[field] = Math.max(0, next[field] + c.delta);
+      return { ...v, training: { ...training, reps: found ? training.reps.map((r) => (r === found ? next : r)) : [...training.reps, next] } };
     }
     case "training.treat": {
       if (!training) return v;

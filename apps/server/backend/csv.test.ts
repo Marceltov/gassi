@@ -15,7 +15,7 @@ test("one line per entry, oldest first, times in the time zone", () => {
   const csv = entriesCsv(
     [
       entry({ id: 4, type: "restock", at: "2026-10-21T09:00:00.000Z", dogIds: [], foodKind: "dry", amountG: 10_000 }),
-      entry({ id: 3, type: "training", at: "2026-10-21T08:00:00.000Z", endedAt: "2026-10-21T08:12:00.000Z", durationMin: 12, exercises: ["Rückruf", "Sitz"], treats: 6, byName: "Herzii" }),
+      entry({ id: 3, type: "training", at: "2026-10-21T08:00:00.000Z", endedAt: "2026-10-21T08:12:00.000Z", durationMin: 12, exercises: [{ name: "Rückruf", ok: 1, fail: 0 }, { name: "Sitz", ok: 2, fail: 0 }], treats: 6, byName: "Herzii" }),
       entry({ id: 2, type: "food", at: "2026-10-20T22:30:00.000Z", amountG: 200, foodKind: "wet", byName: "Herzii" }),
       entry({ endedAt: "2026-10-20T12:57:00.000Z", durationMin: 52, pauseMin: 8, walkers: ["Hirsch", "Herzii"], dogIds: [1, 2] }),
     ],

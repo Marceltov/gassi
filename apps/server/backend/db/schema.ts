@@ -95,6 +95,9 @@ export interface ExerciseTable {
 export interface TrainingExerciseTable {
   entry_id: number;
   exercise_id: number;
+  dog_id: number;
+  ok_count: Generated<number>;
+  fail_count: Generated<number>;
 }
 
 export interface TreatKindTable {

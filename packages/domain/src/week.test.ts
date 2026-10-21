@@ -73,7 +73,7 @@ describe("weekView", () => {
   test("exercise counts, treats and training time per person", () => {
     const t1 = e("training", "2026-10-21T15:00:00.000Z", { endedAt: "2026-10-21T15:12:00.000Z", loggedBy: "bille" });
     const t2 = e("training", "2026-10-22T15:00:00.000Z", { endedAt: "2026-10-22T15:05:00.000Z" });
-    const w = view([t1, t2], { trainings: { [t1.id]: { exercises: ["Sitz", "Rückruf"], treats: 6 }, [t2.id]: { exercises: ["Rückruf"], treats: 2 } } });
+    const w = view([t1, t2], { trainings: { [t1.id]: { exercises: [{ name: "Sitz", ok: 1, fail: 0 }, { name: "Rückruf", ok: 1, fail: 0 }], treats: 6 }, [t2.id]: { exercises: [{ name: "Rückruf", ok: 3, fail: 1 }], treats: 2 } } });
     expect(w.exerciseCounts).toEqual([
       { name: "Rückruf", count: 2 },
       { name: "Sitz", count: 1 },

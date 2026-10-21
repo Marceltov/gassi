@@ -16,7 +16,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("walk.stop"), walkKey: key }),
   z.object({ ...base, kind: z.literal("training.start"), trainingKey: key, walkKey: key.optional(), dogIds }),
   z.object({ ...base, kind: z.literal("training.stop"), trainingKey: key }),
-  z.object({ ...base, kind: z.literal("training.exercise"), trainingKey: key, exerciseId: z.number().int().positive(), on: z.boolean() }),
+  z.object({ ...base, kind: z.literal("training.rep"), trainingKey: key, exerciseId: z.number().int().positive(), dogId, ok: z.boolean(), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("training.treat"), trainingKey: key, treatKindId: z.number().int().positive(), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("log"), type: z.enum(["pee", "poop"]), dogId }),
 ]);

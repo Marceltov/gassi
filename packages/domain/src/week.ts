@@ -3,6 +3,7 @@
 // poop as ticks; above that the week's sums. A walk counts for each of its walkers, so the per-person sums can add up
 // to more than the total. A walk or training still running counts up to now.
 import type { Entry } from "./entry";
+import type { ExerciseTotal } from "./exerciseTotals";
 import { dayBounds, dayOf } from "./time";
 
 type Names = ReadonlyMap<string, string>;
@@ -23,7 +24,7 @@ export type WeekView = {
 export type WeekInput = {
   entries: readonly Entry[];
   walkers: Record<number, string[]>; // walk entry id → person ids
-  trainings: Record<number, { exercises: string[]; treats: number }>; // training entry id → what was practised
+  trainings: Record<number, { exercises: ExerciseTotal[]; treats: number }>; // training entry id → what was practised
   names: Names;
   monday: string; // "2026-10-19"
   timeZone: string;
@@ -99,7 +100,7 @@ export function weekView({ entries, walkers, trainings, names, monday, timeZone,
       if (!(at >= week.start && at < week.end)) continue;
       trainingTotals.set(e.loggedBy, (trainingTotals.get(e.loggedBy) ?? 0) + min);
       const t = trainings[e.id];
-      for (const name of t?.exercises ?? []) exercises.set(name, (exercises.get(name) ?? 0) + 1);
+      for (const { name } of t?.exercises ?? []) exercises.set(name, (exercises.get(name) ?? 0) + 1);
       treats += t?.treats ?? 0;
     }
   }

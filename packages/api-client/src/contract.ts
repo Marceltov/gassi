@@ -44,6 +44,8 @@ export const deviceSchema = z.object({ id: z.number(), kind: z.enum(deviceKinds)
 
 export const dogSchema = z.object({ id: z.number(), name: z.string(), color: z.string(), archived: z.boolean() });
 
+const exerciseTotalSchema = z.object({ name: z.string(), ok: z.number(), fail: z.number() });
+
 export const entryViewSchema = z.object({
   id: z.number(),
   dogIds: z.array(z.number()),
@@ -60,7 +62,7 @@ export const entryViewSchema = z.object({
   byName: z.string(),
   walkers: z.array(z.string()),
   pauseMin: z.number().nullable(),
-  exercises: z.array(z.string()),
+  exercises: z.array(exerciseTotalSchema),
   treats: z.number().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -79,7 +81,7 @@ const trainingView = z.object({
   startedAt: z.string(),
   dogIds: z.array(z.number()),
   walkKey: z.string().nullable(),
-  exercises: z.array(z.number()),
+  reps: z.array(z.object({ exerciseId: z.number(), dogId: z.number(), ok: z.number(), fail: z.number() })),
   treats: z.record(z.string(), z.number()),
 });
 export const sessionsViewSchema = z.object({ walk: walkView.nullable(), training: trainingView.nullable() });
@@ -109,7 +111,7 @@ export const walkSummarySchema = z.object({
   pauseMin: z.number(),
   pauseCount: z.number(),
   walkers: z.array(personSchema),
-  trainings: z.array(z.object({ min: z.number(), exercises: z.array(z.string()), treats: z.array(z.object({ name: z.string(), count: z.number() })) })),
+  trainings: z.array(z.object({ min: z.number(), exercises: z.array(exerciseTotalSchema), treats: z.array(z.object({ name: z.string(), count: z.number() })) })),
   pee: z.number(),
   poop: z.number(),
 });

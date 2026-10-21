@@ -100,7 +100,10 @@ const migrations: Record<string, Migration> = {
         .createTable("training_exercise")
         .addColumn("entry_id", "integer", byEntry)
         .addColumn("exercise_id", "integer", (c) => c.notNull().references("exercise.id").onDelete("cascade"))
-        .addPrimaryKeyConstraint("training_exercise_pk", ["entry_id", "exercise_id"])
+        .addColumn("dog_id", "integer", (c) => c.notNull().references("dog.id"))
+        .addColumn("ok_count", "integer", (c) => c.notNull().defaultTo(0))
+        .addColumn("fail_count", "integer", (c) => c.notNull().defaultTo(0))
+        .addPrimaryKeyConstraint("training_exercise_pk", ["entry_id", "exercise_id", "dog_id"])
         .execute();
       await db.schema
         .createTable("treat_kind")

@@ -5,6 +5,7 @@ export * from "./commands";
 export * from "./describe";
 export * from "./dogs";
 export * from "./entry";
+export * from "./exerciseTotals";
 export * from "./entryTypes";
 export * from "./food";
 export * from "./inputs";

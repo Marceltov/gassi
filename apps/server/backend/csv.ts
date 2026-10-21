@@ -22,7 +22,7 @@ function row(e: EntryView, timeZone: string, x: CsvExtras): string[] {
   const by = e.walkers.length ? e.walkers.join(" + ") : e.byName;
   const n = (v: number | null) => (v === null ? "" : String(v));
   const dogs = e.dogIds.map((id) => x.dogNames.get(id) ?? `#${id}`).join(", ");
-  return [date, time, TYPE_LABEL[e.type], dogs, end, n(e.durationMin), e.pauseMin ? String(e.pauseMin) : "", e.foodKind ? FOOD_LABEL[e.foodKind] : "", n(e.amountG), e.exercises.join(", "), e.treats ? String(e.treats) : "", km(x.distanceM.get(e.id)), e.note ?? "", by];
+  return [date, time, TYPE_LABEL[e.type], dogs, end, n(e.durationMin), e.pauseMin ? String(e.pauseMin) : "", e.foodKind ? FOOD_LABEL[e.foodKind] : "", n(e.amountG), e.exercises.map((x) => x.name).join(", "), e.treats ? String(e.treats) : "", km(x.distanceM.get(e.id)), e.note ?? "", by];
 }
 
 /** `entries` newest first, as the diary lists them. */
