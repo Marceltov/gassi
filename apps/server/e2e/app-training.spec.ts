@@ -73,6 +73,42 @@ test("✓ ✓ ✗ and a treat count per exercise; a long press undoes the last, 
   }
 });
 
+test("+ Übung offers the exercises not shown yet and a new one; a new one needs reception and then shows", async ({ page, context }) => {
+  const { client } = await household();
+  const name = `Pfote ${Date.now()}`;
+  const restore = await onlyOneDog();
+  try {
+    await signIn(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Training starten" }).click();
+    await expect(page.getByText("„+ Übung“ wählt eine aus oder legt eine an")).toBeVisible();
+    await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+    const picker = page.getByTestId("exercise-picker");
+    await expect(picker.getByRole("button", { name: "Sitz", exact: true })).toBeVisible();
+    await picker.getByRole("button", { name: "Sitz", exact: true }).click();
+    await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+    await expect(picker.getByRole("button", { name: "Sitz", exact: true })).toHaveCount(0); // shown already
+
+    // without reception a new exercise can't be made
+    await context.setOffline(true);
+    await picker.getByRole("button", { name: "Neue Übung …" }).click();
+    await page.getByLabel("Name der Übung").fill(name);
+    await page.getByRole("button", { name: "Anlegen" }).click();
+    await expect(page.getByTestId("exercise-message")).toHaveText("Keine Verbindung – bitte später nochmal.");
+    await context.setOffline(false);
+
+    await page.getByRole("button", { name: "Anlegen" }).click();
+    await expect(page.getByTestId("exercise-new")).toBeHidden();
+    await page.getByRole("button", { name: `${name} klappt`, exact: true }).click();
+    await expect(page.getByTestId("training-summary")).toHaveText(`${name} 1/1`);
+    expect((await client.exercises()).exercises.some((e) => e.name === name)).toBe(true);
+  } finally {
+    await restore();
+    const made = (await client.exercises()).exercises.find((e) => e.name === name);
+    if (made) await client.updateExercise({ id: made.id, archived: true });
+  }
+});
+
 test("with several dogs ✓ asks for the dog; Fertig on a walk's training leads back to the walk", async ({ page }) => {
   const { client } = await household();
   const luna = await client.addDog({ name: "Luna", color: "#7a4fc0" });

@@ -1,16 +1,19 @@
 // The running training: on top the clock and the summary line, at the bottom each shown exercise with ✓ klappt /
-// ✗ klappt nicht per repetition, "+ Übung", the treats with +1, and Fertig. A long press on a button undoes its last
-// tap. With several dogs a tap asks for the dog (like Pipi on the walk). Every tap goes through the queue.
+// ✗ klappt nicht per repetition, "+ Übung" (one of the household's exercises not shown yet, or a new one: "Neue Übung
+// …"), the treats with +1, and Fertig. A long press on a button undoes its last tap. With several dogs a tap asks for
+// the dog (like Pipi on the walk). Every tap goes through the queue; only a new exercise needs the server.
 import { newId, trainingSummaryLine } from "@gassi/domain";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
+import { useWrite } from "../more/useWrite";
 import { trainingClock } from "../start/elapsed";
 import { useNow } from "../start/useNow";
 import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { DogChoiceSheet } from "../ui/DogChoiceSheet";
+import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
 import { useLeaving } from "../ui/useLeaving";
@@ -18,12 +21,15 @@ import { useLeaving } from "../ui/useLeaving";
 export function Training() {
   const router = useRouter();
   const theme = useTheme();
-  const { view, send, exercises, treatKinds, dogs, online, unsent } = useGassi();
+  const { view, send, exercises, treatKinds, dogs, online, unsent, refresh } = useGassi();
   const training = view.training;
   const now = useNow(1000);
   // exercises added with "+ Übung" stay shown before their first tap; the others show because they have reps
   const [added, setAdded] = useState<number[]>([]);
   const [picking, setPicking] = useState(false);
+  // "Neue Übung …": the name typed in the picker (null: the list of exercises shows)
+  const [naming, setNaming] = useState<string | null>(null);
+  const { message, setMessage, run } = useWrite();
   // the dog question for a tap, or for an undo when the last tap's dog is not known (`undoDogs`: those with a count)
   const [choosing, setChoosing] = useState<{ exerciseId: number; ok: boolean; undoDogs?: number[] } | null>(null);
   // the dog of the last tap on each ✓/✗ button of an exercise, so that a long press undoes that very tap; after a
@@ -91,6 +97,22 @@ export function Training() {
   const rows = training.reps.map((r) => ({ name: exerciseName(r.exerciseId), ok: r.ok, fail: r.fail }));
   const treats = Object.values(training.treats).reduce((n, c) => n + c, 0);
   const choosingExercise = choosing ? exerciseName(choosing.exerciseId) : "";
+  const openPicker = () => {
+    setNaming(null);
+    setMessage(null);
+    setPicking(true);
+  };
+  const show = (id: number) => {
+    setPicking(false);
+    setAdded((a) => [...a, id]);
+  };
+  // a new exercise is made on the server (without reception it says so); it shows once the lists are fresh
+  const create = () =>
+    void run(async (api) => {
+      const made = await api.addExercise({ name: naming ?? "" });
+      await refresh();
+      show(made.id);
+    });
 
   return (
     <Screen
@@ -130,10 +152,10 @@ export function Training() {
                 </View>
               );
             })}
-            {shown.length === 0 ? <Text style={[styles.hint, { color: theme.muted }]}>Noch keine Übung – „+ Übung“ wählt eine aus.</Text> : null}
+            {shown.length === 0 ? <Text style={[styles.hint, { color: theme.muted }]}>Noch keine Übung – „+ Übung“ wählt eine aus oder legt eine an.</Text> : null}
           </ScrollView>
           {shown.length || treatKinds.length ? <Text style={[styles.hint, { color: theme.muted }]}>Halten = rückgängig</Text> : null}
-          {more.length ? <BigButton kind="neutral" size="m" label="+ Übung" a11y="Übung hinzufügen" onPress={() => setPicking(true)} /> : null}
+          <BigButton kind="neutral" size="m" label="+ Übung" a11y="Übung hinzufügen" onPress={openPicker} />
           {treatKinds.length ? (
             <View style={[styles.row, styles.wrap]}>
               {treatKinds.map((k) => (
@@ -154,21 +176,26 @@ export function Training() {
             onClose={() => setChoosing(null)}
           />
           <Sheet open={picking} onClose={() => setPicking(false)}>
-            <View style={styles.gap}>
-              <Text style={[styles.title, { color: theme.ink }]}>Welche Übung?</Text>
-              {more.map((e) => (
-                <BigButton
-                  key={e.id}
-                  kind="training"
-                  size="l"
-                  label={e.name}
-                  onPress={() => {
-                    setPicking(false);
-                    setAdded((a) => [...a, e.id]);
-                  }}
-                />
-              ))}
-            </View>
+            {naming === null ? (
+              <View testID="exercise-picker" style={styles.gap}>
+                <Text style={[styles.title, { color: theme.ink }]}>Welche Übung?</Text>
+                {more.map((e) => (
+                  <BigButton key={e.id} kind="training" size="l" label={e.name} onPress={() => show(e.id)} />
+                ))}
+                <BigButton kind="neutral" size="m" label="Neue Übung …" onPress={() => setNaming("")} />
+              </View>
+            ) : (
+              <View testID="exercise-new" style={styles.gap}>
+                <Text style={[styles.title, { color: theme.ink }]}>Neue Übung</Text>
+                <Field label="Name der Übung" value={naming} onChangeText={setNaming} autoFocus onSubmitEditing={create} />
+                {message ? (
+                  <Text testID="exercise-message" style={[styles.hint, { color: theme.ink }]}>
+                    {message}
+                  </Text>
+                ) : null}
+                <BigButton kind="training" size="l" label="Anlegen" disabled={!naming.trim()} onPress={create} />
+              </View>
+            )}
           </Sheet>
         </>
       }
