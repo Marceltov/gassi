@@ -193,11 +193,11 @@ export class Diary {
     return { wet: last("wet"), dry: last("dry"), wetUnitG: food.find((e) => e.foodKind === "wet" && e.unitG)?.unitG ?? null };
   }
 
-  /** Bought food: wet as cans × grams per can, dry in grams. */
-  async restock(user: Person, input: unknown): Promise<EntryView> {
+  /** Bought food: wet as cans × grams per can, one restock per can size (together), dry in grams. */
+  async restock(user: Person, input: unknown): Promise<{ entries: EntryView[] }> {
     const r = parse(restockInput, input, RESTOCK_MESSAGES);
-    const amount = r.foodKind === "wet" ? { amountG: r.cans * r.unitG, unitG: r.unitG } : { amountG: r.grams, unitG: null };
-    return this.create(user, { type: "restock", foodKind: r.foodKind, ...amount });
+    const rows = r.foodKind === "wet" ? r.sizes.map((s) => ({ amountG: s.cans * s.unitG, unitG: s.unitG })) : [{ amountG: r.grams, unitG: null }];
+    return this.createAll(user, "restock", r.foodKind, rows);
   }
 
   /** What is there now, counted by hand: wet in cans per can size, one entry per size at the same time (a size left
@@ -205,11 +205,16 @@ export class Diary {
   async correctStock(user: Person, input: unknown): Promise<{ entries: EntryView[] }> {
     const r = parse(stockCountInput, input, STOCK_COUNT_MESSAGES);
     const rows = r.foodKind === "wet" ? r.sizes.map((s) => ({ amountG: Math.round(s.cans * s.unitG), unitG: s.unitG })) : [{ amountG: r.grams, unitG: null }];
+    return this.createAll(user, "stockcheck", r.foodKind, rows);
+  }
+
+  /** Restocks or stock counts of one kind, at the same time, in one transaction. */
+  private async createAll(user: Person, type: "restock" | "stockcheck", foodKind: FoodKind, rows: readonly { amountG: number; unitG: number | null }[]): Promise<{ entries: EntryView[] }> {
     const at = this.deps.now().toISOString();
     const entries = await this.deps.db.transaction().execute(async (tx) => {
       const repo = new EntryRepository(tx, this.deps.now);
       const made: Entry[] = [];
-      for (const row of rows) made.push(await repo.create({ type: "stockcheck", foodKind: r.foodKind, ...row, at, endedAt: null, note: null, dogIds: [], loggedBy: user.id }));
+      for (const row of rows) made.push(await repo.create({ type, foodKind, ...row, at, endedAt: null, note: null, dogIds: [], loggedBy: user.id }));
       return made;
     });
     return { entries: await this.views(entries) };
@@ -226,11 +231,6 @@ export class Diary {
   async stock(): Promise<Stock> {
     const [entries, treats] = await Promise.all([this.entries.list({}), dryTreats(this.deps.db)]);
     return computeStock({ entries, treats, now: this.deps.now().getTime() });
-  }
-
-  private async create(user: Person, e: { type: EntryType; foodKind: FoodKind; amountG: number; unitG: number | null }): Promise<EntryView> {
-    const at = this.deps.now().toISOString();
-    return this.view1(await this.entries.create({ ...e, at, endedAt: null, note: null, dogIds: [], loggedBy: user.id }));
   }
 
   async history(filter: HistoryFilter, offset = 0): Promise<HistoryPage> {

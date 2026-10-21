@@ -37,15 +37,22 @@ const dryAmount = (min: number) =>
     .transform((r) => ({ foodKind: r.foodKind, grams: r.amount === undefined ? r.grams : Math.round(r.unit === "kg" ? r.amount * 1000 : r.amount) }))
     .pipe(z.object({ foodKind: z.literal("dry"), grams: z.number().int().min(min).max(1_000_000) }));
 
-/** Bought food: wet as cans × grams per can, dry in g or kg. */
+/** No can size twice. */
+const onceEach = (sizes: readonly { unitG: number }[]) => new Set(sizes.map((s) => s.unitG)).size === sizes.length;
+
+/** Bought food: wet as whole cans per can size (one restock each; sizes bought none of are left out), dry in g or kg. */
 export const restockInput = z.discriminatedUnion("foodKind", [
-  z.object({ foodKind: z.literal("wet"), cans: z.coerce.number().int().min(1).max(1000), unitG: canSize }),
+  z
+    .object({ foodKind: z.literal("wet"), sizes: z.array(z.object({ unitG: canSize, cans: z.coerce.number().int().min(0).max(1000) })).min(1).max(20) })
+    .refine((r) => onceEach(r.sizes), { path: ["unitG"], message: "twice" })
+    .transform((r) => ({ ...r, sizes: r.sizes.filter((s) => s.cans > 0) }))
+    .refine((r) => r.sizes.length > 0, { path: ["sizes"], message: "none" }),
   dryAmount(1),
 ]);
 export const RESTOCK_MESSAGES: FieldMessages = {
   foodKind: "Diese Futterart gibt es nicht.",
-  cans: "Wie viele Dosen, und wie viel Gramm hat eine Dose?",
-  unitG: "Wie viele Dosen, und wie viel Gramm hat eine Dose?",
+  sizes: "Wie viele Dosen welcher Größe hast du gekauft?",
+  unitG: "Jede Dosengröße nur einmal.",
   amount: "Wie viel hast du gekauft?",
   grams: "Wie viel hast du gekauft?",
   unit: "Gramm oder Kilogramm?",
@@ -56,7 +63,7 @@ export const RESTOCK_MESSAGES: FieldMessages = {
 export const stockCountInput = z.discriminatedUnion("foodKind", [
   z
     .object({ foodKind: z.literal("wet"), sizes: z.array(z.object({ unitG: canSize, cans: z.preprocess(decimal, z.number().min(0).max(1000)) })).min(1).max(20) })
-    .refine((r) => new Set(r.sizes.map((s) => s.unitG)).size === r.sizes.length, { path: ["unitG"], message: "twice" }),
+    .refine((r) => onceEach(r.sizes), { path: ["unitG"], message: "twice" }),
   dryAmount(0),
 ]);
 export const STOCK_COUNT_MESSAGES: FieldMessages = {

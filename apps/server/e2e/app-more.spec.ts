@@ -2,7 +2,7 @@
 // Geräte (sign out), the Garmin placeholder. And the installable web app: its manifest, the Apple tags, and the app
 // shell that opens without reception after the first visit. The server is shared: each test removes what it made.
 import { createClient } from "@gassi/api-client";
-import { formatCanCount } from "@gassi/domain";
+import { formatCanCount, formatCans } from "@gassi/domain";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
 import { asHirsch } from "./sessions";
@@ -45,23 +45,30 @@ test("Gewicht: 12,4 kg logged shows in the list, on the curve and on Mehr", asyn
   await expect(page.getByTestId("more-Gewicht")).toContainText("12,4 kg · gerade eben");
 });
 
-test("Vorrat: 6 cans of a known size bought add to that size; the total follows", async ({ page }) => {
+test("Vorrat: cans bought are entered per size in rows, a new size in a row of its own; one Eintragen records each", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });
-  made.push((await asHirsch().restock({ foodKind: "wet", cans: 1, unitG: 800 })).id); // 800 g is a known size
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 800, cans: 1 }] })).entries.map((e) => e.id)); // 800 g is a known size
   await page.goto("/mehr/vorrat");
   await page.getByRole("tab", { name: "Nass" }).click();
   await page.getByRole("tab", { name: "Eingekauft" }).click();
-  await page.getByRole("button", { name: "Dosen à 800 g" }).click();
-  await page.getByLabel("Dosen", { exact: true }).fill("6");
+  await expect(page.getByTestId("count-800-value")).toHaveText("0 Dosen"); // bought: from 0
+  await page.getByRole("button", { name: "1 Dose à 800 g mehr" }).click();
+  await page.getByRole("button", { name: "1 Dose à 800 g mehr" }).click();
+  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
+  await page.getByLabel("Gramm pro Dose").fill("1234");
+  await page.getByRole("button", { name: "1 Dose à 1234 g mehr" }).click();
+  // a new row left without grams isn't recorded
+  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
+  await page.getByRole("button", { name: "1 Dose neuer Größe mehr" }).click();
+  await expect(page.getByTestId("count-1234-value")).toHaveText("1 Dose");
   const bought = page.waitForResponse((r) => r.url().endsWith("/api/stock/restock") && r.request().method() === "POST");
   await page.getByRole("button", { name: "Eintragen" }).click();
-  const { id } = (await (await bought).json()) as { id: number };
-  made.push(id);
-  expect(await client.entry({ id })).toMatchObject({ amountG: 6 * 800, unitG: 800 });
+  const { entries } = (await (await bought).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
+  made.push(...entries.map((e) => e.id));
+  expect(entries.map((e) => [e.unitG, e.amountG]).sort()).toEqual([[1234, 1234], [800, 1600]].sort()); // sizes left at 0 stay out
   const after = (await client.stock()).wet;
-  const size = after.sizes.find((s) => s.unitG === 800)!;
-  await expect(page.getByTestId("stock-wet")).toContainText(formatCanCount(size));
+  await expect(page.getByTestId("stock-wet")).toContainText(formatCanCount(after.sizes.find((s) => s.unitG === 800)!));
   await expect(page.getByTestId("stock-wet")).toContainText("zusammen ");
   await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
   // the message is about that purchase: it goes when the form turns to something else
@@ -76,20 +83,18 @@ test("Vorrat: a wet count sets every can size at once, a new size typed in witho
   await page.goto("/mehr/vorrat");
   await page.getByRole("tab", { name: "Nass" }).click();
   await page.getByRole("tab", { name: "Nachgezählt" }).click();
-  for (const s of before) await expect(page.getByTestId(`count-${s.unitG}-value`)).toBeVisible(); // one row per known size
-  await page.getByRole("button", { name: "andere Größe" }).click();
-  await page.getByLabel("Gramm pro Dose").fill("1234");
-  await page.getByRole("button", { name: "½ Dose à 1234 g mehr" }).click();
-  await page.getByRole("button", { name: "½ Dose à 1234 g mehr" }).click();
-  await page.getByRole("button", { name: "½ Dose à 1234 g mehr" }).click();
-  await expect(page.getByTestId("count-1234-value")).toHaveText("1½ Dosen");
+  for (const s of before) await expect(page.getByTestId(`count-${s.unitG}-value`)).toHaveText(formatCans(s.cans)); // one row per known size, from the stock
+  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
+  await page.getByLabel("Gramm pro Dose").fill("1235");
+  for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "½ Dose à 1235 g mehr" }).click();
+  await expect(page.getByTestId("count-1235-value")).toHaveText("1½ Dosen");
   const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
   await page.getByRole("button", { name: "Eintragen" }).click();
   const { entries } = (await (await counted).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
   made.push(...entries.map((e) => e.id));
-  expect(entries.find((e) => e.unitG === 1234)?.amountG).toBe(1851);
-  expect(entries.map((e) => e.unitG).sort()).toEqual([...before.map((s) => s.unitG), 1234].sort());
-  await expect(page.getByTestId("stock-wet")).toContainText("1½ × 1234 g");
+  expect(entries.find((e) => e.unitG === 1235)?.amountG).toBe(1853);
+  expect(entries.map((e) => e.unitG).sort()).toEqual([...before.map((s) => s.unitG), 1235].sort());
+  await expect(page.getByTestId("stock-wet")).toContainText("1½ × 1235 g");
   await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
   await page.getByRole("tab", { name: "Trocken" }).click();
   await expect(page.getByTestId("stock-message")).toBeHidden();
@@ -105,7 +110,7 @@ test("Vorrat: dry food bought in kg with a decimal comma, counted in g", async (
   await page.getByLabel("Menge").fill("1,5");
   const bought = page.waitForResponse((r) => r.url().endsWith("/api/stock/restock") && r.request().method() === "POST");
   await page.getByRole("button", { name: "Eintragen" }).click();
-  const { id } = (await (await bought).json()) as { id: number };
+  const { entries: [{ id }] } = (await (await bought).json()) as { entries: { id: number }[] };
   made.push(id);
   expect(await client.entry({ id })).toMatchObject({ foodKind: "dry", amountG: 1500 });
   await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");

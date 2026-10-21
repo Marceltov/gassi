@@ -32,7 +32,7 @@ test("the sheet opens with the newest feeding, a plus makes it 60 g dry, Eintrag
 });
 
 test("switching to wet takes that kind's last portion; the quick amounts and the stock line follow", async ({ page }) => {
-  await asHirsch().restock({ foodKind: "wet", cans: 9, unitG: 400 });
+  await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 400, cans: 9 }] });
   await feed(90, "wet");
   await feed(55, "dry");
   await signIn(page);
@@ -55,7 +55,7 @@ test("switching to wet takes that kind's last portion; the quick amounts and the
 
 test("a wet feeding comes out of a can size: pre-set to the last used one, ½ and 1 Dose follow the size chosen", async ({ page }) => {
   const client = asHirsch();
-  const bought = [await client.restock({ foodKind: "wet", cans: 4, unitG: 400 }), await client.restock({ foodKind: "wet", cans: 2, unitG: 800 })];
+  const { entries: bought } = await client.restock({ foodKind: "wet", sizes: [{ unitG: 400, cans: 4 }, { unitG: 800, cans: 2 }] });
   try {
     await feed(400, "wet", 800); // the last used can is 800 g
     const token = await signIn(page);

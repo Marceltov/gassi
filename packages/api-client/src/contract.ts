@@ -257,7 +257,8 @@ export const contract = {
     output: z.object({ updated: z.literal(true) }),
   }),
   stock: endpoint({ method: "GET", path: "/api/stock", input: none, output: stockSchema }),
-  restock: endpoint({ method: "POST", path: "/api/stock/restock", input: restockInput, output: entryViewSchema, messages: RESTOCK_MESSAGES }),
+  // wet food: one entry per can size bought
+  restock: endpoint({ method: "POST", path: "/api/stock/restock", input: restockInput, output: z.object({ entries: z.array(entryViewSchema) }), messages: RESTOCK_MESSAGES }),
   // a wet count is one entry per can size
   correctStock: endpoint({ method: "POST", path: "/api/stock/correct", input: stockCountInput, output: z.object({ entries: z.array(entryViewSchema) }), messages: STOCK_COUNT_MESSAGES }),
   // each kind's last portion, and the can size the last wet feeding came out of

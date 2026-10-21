@@ -1,14 +1,15 @@
 // Vorrat: what is left of the wet food (per can size, with the total) and of the dry food, and how long it lasts
-// (from the server, worked out by the domain) on top; at the bottom what was bought (Eingekauft: a can size and how
-// many, or dry food in g or kg) or what is there when counted by hand (Nachgezählt: every can size at once, in halves
-// for an opened can, or dry food in g or kg), then Eintragen.
+// (from the server, worked out by the domain) on top; at the bottom what was bought (Eingekauft) or what is there when
+// counted by hand (Nachgezählt), the same way in both: wet food one row per can size with − and + (bought: whole cans
+// from 0; counted: from what the stock says, in halves for an opened can), a row of another
+// size added with "+ Dosengröße" (its grams typed in the row; one without grams isn't recorded); dry food one amount in
+// g or kg. One Eintragen records it all.
 import type { DryUnit, FoodKind } from "@gassi/domain";
 import { formatCans, stockParts } from "@gassi/domain";
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
-import { Chip } from "../ui/Chip";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
 import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
@@ -27,7 +28,6 @@ const UNITS = [
   { value: "kg", label: "kg" },
   { value: "g", label: "g" },
 ] as const;
-const OTHER = "other";
 const MAX_CANS = 1000;
 
 /** A whole number of grams per can typed in, else null. */
@@ -42,40 +42,47 @@ export function Stock() {
   const [mode, setMode] = useState<Mode>("restock");
   const [amount, setAmount] = useState("");
   const [unit, setUnit] = useState<DryUnit>("kg"); // dry food: sacks in kg, the rest of one maybe in g
-  // the can size: one of the known ones (the last bought to start with) or another one typed in
+  // wet food: one row per known can size, and one per size typed in ("+ Dosengröße"); bought counts start at 0 in
+  // whole cans, counted ones at what the stock says, in halves
   const known = stock?.wet.sizes.map((s) => s.unitG) ?? [];
-  const [size, setSize] = useState<number | typeof OTHER | null>(null);
-  const chosen = size ?? stock?.wet.newestUnitG ?? known.at(-1) ?? OTHER;
-  const [other, setOther] = useState("");
-  const otherG = typedSize(other);
-  // a count per can size: what the stock says until changed here
-  const [counts, setCounts] = useState<Record<number, number>>({});
-  const countOf = (u: number) => counts[u] ?? stock?.wet.sizes.find((s) => s.unitG === u)?.cans ?? 0;
-  const rows = [...known, ...(chosen === OTHER && otherG && !known.includes(otherG) ? [otherG] : [])];
+  const [extras, setExtras] = useState<string[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const step = mode === "restock" ? 1 : 0.5;
+  const rows = [
+    ...known.map((u) => ({ key: `k${u}`, unitG: u as number | null, extra: null as number | null })),
+    ...extras.map((text, i) => ({ key: `x${i}`, unitG: typedSize(text), extra: i })),
+  ];
+  const countOf = (key: string, unitG: number | null) => counts[key] ?? (mode === "count" && unitG ? (stock?.wet.sizes.find((s) => s.unitG === unitG)?.cans ?? 0) : 0);
+  const sized = rows.flatMap((r) => (r.unitG ? [{ unitG: r.unitG, cans: countOf(r.key, r.unitG) }] : []));
+  const sizes = [...new Map(sized.map((s) => [s.unitG, s])).values()]; // a typed size that is known already counts once
 
-  // a message is about what was entered: it goes when the form changes to something else
+  // a message is about what was entered, and the rows are for one mode: both go when the form changes
+  const reset = () => {
+    setMessage(null);
+    setCounts({});
+    setExtras([]);
+    setAmount("");
+  };
   const pickKind = (k: FoodKind) => {
     setKind(k);
-    setMessage(null);
+    reset();
   };
   const pickMode = (m: Mode) => {
     setMode(m);
-    setMessage(null);
+    reset();
   };
 
-  const restockUnit = chosen === OTHER ? otherG : chosen;
-  const ready = kind === "dry" ? !!amount.trim() : mode === "restock" ? !!amount.trim() && restockUnit !== null : rows.length > 0;
+  const ready = kind === "dry" ? !!amount.trim() : mode === "restock" ? sizes.some((s) => s.cans > 0) : sizes.length > 0;
   const save = () =>
     void run(async (api) => {
       if (kind === "dry") {
         if (mode === "restock") await api.restock({ foodKind: "dry", amount, unit });
         else await api.correctStock({ foodKind: "dry", amount, unit });
-      } else if (mode === "restock") await api.restock({ foodKind: "wet", cans: amount, unitG: restockUnit ?? 0 });
-      else await api.correctStock({ foodKind: "wet", sizes: rows.map((unitG) => ({ unitG, cans: countOf(unitG) })) });
+      } else if (mode === "restock") await api.restock({ foodKind: "wet", sizes });
+      else await api.correctStock({ foodKind: "wet", sizes });
       setAmount("");
       setCounts({});
-      setOther("");
-      setSize(null);
+      setExtras([]);
       reload();
     }, "Eingetragen.");
 
@@ -105,46 +112,44 @@ export function Stock() {
     );
   };
 
-  const sizeChips = (
-    <View style={styles.chips}>
-      {(mode === "restock" ? known : []).map((u) => (
-        <Chip key={u} label={`${u} g`} a11y={`Dosen à ${u} g`} on={chosen === u} onPress={() => setSize(u)} />
-      ))}
-      <Chip label="andere Größe" on={chosen === OTHER} onPress={() => setSize(chosen === OTHER && mode === "count" ? (known.at(-1) ?? OTHER) : OTHER)} />
-    </View>
+  const wet = (
+    <>
+      {rows.map((r) => {
+        const n = countOf(r.key, r.unitG);
+        const name = r.unitG ? `à ${r.unitG} g` : "neuer Größe";
+        const change = (d: number) => setCounts({ ...counts, [r.key]: Math.min(MAX_CANS, Math.max(0, n + d)) });
+        const what = step === 1 ? "1 Dose" : "½ Dose";
+        return (
+          <View key={r.key} testID={r.unitG ? `count-${r.unitG}` : undefined} style={[styles.row, { backgroundColor: theme.surface }]}>
+            {r.extra === null ? (
+              <Text style={[styles.rowLabel, { color: theme.muted }]}>Dosen à {r.unitG} g</Text>
+            ) : (
+              <View style={styles.rowField}>
+                <TextInput
+                  accessibilityLabel="Gramm pro Dose"
+                  value={extras[r.extra]}
+                  onChangeText={(v) => setExtras(extras.map((x, i) => (i === r.extra ? v : x)))}
+                  placeholder="…"
+                  placeholderTextColor={theme.muted}
+                  inputMode="numeric"
+                  keyboardType="number-pad"
+                  autoFocus
+                  style={[styles.gramInput, { color: theme.ink, borderColor: theme.line, backgroundColor: theme.background }]}
+                />
+                <Text style={[styles.rowLabel, { color: theme.muted }]}>g</Text>
+              </View>
+            )}
+            <StepButton small label={`${what} ${name} weniger`} sign="−" disabled={n <= 0} onPress={() => change(-step)} />
+            <Text testID={r.unitG ? `count-${r.unitG}-value` : undefined} style={[styles.rowValue, { color: theme.ink }]}>
+              {formatCans(n)}
+            </Text>
+            <StepButton small label={`${what} ${name} mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => change(step)} />
+          </View>
+        );
+      })}
+      <BigButton kind="neutral" size="m" label="+ Dosengröße" a11y="Dosengröße hinzufügen" onPress={() => setExtras([...extras, ""])} />
+    </>
   );
-  const otherField = chosen === OTHER ? <Field label="Gramm pro Dose" value={other} onChangeText={setOther} inputMode="numeric" keyboardType="number-pad" /> : null;
-
-  const wet =
-    mode === "restock" ? (
-      <>
-        <Text style={[styles.small, { color: theme.muted }]}>Dosengröße</Text>
-        {sizeChips}
-        <View style={styles.fields}>
-          {otherField}
-          <Field label="Dosen" value={amount} onChangeText={setAmount} inputMode="numeric" keyboardType="number-pad" />
-        </View>
-      </>
-    ) : (
-      <>
-        {rows.map((u) => {
-          const n = countOf(u);
-          const step = (d: number) => setCounts({ ...counts, [u]: Math.min(MAX_CANS, Math.max(0, n + d)) });
-          return (
-            <View key={u} testID={`count-${u}`} style={[styles.row, { backgroundColor: theme.surface }]}>
-              <Text style={[styles.rowLabel, { color: theme.muted }]}>Dosen à {u} g</Text>
-              <StepButton small label={`½ Dose à ${u} g weniger`} sign="−" disabled={n <= 0} onPress={() => step(-0.5)} />
-              <Text testID={`count-${u}-value`} style={[styles.rowValue, { color: theme.ink }]}>
-                {formatCans(n)}
-              </Text>
-              <StepButton small label={`½ Dose à ${u} g mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => step(0.5)} />
-            </View>
-          );
-        })}
-        {sizeChips}
-        {otherField}
-      </>
-    );
 
   return (
     <Screen
@@ -194,9 +199,10 @@ const styles = StyleSheet.create({
   small: { fontSize: 13 },
   fields: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   unit: { width: 120 },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   row: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: radius.tile, paddingVertical: 6, paddingHorizontal: 12 },
   rowLabel: { flex: 1, fontSize: 14, fontWeight: "600" },
+  rowField: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
+  gramInput: { width: 72, borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6, fontSize: 15, fontWeight: "600" },
   rowValue: { minWidth: 84, textAlign: "center", fontSize: 16, fontWeight: "700" },
   message: { fontSize: 15, fontWeight: "600" },
 });
