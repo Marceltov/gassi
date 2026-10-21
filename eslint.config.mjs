@@ -49,5 +49,5 @@ export default defineConfig([
   { files: ["apps/mobile/**"], rules: { "no-restricted-imports": ["error", MOBILE_IMPORTS] } },
   { files: ["apps/server/app/**"], ignores: ["**/*.test.ts"], rules: { "no-restricted-imports": ["error", FRONTEND_IMPORTS] } },
   { files: ["apps/server/backend/**"], rules: { "no-restricted-imports": ["error", BACKEND_IMPORTS] } },
-  globalIgnores(["**/.next/**", "**/node_modules/**", "**/next-env.d.ts", "**/test-results/**", "**/playwright-report/**", "**/data/**", "apps/mobile/dist/**", "apps/mobile/.expo/**", "apps/server/public/**"]),
+  globalIgnores(["**/.next/**", "**/node_modules/**", "**/next-env.d.ts", "**/test-results/**", "**/playwright-report/**", "**/data/**", "apps/mobile/dist/**", "apps/mobile/.expo/**", "apps/server/public/**", ".claude/**"]),
 ]);

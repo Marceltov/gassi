@@ -108,12 +108,16 @@ export function Training() {
     setAdded((a) => [...a, id]);
   };
   // a new exercise is made on the server (without reception it says so); it shows once the lists are fresh
-  const create = () =>
+  const create = () => {
+    // a name the household has already (in any case) is that exercise: no second one
+    const same = exercises.find((e) => e.name.trim().toLocaleLowerCase("de") === (naming ?? "").trim().toLocaleLowerCase("de"));
+    if (same) return show(same.id);
     void run(async (api) => {
       const made = await api.addExercise({ name: naming ?? "" });
       await refresh();
       show(made.id);
     });
+  };
 
   return (
     <Screen

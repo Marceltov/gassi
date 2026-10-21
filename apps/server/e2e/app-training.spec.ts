@@ -102,6 +102,14 @@ test("+ Übung offers the exercises not shown yet and a new one; a new one needs
     await page.getByRole("button", { name: `${name} klappt`, exact: true }).click();
     await expect(page.getByTestId("training-summary")).toHaveText(`${name} 1/1`);
     expect((await client.exercises()).exercises.some((e) => e.name === name)).toBe(true);
+
+    // the name of one the household has already (in other letters) shows that one, without a second
+    await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+    await picker.getByRole("button", { name: "Neue Übung …" }).click();
+    await page.getByLabel("Name der Übung").fill(name.toUpperCase());
+    await page.getByRole("button", { name: "Anlegen" }).click();
+    await expect(page.getByTestId("exercise-new")).toBeHidden();
+    expect((await client.exercises()).exercises.filter((e) => e.name.toLowerCase() === name.toLowerCase())).toHaveLength(1);
   } finally {
     await restore();
     const made = (await client.exercises()).exercises.find((e) => e.name === name);

@@ -112,7 +112,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
       {kind === "wet" && cans.length ? (
         <View testID="food-cans" style={styles.chips}>
           {cans.map((u) => (
-            <Chip key={u} label={`${u}-g-Dose`} on={u === can} onPress={() => pickCan(u)} />
+            <Chip key={u} label={`${u}-g-Dose`} on={u === can} accent={theme.food} onPress={() => pickCan(u)} />
           ))}
         </View>
       ) : null}
@@ -129,7 +129,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
       {active.length > 1 ? (
         <View style={styles.chips}>
           {active.map((d) => (
-            <Chip key={d.id} label={d.name} color={d.color} on={!off.includes(d.id)} onPress={() => toggleDog(d.id)} />
+            <Chip key={d.id} label={d.name} color={d.color} on={!off.includes(d.id)} accent={theme.food} onPress={() => toggleDog(d.id)} />
           ))}
         </View>
       ) : null}
