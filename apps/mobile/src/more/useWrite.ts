@@ -1,5 +1,6 @@
-// A write from a Mehr screen: needs the server (no queue), so without reception, or without an answer within
-// WRITE_TIMEOUT_MS, it says so (OFFLINE). A second tap while one is on its way does nothing.
+// A write from a Mehr screen: needs the server (no queue), so without reception it says so (OFFLINE), and without an
+// answer within WRITE_TIMEOUT_MS that it may have been saved (NO_ANSWER). A second tap while one is on its way does
+// nothing.
 import type { Client } from "@gassi/api-client";
 import { useCallback, useRef, useState } from "react";
 import { errorMessage } from "../data/api";

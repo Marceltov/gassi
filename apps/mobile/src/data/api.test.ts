@@ -1,6 +1,6 @@
 import { ApiError } from "@gassi/api-client";
 import { expect, test, vi } from "vitest";
-import { apiFor, errorMessage, OFFLINE } from "./api";
+import { apiFor, errorMessage, isOffline, NO_ANSWER, OFFLINE } from "./api";
 import { loadDevice, saveDevice } from "./device";
 import { fakeServer, HIRSCH, status } from "./testing";
 
@@ -37,7 +37,7 @@ test("a server out of reach says so in German and reports offline; any answer re
   expect(reached).toEqual([false, true]);
 });
 
-test("a call with a timeout that gets no answer in time gives up as unreachable", async () => {
+test("a call with a timeout that gets no answer in time gives up: it may have arrived, so it doesn't say OFFLINE", async () => {
   vi.useFakeTimers();
   try {
     // a fetch that never answers, only its abort ends it
@@ -47,9 +47,22 @@ test("a call with a timeout that gets no answer in time gives up as unreachable"
     await vi.advanceTimersByTimeAsync(2999);
     expect(reached).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);
-    expect(errorMessage(await call)).toBe(OFFLINE);
+    const e = await call;
+    expect(errorMessage(e)).toBe(NO_ANSWER);
+    expect(NO_ANSWER).toBe("Keine Antwort – ob es gespeichert wurde, ist unklar. Bitte im Verlauf prüfen.");
+    expect(isOffline(e)).toBe(false);
     expect(reached).toEqual([false]);
   } finally {
     vi.useRealTimers();
   }
+});
+
+test("a proxy's 502–504 and a failed fetch both say OFFLINE, also on a call with a timeout", async () => {
+  const server = fakeServer({ "GET /api/stock": () => status(503, { error: "Service Unavailable" }) });
+  const api = apiFor({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: server.fetch, timeoutMs: 3000 });
+  const gateway = await api.stock().catch((e: unknown) => e);
+  expect([errorMessage(gateway), isOffline(gateway)]).toEqual([OFFLINE, true]);
+  server.reachable = false;
+  const failed = await api.stock().catch((e: unknown) => e);
+  expect([errorMessage(failed), isOffline(failed)]).toEqual([OFFLINE, true]);
 });

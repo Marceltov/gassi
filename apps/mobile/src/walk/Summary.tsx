@@ -1,7 +1,8 @@
 // A walk looked back on: after Zuhause, and from Verlauf. The map when there is a track, Dauer, Strecke, Pause, who
 // went (tap a person to change it), each Pipi/Poopoo with its time, the trainings, a note, and a way to its detail
 // (time, end, dogs, delete); Fertig leads back. Right after Zuhause without reception it shows what this phone knows
-// and says so; changes need the server.
+// and says so; changes need the server (the writes' client: OFFLINE without reception, NO_ANSWER without an answer
+// in time).
 import { formatDistance, formatMinutes, keepsOne, simplify } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
@@ -21,7 +22,7 @@ import { useWalkSummary } from "./useWalkSummary";
 export function Summary({ idOrKey }: { idOrKey: string }) {
   const router = useRouter();
   const theme = useTheme();
-  const { api, people, dogs } = useGassi();
+  const { writeApi, people, dogs } = useGassi();
   const { shown, track, local, error, reload } = useWalkSummary(idOrKey);
   const [message, setMessage] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null); // null: as the server has it
@@ -30,12 +31,12 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
   const done = () => (router.canGoBack() ? router.back() : router.replace("/"));
   // an edit sends all of the walk's fields (left-out ones would become empty), with the change; whether it went through
   const edit = async (s: Shown, change: { walkers?: string[]; note?: string | null }): Promise<boolean> => {
-    if (s.id === null || !api) {
+    if (s.id === null || !writeApi) {
       setMessage(OFFLINE);
       return false;
     }
     try {
-      await api.editEntry({ id: s.id, at: s.startedAt, endedAt: s.endedAt, note: s.note, ...change });
+      await writeApi.editEntry({ id: s.id, at: s.startedAt, endedAt: s.endedAt, note: s.note, ...change });
       setMessage(null);
       reload();
       return true;

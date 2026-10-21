@@ -1,6 +1,7 @@
 // One entry from Verlauf, to be put right afterwards: its time (and end), the dogs, for a walk who went, for food the
 // amount and kind, for weight the weight, for a training its repetitions per exercise and dog and its treats, a note;
-// Speichern sends it all, Löschen asks first. Both need the server and say so without reception.
+// Speichern sends it all, Löschen asks first. Both need the server (the writes' client): they say so without
+// reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
 import { clampPortion, dogRule, FOOD_MAX_G, type FoodKind, formatKg, keepsOne, trainingSummaryLine, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -25,7 +26,7 @@ const BUTTON: Partial<Record<Entry["type"], ButtonKind>> = { walk: "walk", food:
 export function EntryDetail({ id }: { id: number }) {
   const router = useRouter();
   const theme = useTheme();
-  const { api, people, dogs, exercises, treatKinds } = useGassi();
+  const { api, writeApi, people, dogs, exercises, treatKinds } = useGassi();
   const [entry, setEntry] = useState<Entry | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -63,16 +64,16 @@ export function EntryDetail({ id }: { id: number }) {
   };
   const save = (e: Entry, f: Form) =>
     run(async () => {
-      if (!api) return;
-      await api.editEntry(editInput(e, f));
-      if (e.type === "training") await api.editTraining(trainingInput(e, f));
+      if (!writeApi) return;
+      await writeApi.editEntry(editInput(e, f));
+      if (e.type === "training") await writeApi.editTraining(trainingInput(e, f));
     });
   // a deleted walk has no summary to go back to: Verlauf (anything else goes back to where it was opened)
   const remove = (e: Entry) =>
     run(
       async () => {
         setAsking(false);
-        if (api) await api.deleteEntry({ id });
+        if (writeApi) await writeApi.deleteEntry({ id });
       },
       e.type === "walk" ? () => router.dismissTo("/verlauf") : back,
     );
