@@ -2,12 +2,12 @@
 // (from the server, worked out by the domain) on top; at the bottom what was bought (Eingekauft) or what is there when
 // counted by hand (Nachgezählt), the same way in both: wet food one row per can size with − and + (bought: whole cans
 // from 0; counted: from what the stock says, in halves for an opened can), a row of another
-// size added with "+ Dosengröße" (its grams typed in the row; one without grams isn't recorded); dry food one amount in
-// g or kg. One Eintragen records it all.
+// size added with "+ Dosengröße" ("Dosen à [ ] g"; one without grams isn't recorded), × on a row takes it away
+// (counting, a known size is then 0, which retires it); dry food one amount in g or kg. One Eintragen records it all.
 import type { DryUnit, FoodKind } from "@gassi/domain";
 import { formatCans, mergeSizes, stockParts } from "@gassi/domain";
 import { useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Field } from "../ui/Field";
@@ -47,6 +47,8 @@ export function Stock() {
   const known = stock?.wet.sizes.map((s) => s.unitG) ?? [];
   const [extras, setExtras] = useState<string[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  // rows taken away with ×: counting, a known size is then 0 (and retired); buying, it is only left out of this form
+  const [removed, setRemoved] = useState<string[]>([]);
   const step = mode === "restock" ? 1 : 0.5;
   const rows = [
     ...known.map((u) => ({ key: `k${u}`, unitG: u as number | null, extra: null as number | null })),
@@ -54,7 +56,9 @@ export function Stock() {
   ];
   // only a known size's row starts at the stock: a new row (even of a known size) starts at 0, so it adds what is typed
   const countOf = (key: string, unitG: number | null) => counts[key] ?? (mode === "count" && unitG && key.startsWith("k") ? (stock?.wet.sizes.find((s) => s.unitG === unitG)?.cans ?? 0) : 0);
-  const sized = rows.flatMap((r) => (r.unitG ? [{ unitG: r.unitG, cans: countOf(r.key, r.unitG) }] : []));
+  const gone = (key: string) => removed.includes(key);
+  const shown = rows.filter((r) => !gone(r.key));
+  const sized = rows.flatMap((r) => (!r.unitG || (gone(r.key) && r.extra !== null) ? [] : [{ unitG: r.unitG, cans: gone(r.key) ? 0 : countOf(r.key, r.unitG) }]));
   const sizes = mergeSizes(sized); // a new row typed with a known size adds to that size
 
   // a message is about what was entered, and the rows are for one mode: both go when the form changes
@@ -62,6 +66,7 @@ export function Stock() {
     setMessage(null);
     setCounts({});
     setExtras([]);
+    setRemoved([]);
     setAmount("");
   };
   const pickKind = (k: FoodKind) => {
@@ -84,6 +89,7 @@ export function Stock() {
       setAmount("");
       setCounts({});
       setExtras([]);
+      setRemoved([]);
       reload();
     }, "Eingetragen.");
 
@@ -115,17 +121,18 @@ export function Stock() {
 
   const wet = (
     <>
-      {rows.map((r) => {
+      {shown.map((r) => {
         const n = countOf(r.key, r.unitG);
         const name = r.unitG ? `à ${r.unitG} g` : "neuer Größe";
         const change = (d: number) => setCounts({ ...counts, [r.key]: Math.min(MAX_CANS, Math.max(0, n + d)) });
         const what = step === 1 ? "1 Dose" : "½ Dose";
         return (
-          <View key={r.key} testID={r.unitG ? `count-${r.unitG}` : undefined} style={[styles.row, { backgroundColor: theme.surface }]}>
+          <View key={r.key} testID={r.unitG ? `count-${r.unitG}` : "count-new"} style={[styles.row, { backgroundColor: theme.surface }]}>
             {r.extra === null ? (
               <Text style={[styles.rowLabel, { color: theme.muted }]}>Dosen à {r.unitG} g</Text>
             ) : (
               <View style={styles.rowField}>
+                <Text style={[styles.labelText, { color: theme.muted }]}>Dosen à</Text>
                 <TextInput
                   accessibilityLabel="Gramm pro Dose"
                   value={extras[r.extra]}
@@ -137,7 +144,7 @@ export function Stock() {
                   autoFocus
                   style={[styles.gramInput, { color: theme.ink, borderColor: theme.line, backgroundColor: theme.background }]}
                 />
-                <Text style={[styles.rowLabel, { color: theme.muted }]}>g</Text>
+                <Text style={[styles.labelText, { color: theme.muted }]}>g</Text>
               </View>
             )}
             <StepButton small label={`${what} ${name} weniger`} sign="−" disabled={n <= 0} onPress={() => change(-step)} />
@@ -145,6 +152,9 @@ export function Stock() {
               {formatCans(n)}
             </Text>
             <StepButton small label={`${what} ${name} mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => change(step)} />
+            <Pressable accessibilityRole="button" accessibilityLabel="Dosengröße entfernen" hitSlop={8} onPress={() => setRemoved([...removed, r.key])} style={({ pressed }) => [styles.remove, { opacity: pressed ? 0.6 : 1 }]}>
+              <Text style={[styles.removeText, { color: theme.muted }]}>×</Text>
+            </Pressable>
           </View>
         );
       })}
@@ -200,10 +210,13 @@ const styles = StyleSheet.create({
   small: { fontSize: 13 },
   fields: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   unit: { width: 120 },
-  row: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: radius.tile, paddingVertical: 6, paddingHorizontal: 12 },
+  row: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.tile, paddingVertical: 6, paddingHorizontal: 12 },
   rowLabel: { flex: 1, fontSize: 14, fontWeight: "600" },
   rowField: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
-  gramInput: { width: 72, borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6, fontSize: 15, fontWeight: "600" },
-  rowValue: { minWidth: 84, textAlign: "center", fontSize: 16, fontWeight: "700" },
+  labelText: { fontSize: 14, fontWeight: "600" },
+  remove: { width: 24, alignItems: "center", justifyContent: "center" },
+  removeText: { fontSize: 20, fontWeight: "700" },
+  gramInput: { width: 64, borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6, fontSize: 15, fontWeight: "600" },
+  rowValue: { minWidth: 76, textAlign: "center", fontSize: 16, fontWeight: "700" },
   message: { fontSize: 15, fontWeight: "600" },
 });

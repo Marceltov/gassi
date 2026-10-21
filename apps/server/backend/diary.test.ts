@@ -120,10 +120,10 @@ describe("food and stock", () => {
     const stock = await d.stock();
     expect(stock.wet.sizes.map((s) => [s.unitG, s.cans])).toEqual([[400, 5], [800, 1]]);
     expect(stock).toMatchObject({ wet: { grams: 2800 }, dry: { grams: 0 } });
-    // a size left out of a count is 0
+    // a size left out of a count is 0, and no longer offered
     clock = new Date("2026-10-20T10:15:00Z");
     await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 800, cans: 2 }] });
-    expect((await d.stock()).wet.sizes.map((s) => [s.unitG, s.cans])).toEqual([[400, 0], [800, 2]]);
+    expect((await d.stock()).wet.sizes.map((s) => [s.unitG, s.cans])).toEqual([[800, 2]]);
   });
 });
 

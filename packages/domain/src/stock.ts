@@ -5,7 +5,8 @@
 // count is younger than that).
 //
 // Wet food is counted per can size (400 g and 800 g cans are not merged), with a total over the sizes. A wet count
-// sets every size at once: it is one stockcheck per size at the same time, and a size it leaves out is 0. A feeding
+// sets every size at once: it is one stockcheck per size at the same time, and a size it leaves out is 0; a size
+// it has no cans of is retired until it is bought, counted or fed again. A feeding
 // names the can it came out of; one that doesn't (older data) comes out of the size bought most recently before it.
 import type { Entry } from "./entry";
 import type { FoodKind } from "./entryTypes";
@@ -65,12 +66,15 @@ function wetStock(entries: readonly Entry[], now: number): WetStock {
   // the size an entry came out of: its own, else the one bought most recently before it (else any bought, else counted)
   const fallback = restocks.at(-1)?.unitG ?? check.find((c) => c.unitG)?.unitG ?? null;
   const sizeOf = (e: Entry) => e.unitG ?? restocks.filter((r) => r.at <= e.at).at(-1)?.unitG ?? fallback;
-  const units = [...new Set(sorted.filter((e) => e.type !== "food").flatMap((e) => (e.unitG ? [e.unitG] : [])))].sort((a, b) => a - b);
+  // the known sizes (Ruling V): those the latest count has cans of, and those bought, counted or fed after it; without a
+  // count every size bought (or fed). So a count that sets a size to 0 retires it, one eaten down to 0 stays.
+  const after = sorted.filter((e) => (checkAt ? e.at > checkAt : true) && (e.type === "restock" || (e.type === "food" && e.unitG)));
+  const sizesOf = (es: readonly Entry[]) => es.flatMap((e) => (sizeOf(e) ? [sizeOf(e)!] : []));
+  const units = [...new Set([...sizesOf(check.filter((c) => (c.amountG ?? 0) > 0)), ...sizesOf(after)])].sort((a, b) => a - b);
   const newestUnitG = restocks.at(-1)?.unitG ?? null;
-  if (!units.length) return { grams: null, daysLeft: null, belowZero: false, sizes: [], newestUnitG };
+  if (!units.length && !checkAt) return { grams: null, daysLeft: null, belowZero: false, sizes: [], newestUnitG };
 
   const feedings = sorted.filter((e) => e.type === "food");
-  // every size ever bought or counted is known; one bought or counted only before the latest count is 0 there
   const sizes = units.map((unitG): CanStock => {
     const mine = (e: Entry) => sizeOf(e) === unitG;
     // after a count: what it said for this size (0 when it left the size out); else from this size's first restock
@@ -81,7 +85,7 @@ function wetStock(entries: readonly Entry[], now: number): WetStock {
     return { unitG, grams: left, cans: cansOf(left, unitG), belowZero: grams < 0 };
   });
   const left = sum(sizes);
-  const countStart = checkAt ?? restocks[0]?.at ?? sorted[0].at;
+  const countStart = checkAt ?? restocks[0]?.at ?? sorted[0]?.at ?? new Date(now).toISOString();
   const use = feedings.map((e) => ({ at: e.at, grams: e.amountG ?? 0 }));
   return { grams: left, daysLeft: daysLeft(left, use, countStart, now), belowZero: sizes.some((s) => s.belowZero), sizes, newestUnitG };
 }

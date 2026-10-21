@@ -121,6 +121,33 @@ test("Vorrat: a new row typed with a known size adds only what is typed to it, a
   expect(entries.find((e) => e.unitG === 400)?.amountG).toBe((was + 0.5) * 400);
 });
 
+test("Vorrat: × takes a size away: buying only from this form, counting it to 0, which retires it", async ({ page }) => {
+  const token = await signIn(page);
+  const client = createClient({ baseUrl: BASE_URL, token });
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9999, cans: 1 }] })).entries.map((e) => e.id)); // a mistake
+  await page.goto("/mehr/vorrat");
+  await page.getByRole("tab", { name: "Nass" }).click();
+  await page.getByRole("tab", { name: "Eingekauft" }).click();
+  await page.getByTestId("count-9999").getByRole("button", { name: "Dosengröße entfernen" }).click();
+  await expect(page.getByTestId("count-9999")).toHaveCount(0);
+  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
+  await page.getByTestId("count-new").getByRole("button", { name: "Dosengröße entfernen" }).click(); // a typed row too
+  await expect(page.getByTestId("count-new")).toHaveCount(0);
+
+  await page.getByRole("tab", { name: "Nachgezählt" }).click(); // a new form: the size is back
+  await page.getByTestId("count-9999").getByRole("button", { name: "Dosengröße entfernen" }).click();
+  await expect(page.getByTestId("count-9999")).toHaveCount(0);
+  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Eintragen" }).click();
+  const { entries } = (await (await counted).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
+  made.push(...entries.map((e) => e.id));
+  expect(entries.find((e) => e.unitG === 9999)?.amountG).toBe(0);
+  expect((await client.stock()).wet.sizes.some((x) => x.unitG === 9999)).toBe(false);
+  await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
+  await expect(page.getByTestId("stock-wet")).not.toContainText("9999");
+  await expect(page.getByTestId("count-9999")).toHaveCount(0);
+});
+
 test("Vorrat: dry food bought in kg with a decimal comma, counted in g", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });

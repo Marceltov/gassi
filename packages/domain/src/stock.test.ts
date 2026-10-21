@@ -86,9 +86,9 @@ describe("computeStock", () => {
     expect(s.dry.grams).toBe(1600);
   });
 
-  test("a wet count sets every size at once: a size left out is 0, later restocks and feedings count on", () => {
+  test("a wet count sets every size at once: a size left out is 0 (and retired), later restocks and feedings count on", () => {
     const s = stock([restockWet(day(10), 12, 400), restockWet(day(9), 3, 800), feedCan(day(5), 2000, 400), check(day(3), 400, 5), feedCan(day(2), 400, 400), restockWet(day(1), 6, 400)]);
-    expect(wetOf(s)).toEqual([[400, 10], [800, 0]]);
+    expect(wetOf(s)).toEqual([[400, 10]]);
     expect(s.wet.grams).toBe(4000);
   });
 
@@ -101,12 +101,24 @@ describe("computeStock", () => {
 
   test("an older count is replaced by the newest one as a whole", () => {
     const s = stock([check(day(5), 400, 3), check(day(5), 800, 2), check(day(2), 400, 1)]);
-    expect(wetOf(s)).toEqual([[400, 1], [800, 0]]);
+    expect(wetOf(s)).toEqual([[400, 1]]);
+  });
+
+  test("a size counted to 0 is retired; bought, counted or fed after the count it is back", () => {
+    const at = day(5);
+    const counted = [restockWet(day(9), 1, 10_000), restockWet(day(8), 4, 400), check(at, 10_000, 0), check(at, 400, 3)];
+    expect(wetOf(stock(counted))).toEqual([[400, 3]]); // the mistaken 10000 g can is gone
+    expect(wetOf(stock([...counted, restockWet(day(2), 1, 10_000)]))).toEqual([[400, 3], [10_000, 1]]);
+    expect(stock([...counted, feedCan(day(2), 100, 10_000)]).wet.sizes.map((x) => x.unitG)).toEqual([400, 10_000]);
+  });
+
+  test("a size eaten down to 0 without a count stays, to be bought again", () => {
+    expect(wetOf(stock([restockWet(day(5), 1, 800), restockWet(day(4), 2, 400), feedCan(day(2), 800, 800)]))).toEqual([[400, 2], [800, 0]]);
   });
 
   test("a stockcheck of zero is a known, empty stock", () => {
     expect(stock([e("stockcheck", day(1), { foodKind: "dry", amountG: 0 })]).dry).toEqual({ grams: 0, daysLeft: null, belowZero: false });
-    expect(stock([check(day(1), 400, 0)]).wet).toMatchObject({ grams: 0, sizes: [{ unitG: 400, cans: 0 }] });
+    expect(stock([check(day(1), 400, 0)]).wet).toMatchObject({ grams: 0, sizes: [] });
   });
 
   test("negative stock is clamped, per size", () => {
