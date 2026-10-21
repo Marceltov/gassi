@@ -5,6 +5,8 @@ coverage/
 test-results/
 playwright-report/
 data/
+# the app's data modules are code, not a data folder
+!/apps/mobile/src/data/
 .env*
 !.env.example
 *.tsbuildinfo

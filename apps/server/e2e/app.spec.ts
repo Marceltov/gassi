@@ -4,8 +4,10 @@ import { readFileSync } from "node:fs";
 import { createClient } from "@gassi/api-client";
 import { expect, test } from "@playwright/test";
 import { BASE_URL, TOKEN_FILE } from "../playwright.config";
+import { signIn } from "./signed-in";
 
 test("/ and a deep link like /verlauf open the web app", async ({ page }) => {
+  await signIn(page);
   for (const [path, tab] of [["/", "Start"], ["/verlauf", "Verlauf"]]) {
     const res = await page.goto(path);
     expect(res!.status()).toBe(200);
