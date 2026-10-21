@@ -12,6 +12,10 @@ test("the server's taps and the unsent ones during the walk, oldest first, each 
   expect(mergeTaps(known, unsent, at(0), null).map((t) => t.at)).toEqual([at(2), at(5), at(8), at(40)]);
 });
 
+test("an unsent tap at the very end of the walk is after it, as on the server", () => {
+  expect(mergeTaps([], [pee(0), pee(30)], at(0), at(30))).toEqual([pee(0)]);
+});
+
 test("only log commands are taps", () => {
   const commands: Command[] = [
     { id: "a", at: at(1), kind: "walk.pause", walkKey: "w" },

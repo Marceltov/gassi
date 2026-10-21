@@ -3,7 +3,7 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
+import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
@@ -314,7 +314,7 @@ export class Diary {
       : [];
     return new Map(
       walks.map((w) => {
-        const mine = inside.filter((e) => e.at >= w.at && e.at < endOf(w));
+        const mine = inside.filter((e) => withinWalk(e.at, w.at, endOf(w)));
         // oldest training first, as the summary lists them
         const trainings = mine.filter((e) => e.type === "training").reverse();
         const rows = trainings.flatMap((t) => reps.filter((r) => r.entry_id === t.id).map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count })));

@@ -1,6 +1,6 @@
 // How an entry reads in a list, the same in the apps.
 import { type EntryType, FOOD_LABEL, type FoodKind, TYPE_LABEL } from "./entryTypes";
-import { exerciseRate, type ExerciseTotal } from "./exerciseTotals";
+import { exerciseRate, type ExerciseTotal, trainingParts } from "./exerciseTotals";
 import { formatMinutes } from "./time";
 
 /** What happened during a walk: its pee and poop, and the exercises of the trainings on it. */
@@ -31,8 +31,6 @@ export const formatDistance = (m: number) => (m < 999.5 ? `${Math.round(m)} m` :
 
 const grams = (g: number) => (g >= 1000 && g % 100 === 0 ? formatKg(g).replace(",0 kg", " kg") : `${g} g`);
 
-const treatsText = (n: number | null) => (n ? `${n} ${n === 1 ? "Leckerli" : "Leckerlis"}` : "");
-
 /** How an entry reads in a list: "Gassi" + "52 Min. (8 Pause) · 3,1 km" + "Hirsch + Herzii", "Futter" +
  * "Nassfutter, 200 g" + "von Hirsch". `by` is who walked for walks with walkers, else "von <who logged it>"; `during`
  * is what happened on a walk ("💧 2 · 💩 1 · 🎯 Sitz 4/5"), else empty. A training's exercises read with their
@@ -51,7 +49,7 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
       return { title: TYPE_LABEL.walk, extra: [time, e.distanceM ? formatDistance(e.distanceM) : ""].filter(Boolean).join(" · "), by, during };
     }
     case "training":
-      return plain(TYPE_LABEL.training, [running ? "läuft" : duration, ...e.exercises.map(exerciseRate), treatsText(e.treats)].filter(Boolean).join(" · "));
+      return plain(TYPE_LABEL.training, [running ? "läuft" : duration, ...trainingParts(e.exercises, e.treats ?? 0)].filter(Boolean).join(" · "));
     case "weight":
       return plain(TYPE_LABEL.weight, e.amountG ? formatKg(e.amountG) : "");
     case "restock": {

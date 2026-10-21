@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { isOver, joinsEndedSession, keepsOne, pausedWithin, resolveDogs, startedTrainingEndsAt } from "./sessionRules";
+import { isOver, joinsEndedSession, keepsOne, pausedWithin, resolveDogs, startedTrainingEndsAt, withinWalk } from "./sessionRules";
 
 const at = (m: number) => `2026-10-20T09:${String(m).padStart(2, "0")}:00.000Z`;
 
@@ -8,6 +8,15 @@ describe("the rules for taps on walks and trainings", () => {
     expect(isOver(null, at(50))).toBe(false);
     expect(isOver(at(30), at(29))).toBe(false);
     expect(isOver(at(30), at(30))).toBe(true);
+  });
+
+  test("during a walk: from its start, up to but not at its end; while it runs, anything from its start", () => {
+    expect(withinWalk(at(0), at(0), at(30))).toBe(true);
+    expect(withinWalk(at(29), at(0), at(30))).toBe(true);
+    expect(withinWalk(at(30), at(0), at(30))).toBe(false); // a tap at the very end is after the walk, as on the server
+    expect(withinWalk("2026-10-20T08:59:59.999Z", at(0), at(30))).toBe(false);
+    expect(withinWalk(at(59), at(0), null)).toBe(true);
+    expect(withinWalk("2026-10-20T08:59:00.000Z", at(0), null)).toBe(false);
   });
 
   test("a start that arrives late joins the walk that ran at its time, but never one whose end lies in the future", () => {

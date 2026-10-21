@@ -3,7 +3,7 @@
 // server (ADR 0002). Before the server knows a just-ended walk, its summary is made from what the walk screen showed
 // at "Zuhause" (`Ended`), with the same helpers the server uses.
 import type { Output } from "@gassi/api-client";
-import { type Command, minutesBetween, type Person, pausedWithin, type WalkView } from "@gassi/domain";
+import { type Command, minutesBetween, type Person, pausedWithin, type WalkView, withinWalk } from "@gassi/domain";
 
 export type WalkSummary = Output<"walk">["summary"];
 /** A pee or poop; `id` is its entry's once the server has it (a tap still in the queue has none). */
@@ -21,10 +21,11 @@ export const summaryTaps = (s: Pick<WalkSummary, "pees" | "poops">): Tap[] => [
   ...s.poops.map((m) => ({ type: "poop" as const, ...m })),
 ];
 
-/** `known` with the `unsent` taps between `from` and `to` (null: the walk still runs) added, oldest first, each once. */
+/** `known` with the `unsent` taps during the walk from `from` to `to` (null: it still runs) added, oldest first, each
+ * once. */
 export function mergeTaps(known: readonly Tap[], unsent: readonly Tap[], from: string, to: string | null): Tap[] {
   const all = [...known];
-  for (const t of unsent) if (t.at >= from && (to === null || t.at <= to) && !all.some((k) => same(k, t))) all.push(t);
+  for (const t of unsent) if (withinWalk(t.at, from, to) && !all.some((k) => same(k, t))) all.push(t);
   return all.sort(byTime);
 }
 

@@ -3,6 +3,7 @@
 // then, for the walk this phone ended, the one made from what the walk screen showed (`local`). Asked again when the
 // queue or reception changes, and when the screen comes to the front again, so it switches over by itself.
 import type { Output } from "@gassi/api-client";
+import { withinWalk } from "@gassi/domain";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage } from "../data/api";
@@ -42,7 +43,7 @@ export function useWalkSummary(idOrKey: string): WalkSummaryState {
 
   const ended = loadEnded(idOrKey);
   const local = ended ? fromEnded(ended, tapsOf(pending)) : null;
-  const waiting = !!ended && pending.some((c) => c.at >= ended.startedAt && c.at <= ended.endedAt);
+  const waiting = !!ended && pending.some((c) => withinWalk(c.at, ended.startedAt, ended.endedAt));
   const server = answer?.for === idOrKey ? answer : null;
   const done = server?.data && server.data.summary.endedAt !== null ? server.data : null;
   const replaced = !!ended && !!done && !waiting;

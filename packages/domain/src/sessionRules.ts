@@ -11,6 +11,11 @@ const earlier = (a: string, b: string) => (a < b ? a : b);
 /** A tap at or after the end of its walk or training is too late (a pause, a join, a treat …). */
 export const isOver = (endedAt: string | null, at: string): boolean => endedAt !== null && at >= endedAt;
 
+/** Whether something at `at` happened during a walk from `startedAt` to `endedAt` (null while it runs): from its start
+ * up to, not including, its end (ADR 0002). The server counts a walk's pee, poop and trainings by it (its queries use
+ * the same bounds, `at >= start and at < end`), and the phone lays its unsent taps over a walk by it. */
+export const withinWalk = (at: string, startedAt: string, endedAt: string | null): boolean => at >= startedAt && (endedAt === null || at < endedAt);
+
 /** A start that arrives after a stop (queued without reception) joins the walk that was running at its time — but not
  * one whose end lies after `now`, which is an end edited into the future, not a real stop. */
 export const joinsEndedSession = (s: { at: string; endedAt: string | null }, at: string, now: string): boolean => s.endedAt !== null && s.at <= at && at < s.endedAt && s.endedAt <= now;

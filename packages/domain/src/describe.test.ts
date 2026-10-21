@@ -38,7 +38,7 @@ test("what happened during a walk: pee, poop and the exercises with their succes
 });
 
 test("a training: duration, exercises with successes / repetitions, and treats", () => {
-  expect(text(entry({ type: "training", endedAt: "x", durationMin: 12, exercises: [{ name: "Rückruf", ok: 1, fail: 0 }, { name: "Sitz", ok: 2, fail: 1 }], treats: 6, byName: "Herzii" }))).toBe("Training, 12 Min. · Rückruf 1/1 · Sitz 2/3 · 6 Leckerlis von Herzii");
+  expect(text(entry({ type: "training", endedAt: "x", durationMin: 12, exercises: [{ name: "Rückruf", ok: 1, fail: 0 }, { name: "Sitz", ok: 2, fail: 1 }], treats: 6, byName: "Herzii" }))).toBe("Training, 12 Min. · Rückruf 1/1 · Sitz 2/3 · 6 Leckerli von Herzii");
   expect(text(entry({ type: "training", endedAt: "x", durationMin: 5, treats: 1 }))).toBe("Training, 5 Min. · 1 Leckerli von Hirsch");
   expect(text(entry({ type: "training", clientKey: "k", exercises: [{ name: "Sitz", ok: 1, fail: 0 }], treats: 0 }))).toBe("Training, läuft · Sitz 1/1 von Hirsch");
 });

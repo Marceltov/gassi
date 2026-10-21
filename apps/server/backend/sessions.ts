@@ -10,7 +10,7 @@
 //   alias of the running walk, so its later taps land there. A start arriving after the stop joins the walk that was
 //   running at its time. Trainings do the same; a training started on a walk that has since ended ends with it.
 import { sql, type Kysely } from "kysely";
-import { type Command, type Entry, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, keepsOne, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView } from "@gassi/domain";
+import { type Command, type Entry, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, keepsOne, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView, withinWalk } from "@gassi/domain";
 import type { DB } from "./db/open";
 import type { Schema } from "./db/schema";
 import { DogRepository } from "./dogs";
@@ -84,7 +84,7 @@ export class Sessions {
     const walk = await repo.get(walkEntryId);
     if (!walk || walk.type !== "walk") throw new Error(`entry ${walkEntryId} is not a walk`);
     const end = walk.endedAt ?? this.deps.now().toISOString();
-    const during = await repo.list({ since: walk.at, until: end });
+    const during = await repo.list({ since: walk.at, until: end }); // withinWalk's bounds, in the query
     const { pauses } = await this.pauses(walk.id);
     const pauseMs = pausedWithin(pauses, walk.at, end);
     const trainings = during.filter((e) => e.type === "training").reverse();
@@ -130,7 +130,7 @@ export class Sessions {
       key: t.clientKey!,
       startedAt: t.at,
       dogIds: t.dogIds,
-      walkKey: walk && walk.at <= t.at ? walk.clientKey : null,
+      walkKey: walk && withinWalk(t.at, walk.at, walk.endedAt) ? walk.clientKey : null,
       reps: exercises.map((r) => ({ exerciseId: r.exercise_id, dogId: r.dog_id, ok: r.ok_count, fail: r.fail_count })),
       treats: Object.fromEntries(treats.map((r) => [r.treat_kind_id, r.count])),
     };
@@ -342,7 +342,7 @@ class Step {
       .where((eb) => eb.or([eb("ended_at", "is", null), eb("ended_at", ">", end)]))
       .execute();
     const training = await this.entries.running("training");
-    if (training && training.at >= w.at && training.at < end) await this.end(training, end);
+    if (training && withinWalk(training.at, w.at, end)) await this.end(training, end);
     return "applied";
   }
 
