@@ -34,11 +34,12 @@ test("the sheet opens with the newest feeding, a plus makes it 60 g dry, Eintrag
 test("switching to wet takes that kind's last portion; the quick amounts and the stock line follow", async ({ page }) => {
   await asHirsch().restock({ foodKind: "wet", cans: 9, unitG: 400 });
   await feed(90, "wet");
-  await feed(50, "dry");
+  await feed(55, "dry");
   await signIn(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Futter geben" }).click();
   const sheet = page.getByTestId("food-sheet");
+  await expect(sheet.getByTestId("food-amount")).toHaveText("55 g"); // the server's answer is in (no default is 55)
   await sheet.getByRole("tab", { name: "Nass" }).click();
   await expect(sheet.getByTestId("food-amount")).toHaveText("90 g");
   await expect(sheet.getByRole("button", { name: "90 g", exact: true })).toBeVisible(); // a recent portion
@@ -49,7 +50,7 @@ test("switching to wet takes that kind's last portion; the quick amounts and the
   await sheet.getByRole("button", { name: "90 g", exact: true }).click();
   await expect(sheet.getByTestId("food-amount")).toHaveText("90 g");
   await sheet.getByRole("tab", { name: "Trocken" }).click();
-  await expect(sheet.getByTestId("food-amount")).toHaveText("50 g");
+  await expect(sheet.getByTestId("food-amount")).toHaveText("55 g");
 });
 
 test("without reception Eintragen is queued, the tile shows it at once, and it reaches the server later", async ({ page, context }) => {

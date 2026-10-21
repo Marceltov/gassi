@@ -2,6 +2,10 @@
 // the time of the tap (so taps queued without reception keep their real time). Runs in the browser too.
 import { z } from "zod";
 
+/** The grams one feeding may have. */
+export const FOOD_MIN_G = 1;
+export const FOOD_MAX_G = 5000;
+
 const key = z.string().min(1).max(64);
 const dogId = z.number().int().positive();
 // The dogs a walk or training is for; left out, the server takes every active dog.
@@ -23,7 +27,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("training.treat"), trainingKey: key, treatKindId: z.number().int().positive(), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("log"), type: z.enum(["pee", "poop"]), dogId }),
   // a feeding; the dogs left out, the server takes every active dog
-  z.object({ ...base, kind: z.literal("food"), dogIds, amountG: z.number().int().min(1).max(5000), foodKind: z.enum(["wet", "dry"]) }),
+  z.object({ ...base, kind: z.literal("food"), dogIds, amountG: z.number().int().min(FOOD_MIN_G).max(FOOD_MAX_G), foodKind: z.enum(["wet", "dry"]) }),
 ]);
 
 export type Command = z.output<typeof commandSchema>;

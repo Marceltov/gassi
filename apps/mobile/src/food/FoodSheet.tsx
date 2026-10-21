@@ -1,7 +1,7 @@
 // Futter geben: a sheet pre-filled with the newest feeding (kind and grams), a switch for wet or dry, − and + in 10 g
 // steps, quick amounts, the stock, and one tap on Eintragen. All dogs unless some are switched off. It opens at once
 // from what was kept, and Eintragen goes through the queue, so it works without reception.
-import { type FoodKind, newId, portionFor, prefillFood, quickPortions, stockLine } from "@gassi/domain";
+import { clampPortion, FOOD_MAX_G, type FoodKind, newId, portionFor, prefillFood, quickPortions, stockLine } from "@gassi/domain";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
@@ -12,7 +12,7 @@ import { Sheet } from "../ui/Sheet";
 import { type FoodFacts, loadFacts, saveFacts } from "./memory";
 
 const STEP_G = 10;
-const MAX_G = 5000;
+const RECENT = 20; // the newest feedings the portions are taken from
 const KINDS: { kind: FoodKind; label: string }[] = [
   { kind: "wet", label: "Nass" },
   { kind: "dry", label: "Trocken" },
@@ -35,9 +35,12 @@ function FoodForm({ onClose }: { onClose: () => void }) {
   const start = prefillFood(facts.recent, facts.last);
   const [kind, setKind] = useState<FoodKind>(start.foodKind);
   const [amountG, setAmountG] = useState(start.amountG);
+  const chosenKind = useRef(start.foodKind); // the kind now, for the server's answer
   const [off, setOff] = useState<number[]>([]); // dogs switched off; none: all dogs
   const kept = useRef(facts); // what was kept at the opening, for what the server doesn't answer
-  const touched = useRef(false); // the person changed kind or amount: the server's answer must not overwrite it
+  const kindPicked = useRef(false); // the person chose the kind: the server's answer must not change it
+  const edited = useRef(false); // the person set the grams by hand: the server's answer must not change them
+  const submitId = useRef(newId()); // one id per form: a double tap on Eintragen is one feeding
 
   useEffect(() => {
     if (!api) return;
@@ -48,15 +51,17 @@ function FoodForm({ onClose }: { onClose: () => void }) {
       const fresh: FoodFacts = {
         last: last ?? kept.current.last,
         stock: stock ?? kept.current.stock,
-        recent: entries ? entries.entries.flatMap((e) => (e.foodKind && e.amountG ? [{ foodKind: e.foodKind, amountG: e.amountG }] : [])) : kept.current.recent,
+        recent: entries ? entries.entries.flatMap((e) => (e.foodKind && e.amountG ? [{ foodKind: e.foodKind, amountG: e.amountG }] : [])).slice(0, RECENT) : kept.current.recent,
       };
       saveFacts(personId, fresh);
       setFacts(fresh);
-      if (!touched.current) {
-        const next = prefillFood(fresh.recent, fresh.last);
+      const next = kindPicked.current ? null : prefillFood(fresh.recent, fresh.last);
+      const nextKind = next?.foodKind ?? chosenKind.current;
+      if (next) {
+        chosenKind.current = next.foodKind;
         setKind(next.foodKind);
-        setAmountG(next.amountG);
       }
+      if (!edited.current) setAmountG(portionFor(nextKind, fresh.recent, fresh.last));
     });
     return () => {
       alive = false;
@@ -71,19 +76,22 @@ function FoodForm({ onClose }: { onClose: () => void }) {
     if (next.length < active.length) setOff(next); // at least one dog eats
   };
   const pick = (next: FoodKind) => {
-    touched.current = true;
+    if (next === kind) return;
+    kindPicked.current = true;
+    edited.current = false; // the new kind starts from its own last portion
+    chosenKind.current = next;
     setKind(next);
     setAmountG(portionFor(next, facts.recent, facts.last));
   };
   const set = (grams: number) => {
-    touched.current = true;
-    setAmountG(Math.min(MAX_G, Math.max(STEP_G, grams)));
+    edited.current = true;
+    setAmountG(clampPortion(grams));
   };
 
   const quick = quickPortions(facts.recent, kind, facts.stock?.wet.canSizeG ?? null);
   const stock = facts.stock ? stockLine(facts.stock, kind) : null;
   const submit = () => {
-    send({ id: newId(), at: new Date().toISOString(), kind: "food", foodKind: kind, amountG, ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
+    send({ id: submitId.current, at: new Date().toISOString(), kind: "food", foodKind: kind, amountG, ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
     onClose();
   };
 
@@ -105,9 +113,9 @@ function FoodForm({ onClose }: { onClose: () => void }) {
         ))}
       </View>
       <View style={styles.amountRow}>
-        <Step label="10 g weniger" sign="−" disabled={amountG <= STEP_G} onPress={() => set(amountG - STEP_G)} />
+        <Step label="10 g weniger" sign="−" disabled={amountG <= 1} onPress={() => set(amountG - STEP_G)} />
         <Text testID="food-amount" style={[styles.amount, { color: theme.ink }]}>{`${amountG} g`}</Text>
-        <Step label="10 g mehr" sign="+" disabled={amountG >= MAX_G} onPress={() => set(amountG + STEP_G)} />
+        <Step label="10 g mehr" sign="+" disabled={amountG >= FOOD_MAX_G} onPress={() => set(amountG + STEP_G)} />
       </View>
       {quick.length ? (
         <View style={styles.chips}>
@@ -125,7 +133,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
           ))}
         </View>
       ) : null}
-      {stock ? <Text testID="food-stock" style={[styles.stock, { color: theme.muted }]}>{`Vorrat: ${stock}`}</Text> : null}
+      {stock ? <Text testID="food-stock" style={[styles.stock, { color: theme.muted }]}>{stock}</Text> : null}
       <BigButton kind="food" size="l" label="Eintragen" onPress={submit} />
     </View>
   );
