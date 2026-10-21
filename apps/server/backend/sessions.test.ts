@@ -287,6 +287,14 @@ describe("trainings", () => {
     expect(result.dropped).toEqual([foreign.id, unknown.id]);
   });
 
+  test("a rep for an unknown exercise is dropped", async () => {
+    const s = sessions();
+    const unknown = rep(1, 999, 1, true);
+    const result = await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t" }), unknown]);
+    expect(result.dropped).toEqual([unknown.id]);
+    expect((await s.current()).training!.reps).toEqual([]);
+  });
+
   test("resending the same rep command id changes nothing", async () => {
     const sitz = await new Catalog(db()).addExercise("Sitz");
     const s = sessions();

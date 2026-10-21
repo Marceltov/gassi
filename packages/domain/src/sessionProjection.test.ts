@@ -61,3 +61,12 @@ test("training.rep counts ok and fail per exercise and dog", () => {
 test("a rep with delta -1 never goes below zero", () => {
   expect(project(repTraining, [rep("01", 1, true, -1)], HIRSCH).training!.reps).toEqual([{ exerciseId: 1, dogId: 1, ok: 0, fail: 0 }]);
 });
+
+test("a rep for a dog outside the training is left out", () => {
+  expect(project(repTraining, [rep("01", 3, true)], HIRSCH).training!.reps).toEqual([]);
+});
+
+test("with no dogs listed (the server picks them) a rep is kept", () => {
+  const open: SessionsView = { walk: null, training: { ...repTraining.training!, dogIds: [] } };
+  expect(project(open, [rep("01", 3, true)], HIRSCH).training!.reps).toEqual([{ exerciseId: 1, dogId: 3, ok: 1, fail: 0 }]);
+});
