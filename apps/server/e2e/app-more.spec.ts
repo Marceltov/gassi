@@ -100,6 +100,27 @@ test("Vorrat: a wet count sets every can size at once, a new size typed in witho
   await expect(page.getByTestId("stock-message")).toBeHidden();
 });
 
+test("Vorrat: a new row typed with a known size adds only what is typed to it, also when counting", async ({ page }) => {
+  const token = await signIn(page);
+  const client = createClient({ baseUrl: BASE_URL, token });
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 400, cans: 2 }] })).entries.map((e) => e.id));
+  const before = (await client.stock()).wet.sizes;
+  await page.goto("/mehr/vorrat");
+  await page.getByRole("tab", { name: "Nass" }).click();
+  await page.getByRole("tab", { name: "Nachgezählt" }).click();
+  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
+  await page.getByLabel("Gramm pro Dose").fill("400");
+  await expect(page.getByTestId("count-400-value")).toHaveCount(2);
+  await expect(page.getByTestId("count-400-value").last()).toHaveText("0 Dosen"); // only the known row starts at the stock
+  await page.getByRole("button", { name: "½ Dose à 400 g mehr" }).last().click();
+  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Eintragen" }).click();
+  const { entries } = (await (await counted).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
+  made.push(...entries.map((e) => e.id));
+  const was = before.find((s) => s.unitG === 400)!.cans;
+  expect(entries.find((e) => e.unitG === 400)?.amountG).toBe((was + 0.5) * 400);
+});
+
 test("Vorrat: dry food bought in kg with a decimal comma, counted in g", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });

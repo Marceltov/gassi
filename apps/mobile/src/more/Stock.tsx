@@ -52,7 +52,8 @@ export function Stock() {
     ...known.map((u) => ({ key: `k${u}`, unitG: u as number | null, extra: null as number | null })),
     ...extras.map((text, i) => ({ key: `x${i}`, unitG: typedSize(text), extra: i })),
   ];
-  const countOf = (key: string, unitG: number | null) => counts[key] ?? (mode === "count" && unitG ? (stock?.wet.sizes.find((s) => s.unitG === unitG)?.cans ?? 0) : 0);
+  // only a known size's row starts at the stock: a new row (even of a known size) starts at 0, so it adds what is typed
+  const countOf = (key: string, unitG: number | null) => counts[key] ?? (mode === "count" && unitG && key.startsWith("k") ? (stock?.wet.sizes.find((s) => s.unitG === unitG)?.cans ?? 0) : 0);
   const sized = rows.flatMap((r) => (r.unitG ? [{ unitG: r.unitG, cans: countOf(r.key, r.unitG) }] : []));
   const sizes = mergeSizes(sized); // a new row typed with a known size adds to that size
 

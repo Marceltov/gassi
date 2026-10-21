@@ -140,6 +140,10 @@ test("formatWeight", () => {
   expect(formatWeight(4400)).toBe("4,4 kg");
   expect(formatWeight(10_000)).toBe("10 kg");
   expect(formatWeight(800)).toBe("800 g");
+  // halves of odd can sizes leave half grams: they show rounded
+  expect(formatWeight(450.5)).toBe("451 g");
+  expect(formatWeight(1997.5)).toBe("2 kg");
+  expect(formatWeight(2370.5)).toBe("2,4 kg");
 });
 test("parseDecimal reads German and English decimals, empty is not a number", () => {
   expect(parseDecimal("7,5")).toBe(7.5);
