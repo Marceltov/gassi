@@ -3,18 +3,33 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, RESTOCK_MESSAGES, restockInput, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
+import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
 import { InputError } from "./errors";
 import type { Names, Person } from "./people";
 import { dryTreats } from "./stock";
+import { type ShownTrack, Tracks } from "./tracks";
 
-/** An entry as the screens show it: with the display name of whoever logged it, and for walks the walkers' names and
- * minutes paused, for trainings the exercises practised and treats given. */
-export type EntryView = Entry & { byName: string; walkers: string[]; pauseMin: number | null; exercises: ExerciseTotal[]; treats: number | null };
+/** An entry as the screens show it: with the display name of whoever logged it, and for walks the walkers' names,
+ * minutes paused and the distance and a thumbnail route of the shown track, for trainings the exercises practised and treats given. */
+export type EntryView = Entry & { byName: string; walkers: string[]; pauseMin: number | null; exercises: ExerciseTotal[]; treats: number | null; distanceM: number | null; route: Route | null };
 
+
+/** What the walks and trainings among some entries have, by entry id. */
+type Details = {
+  walkers: Map<number, string[]>;
+  pauses: Map<number, { startedAt: string; endedAt: string | null }[]>;
+  exercises: Map<number, ExerciseTotal[]>;
+  treats: Map<number, number>;
+  tracks: Map<number, ShownTrack>;
+};
+
+/** The newest entry of the types the Start screen shows. */
+export type Today = Record<"walk" | "food" | "pee" | "poop", EntryView | null>;
+
+const ROUTE_POINTS = 64;
 
 export type HistoryFilter = { type?: EntryType; by?: string; day?: string; dog?: number };
 export type HistoryPage = { entries: EntryView[]; more: boolean };
@@ -132,25 +147,25 @@ export class Diary {
 
   /** The week starting on the Monday of `day` ("2026-10-21" → that week), this week for anything else. */
   async week(day: unknown): Promise<WeekView> {
-    const { db, timeZone, names } = this.deps;
+    const { timeZone, names } = this.deps;
     const now = this.deps.now().getTime();
     const monday = isDay(day) ? mondayOf(Date.parse(`${day}T12:00:00Z`), timeZone) : mondayOf(now, timeZone);
     const { start, end } = weekBounds(monday, timeZone);
     // with walks that began before Monday and went on into the week
     const entries = await this.entries.list({ since: iso(start), until: iso(end), overlapping: true });
-    const ids = (type: EntryType) => entries.filter((e) => e.type === type).map((e) => e.id);
-    const [walkIds, trainingIds] = [ids("walk"), ids("training")];
-    const [walkerRows, exerciseRows, treatRows] = await Promise.all([
-      walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "person_id"]).where("entry_id", "in", walkIds).execute() : [],
-      trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute() : [],
-      trainingIds.length ? db.selectFrom("training_treat").select(["entry_id", "count"]).where("entry_id", "in", trainingIds).execute() : [],
-    ]);
-    const walkers: WeekInput["walkers"] = {};
-    for (const r of walkerRows) (walkers[r.entry_id] ??= []).push(r.person_id);
-    const trainings: WeekInput["trainings"] = Object.fromEntries(trainingIds.map((id) => [id, { exercises: [] as ExerciseTotal[], treats: 0 }]));
-    for (const [id, t] of Object.entries(trainings)) t.exercises = exerciseTotals(exerciseRows.filter((r) => r.entry_id === Number(id)).map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count })));
-    for (const r of treatRows) trainings[r.entry_id].treats += r.count;
-    return weekView({ entries, walkers, trainings, names, monday, timeZone, now });
+    const d = await this.details(entries);
+    const walkers = Object.fromEntries(d.walkers);
+    const trainings: WeekInput["trainings"] = Object.fromEntries(entries.filter((e) => e.type === "training").map((e) => [e.id, { exercises: d.exercises.get(e.id) ?? [], treats: d.treats.get(e.id) ?? 0 }]));
+    const tracks: WeekInput["tracks"] = Object.fromEntries([...d.tracks].map(([id, t]) => [id, { distanceM: t.metrics.distanceM, route: simplify(t.points, ROUTE_POINTS) }]));
+    return weekView({ entries, walkers, trainings, tracks, names, monday, timeZone, now });
+  }
+
+  /** The newest walk, feeding, pee and poop (null where there is none yet). */
+  async today(): Promise<Today> {
+    const types = ["walk", "food", "pee", "poop"] as const;
+    const newest = await Promise.all(types.map(async (type) => (await this.entries.list({ type, limit: 1 }))[0]));
+    const views = await this.views(newest.filter((e) => e !== undefined));
+    return Object.fromEntries(types.map((type) => [type, views.find((v) => v.type === type) ?? null])) as Today;
   }
 
   async all(query: { type?: EntryType; since?: string } = {}): Promise<EntryView[]> {
@@ -178,36 +193,53 @@ export class Diary {
     return (await this.views([e]))[0];
   }
 
-  // Loads the walkers, pauses, exercises and treats of the walks and trainings among `entries` in one go.
-  private async views(entries: Entry[]): Promise<EntryView[]> {
-    const { db, names } = this.deps;
+  // Loads what the walks and trainings among `entries` have (walkers, pauses, exercises, treats, the shown track),
+  // grouped by entry id.
+  private async details(entries: readonly Entry[]): Promise<Details> {
+    const { db } = this.deps;
     const ids = (type: EntryType) => entries.filter((e) => e.type === type).map((e) => e.id);
     const [walkIds, trainingIds] = [ids("walk"), ids("training")];
-    const [walkers, pauses, exercises, treats] = await Promise.all([
+    const [walkers, pauses, exercises, treats, tracks] = await Promise.all([
       walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "person_id"]).where("entry_id", "in", walkIds).orderBy(sql`rowid`).execute() : [],
       walkIds.length ? db.selectFrom("walk_pause").select(["entry_id", "started_at", "ended_at"]).where("entry_id", "in", walkIds).execute() : [],
       trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute() : [],
       trainingIds.length ? db.selectFrom("training_treat").select(["entry_id", "count"]).where("entry_id", "in", trainingIds).execute() : [],
+      new Tracks(db, this.deps.now).shown(walkIds),
     ]);
+    const group = <R extends { entry_id: number }, V>(rows: R[], value: (r: R) => V) => {
+      const out = new Map<number, V[]>();
+      for (const r of rows) out.set(r.entry_id, [...(out.get(r.entry_id) ?? []), value(r)]);
+      return out;
+    };
+    return {
+      walkers: group(walkers, (w) => w.person_id),
+      pauses: group(pauses, (p) => ({ startedAt: p.started_at, endedAt: p.ended_at })),
+      exercises: new Map([...group(exercises, (x) => ({ name: x.name, ok: x.ok_count, fail: x.fail_count }))].map(([id, rows]) => [id, exerciseTotals(rows)])),
+      treats: new Map([...group(treats, (t) => t.count)].map(([id, counts]) => [id, counts.reduce((n, c) => n + c, 0)])),
+      tracks,
+    };
+  }
+
+  private async views(entries: Entry[]): Promise<EntryView[]> {
+    const { names } = this.deps;
+    const d = await this.details(entries);
     const now = this.deps.now().toISOString();
     return entries.map((e) => {
       const isWalk = e.type === "walk";
-      const pauseMs = pausedWithin(
-        pauses.filter((p) => p.entry_id === e.id).map((p) => ({ startedAt: p.started_at, endedAt: p.ended_at })),
-        e.at,
-        e.endedAt ?? now,
-      );
+      const pauses = d.pauses.get(e.id) ?? [];
+      const track = d.tracks.get(e.id);
       return {
         ...e,
         byName: names.get(e.loggedBy) ?? e.loggedBy,
-        walkers: walkers.filter((w) => w.entry_id === e.id).map((w) => names.get(w.person_id) ?? w.person_id),
-        pauseMin: isWalk && pauses.some((p) => p.entry_id === e.id) ? Math.round(pauseMs / 60_000) : isWalk && e.clientKey ? 0 : null,
-        exercises: exerciseTotals(exercises.filter((x) => x.entry_id === e.id).map((x) => ({ name: x.name, ok: x.ok_count, fail: x.fail_count }))),
-        treats: e.type === "training" ? treats.filter((t) => t.entry_id === e.id).reduce((n, t) => n + t.count, 0) : null,
+        walkers: (d.walkers.get(e.id) ?? []).map((id) => names.get(id) ?? id),
+        pauseMin: isWalk && pauses.length ? Math.round(pausedWithin(pauses, e.at, e.endedAt ?? now) / 60_000) : isWalk && e.clientKey ? 0 : null,
+        exercises: d.exercises.get(e.id) ?? [],
+        treats: e.type === "training" ? (d.treats.get(e.id) ?? 0) : null,
+        distanceM: track?.metrics.distanceM ?? null,
+        route: track ? simplify(track.points, ROUTE_POINTS) : null,
       };
     });
   }
-
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();

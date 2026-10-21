@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { chooseTrack, simplify, type TrackPoint, trackMetrics } from "./track";
+import { chooseTrack, simplify, trimTrack, type TrackPoint, trackMetrics } from "./track";
 
 const T0 = Date.parse("2026-10-20T09:00:00Z");
 // a point `north` metres north and `east` metres east of Munich's Marienplatz, `s` seconds after T0
@@ -43,15 +43,15 @@ describe("trackMetrics", () => {
   });
 });
 
-describe("simplify", () => {
+describe("trimTrack", () => {
   test("keeps the ends and corners, drops points on a straight line", () => {
     const line = [p(0, 0), p(10, 100), p(20, 200), p(30, 300), p(40, 300, 100), p(50, 300, 200)];
-    expect(simplify(line).map((x) => x.t)).toEqual([line[0].t, line[3].t, line[5].t]);
+    expect(trimTrack(line).map((x) => x.t)).toEqual([line[0].t, line[3].t, line[5].t]);
   });
 
   test("a wiggle under the tolerance goes, one over it stays", () => {
-    expect(simplify([p(0, 0), p(10, 50, 3), p(20, 100)])).toHaveLength(2);
-    expect(simplify([p(0, 0), p(10, 50, 20), p(20, 100)])).toHaveLength(3);
+    expect(trimTrack([p(0, 0), p(10, 50, 3), p(20, 100)])).toHaveLength(2);
+    expect(trimTrack([p(0, 0), p(10, 50, 20), p(20, 100)])).toHaveLength(3);
   });
 });
 
@@ -60,5 +60,20 @@ describe("chooseTrack", () => {
     expect(chooseTrack([{ source: "phone", distanceM: 3000 }, { source: "watch", distanceM: 2500 }])).toBe(1);
     expect(chooseTrack([{ source: "phone", distanceM: 1000 }, { source: "phone", distanceM: 3000 }])).toBe(1);
     expect(chooseTrack([])).toBeNull();
+  });
+});
+
+describe("simplify", () => {
+  test("thins 1000 points to 64, evenly spaced, with the ends", () => {
+    const line = Array.from({ length: 1000 }, (_, i) => p(i, i * 2));
+    const out = simplify(line, 64);
+    expect(out).toHaveLength(64);
+    expect(out[0]).toEqual([line[0].lat, line[0].lon]);
+    expect(out[63]).toEqual([line[999].lat, line[999].lon]);
+  });
+
+  test("leaves short lines alone", () => {
+    expect(simplify([p(0, 0), p(1, 1)], 64)).toHaveLength(2);
+    expect(simplify([], 64)).toEqual([]);
   });
 });

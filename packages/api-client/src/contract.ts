@@ -45,6 +45,7 @@ export const deviceSchema = z.object({ id: z.number(), kind: z.enum(deviceKinds)
 export const dogSchema = z.object({ id: z.number(), name: z.string(), color: z.string(), archived: z.boolean() });
 
 const exerciseTotalSchema = z.object({ name: z.string(), ok: z.number(), fail: z.number() });
+const routeSchema = z.array(z.tuple([z.number(), z.number()]));
 
 export const entryViewSchema = z.object({
   id: z.number(),
@@ -64,6 +65,8 @@ export const entryViewSchema = z.object({
   pauseMin: z.number().nullable(),
   exercises: z.array(exerciseTotalSchema),
   treats: z.number().nullable(),
+  distanceM: z.number().nullable(),
+  route: routeSchema.nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -121,7 +124,6 @@ const treatKindSchema = z.object({ id: z.number(), name: z.string(), gramsPerPie
 const treatKindInput = z.object({ name: z.string(), gramsPerPiece: z.number(), fromDry: z.boolean() });
 const kindStock = { grams: z.number().nullable(), daysLeft: z.number().nullable(), belowZero: z.boolean() };
 const stockSchema = z.object({ wet: z.object({ ...kindStock, cans: z.number().nullable(), canSizeG: z.number().nullable() }), dry: z.object(kindStock) });
-const personMinutes = z.array(z.object({ id: z.string(), name: z.string(), min: z.number() }));
 const weekSchema = z.object({
   monday: z.string(),
   days: z.array(
@@ -133,9 +135,11 @@ const weekSchema = z.object({
       trainingMin: z.number(),
     }),
   ),
-  walkMinByPerson: personMinutes,
-  trainingMinByPerson: personMinutes,
-  exerciseCounts: z.array(z.object({ name: z.string(), count: z.number() })),
+  byPerson: z.array(
+    z.object({ id: z.string(), name: z.string(), walks: z.number(), walkMin: z.number(), km: z.number(), feedings: z.number(), trainings: z.number(), trainingMin: z.number(), ok: z.number(), fail: z.number() }),
+  ),
+  exercises: z.array(exerciseTotalSchema),
+  routes: z.array(z.object({ walkId: z.number(), route: routeSchema })),
   treats: z.number(),
 });
 export const linkKinds = ["setup", "person", "device", "watch", "magic"] as const;
@@ -223,6 +227,8 @@ export const contract = {
   lastFood: endpoint({ method: "GET", path: "/api/food/last", input: none, output: z.object({ wet: z.number().nullable(), dry: z.number().nullable() }) }),
   weights: endpoint({ method: "GET", path: "/api/weight", input: none, output: z.object({ weights: z.array(entryViewSchema) }) }),
   logWeight: endpoint({ method: "POST", path: "/api/weight", input: weightInput, output: entryViewSchema, messages: WEIGHT_MESSAGES }),
+  today: endpoint({ method: "GET", path: "/api/today", input: none, output: z.object({ walk: entryViewSchema.nullable(), food: entryViewSchema.nullable(), pee: entryViewSchema.nullable(), poop: entryViewSchema.nullable() }) }),
+  people: endpoint({ method: "GET", path: "/api/people", input: none, output: z.object({ people: z.array(personSchema) }) }),
   week: endpoint({ method: "GET", path: "/api/week", input: z.object({ w: z.string().optional() }), output: weekSchema }),
   updateMe: endpoint({
     method: "PATCH",

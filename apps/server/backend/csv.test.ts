@@ -3,7 +3,7 @@ import { csvField, entriesCsv } from "./csv";
 import type { EntryView } from "./diary";
 
 const EXTRAS = { dogNames: new Map([[1, "Toffee"], [2, "Bruno"]]), distanceM: new Map([[1, 3240]]) };
-const entry = (more: Partial<EntryView>): EntryView => ({ id: 1, dogIds: [1], type: "walk", at: "2026-10-20T12:05:00.000Z", endedAt: null, durationMin: null, amountG: null, foodKind: null, unitG: null, clientKey: null, walkers: [], pauseMin: null, exercises: [], treats: null, note: null, loggedBy: "marcel", byName: "Hirsch", createdAt: "", updatedAt: "", ...more });
+const entry = (more: Partial<EntryView>): EntryView => ({ id: 1, dogIds: [1], type: "walk", at: "2026-10-20T12:05:00.000Z", endedAt: null, durationMin: null, amountG: null, foodKind: null, unitG: null, clientKey: null, walkers: [], pauseMin: null, exercises: [], treats: null, distanceM: null, route: null, note: null, loggedBy: "marcel", byName: "Hirsch", createdAt: "", updatedAt: "", ...more });
 
 test("starts with a BOM and the German header, separated by ;", () => {
   const csv = entriesCsv([], "Europe/Berlin", EXTRAS);

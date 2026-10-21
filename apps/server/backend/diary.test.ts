@@ -139,11 +139,12 @@ describe("day filter and week", () => {
     ]);
     const w = await diary().week("2026-10-19");
     expect(w.monday).toBe("2026-10-19");
-    expect(w.walkMinByPerson).toEqual([
-      { id: "bille", name: "Herzii", min: 40 },
-      { id: "marcel", name: "Hirsch", min: 40 },
+    expect(w.byPerson).toMatchObject([
+      { id: "bille", walks: 1, walkMin: 40, trainings: 1, ok: 1 },
+      { id: "marcel", walks: 1, walkMin: 40, trainings: 0, ok: 0 },
     ]);
-    expect(w.exerciseCounts).toEqual([{ name: "Sitz", count: 1 }]);
+    expect(w.exercises).toEqual([{ name: "Sitz", ok: 1, fail: 0 }]);
+    expect(w.routes).toEqual([]);
     expect(w.treats).toBe(1);
     expect((await diary().week("bogus")).monday).toBe("2026-10-19"); // this week
     expect((await diary().week("2026-10-21")).monday).toBe("2026-10-19"); // any day → its Monday

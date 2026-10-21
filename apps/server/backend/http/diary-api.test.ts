@@ -84,6 +84,40 @@ describe("tracks over the API", () => {
   });
 });
 
+describe("today, people and routes over the API", () => {
+  const point = (s: number, north: number) => ({ t: new Date(Date.parse("2026-10-20T09:00:00Z") + s * 1000).toISOString(), lat: 48.137 + north / 111_195, lon: 11.575, ele: null, acc: null });
+
+  test("today is the newest entry of each type, null where there is none; people lists the household", async () => {
+    const token = await tokenFor(HIRSCH.id);
+    expect((await json("/api/today", { token })).body).toEqual({ walk: null, food: null, pee: null, poop: null });
+    const log = (body: object) => json("/api/entries", { method: "POST", token, body });
+    await log({ type: "pee", at: "2026-10-20T07:00:00Z" });
+    const { body: pee } = await log({ type: "pee", at: "2026-10-20T08:00:00Z" });
+    const { body: food } = await log({ type: "food", foodKind: "dry", amountG: 100, at: "2026-10-20T07:30:00Z" });
+    const { body: walk } = await log({ type: "walk", at: "2026-10-20T06:00:00Z", endedAt: "2026-10-20T06:30:00Z" });
+    const { body } = await json("/api/today", { token });
+    expect(body).toEqual({ walk, food, pee, poop: null });
+    expect(body.walk).toMatchObject({ distanceM: null, route: null });
+    expect((await json("/api/people", { token })).body.people).toEqual([HERZII, HIRSCH]);
+  });
+
+  test("a walk with a track has its distance and a route in entries, today and the week", async () => {
+    const token = await tokenFor(HIRSCH.id);
+    await json("/api/commands", { method: "POST", token, body: { commands: [{ id: "s", at: "2026-10-20T09:00:00.000Z", kind: "walk.start", walkKey: "w" }, { id: "e", at: "2026-10-20T09:10:00.000Z", kind: "walk.stop", walkKey: "w" }] } });
+    const points = Array.from({ length: 200 }, (_, i) => point(i * 3, i * 5 + (i % 2) * 20)); // zigzag: 995 m north, 200 points
+    await json("/api/tracks", { method: "POST", token, body: { trackId: "t", walkKey: "w", source: "phone", seq: 0, points } });
+    const { body: today } = await json("/api/today", { token });
+    expect(Math.round(today.walk.distanceM)).toBeGreaterThan(900);
+    expect(today.walk.route.length).toBeLessThanOrEqual(64);
+    expect(today.walk.route[0]).toEqual([points[0].lat, points[0].lon]);
+    const { body: week } = await json("/api/week?w=2026-10-20", { token });
+    expect(week.routes).toEqual([{ walkId: today.walk.id, route: today.walk.route }]);
+    expect(week.byPerson[0].km).toBeCloseTo(today.walk.distanceM / 1000, 1);
+    const { body: history } = await json("/api/entries?type=walk", { token });
+    expect(history.entries[0].route).toEqual(today.walk.route);
+  });
+});
+
 describe("the server checks inputs with the same schemas and messages", () => {
   test("German messages per field come from the schema, before the use case runs", async () => {
     const token = await tokenFor(HIRSCH.id);

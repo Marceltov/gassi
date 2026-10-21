@@ -1,7 +1,7 @@
 // GPS tracks of walks, as the recording phone or watch sends them: batches of points with a sequence number, so a
 // batch sent twice is stored once and batches sent late (no reception) fall into place. A walk may have several
 // tracks (both walkers recorded); it shows one (chooseTrack: the watch's, else the longest).
-import { chooseTrack, simplify, type TrackMetrics, trackMetrics, type TrackPoint, type TrackSource } from "@gassi/domain";
+import { chooseTrack, trimTrack, type TrackMetrics, trackMetrics, type TrackPoint, type TrackSource } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { InputError } from "./errors";
 import { findByKey } from "./sessions";
@@ -35,33 +35,38 @@ export class Tracks {
 
   /** The distance of the shown track of each walk in `entryIds` that has one (for the CSV). */
   async distances(entryIds: readonly number[]): Promise<Map<number, number>> {
-    const out = new Map<number, number>();
-    for (const id of entryIds) {
-      const t = await this.forWalk(id);
-      if (t) out.set(id, t.metrics.distanceM);
-    }
-    return out;
+    return new Map([...(await this.shown(entryIds))].map(([id, t]) => [id, t.metrics.distanceM]));
   }
 
   /** The track the walk shows, with its metrics and a simplified line for drawing; null without tracks. */
   async forWalk(entryId: number): Promise<ShownTrack | null> {
+    return (await this.shown([entryId])).get(entryId) ?? null;
+  }
+
+  /** The shown track of each walk in `entryIds` that has one, loaded in one query. */
+  async shown(entryIds: readonly number[]): Promise<Map<number, ShownTrack>> {
+    if (entryIds.length === 0) return new Map();
     const rows = await this.db
       .selectFrom("track")
       .innerJoin("track_batch", "track_batch.track_id", "track.id")
-      .select(["track.id", "track.source", "track_batch.seq", "track_batch.points"])
-      .where("track.entry_id", "=", entryId)
+      .select(["track.id", "track.entry_id", "track.source", "track_batch.seq", "track_batch.points"])
+      .where("track.entry_id", "in", entryIds)
       .orderBy("track.id")
       .orderBy("track_batch.seq")
       .execute();
-    const byTrack = new Map<string, { source: TrackSource; points: TrackPoint[] }>();
+    const byTrack = new Map<string, { entryId: number; source: TrackSource; points: TrackPoint[] }>();
     for (const r of rows) {
-      const t = byTrack.get(r.id) ?? { source: r.source === "watch" ? "watch" : "phone", points: [] };
+      const t = byTrack.get(r.id) ?? { entryId: r.entry_id, source: r.source === "watch" ? "watch" : "phone", points: [] };
       t.points.push(...(JSON.parse(r.points) as TrackPoint[]));
       byTrack.set(r.id, t);
     }
-    const all = [...byTrack.values()].map((t) => ({ ...t, metrics: trackMetrics(t.points) }));
-    const i = chooseTrack(all.map((t) => ({ source: t.source, distanceM: t.metrics.distanceM })));
-    if (i === null) return null;
-    return { source: all[i].source, points: simplify(all[i].points), metrics: all[i].metrics };
+    const byWalk = new Map<number, { source: TrackSource; points: TrackPoint[]; metrics: TrackMetrics }[]>();
+    for (const t of byTrack.values()) byWalk.set(t.entryId, [...(byWalk.get(t.entryId) ?? []), { ...t, metrics: trackMetrics(t.points) }]);
+    const out = new Map<number, ShownTrack>();
+    for (const [id, all] of byWalk) {
+      const i = chooseTrack(all.map((t) => ({ source: t.source, distanceM: t.metrics.distanceM })));
+      if (i !== null) out.set(id, { source: all[i].source, points: trimTrack(all[i].points), metrics: all[i].metrics });
+    }
+    return out;
   }
 }

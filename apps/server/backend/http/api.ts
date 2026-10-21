@@ -94,6 +94,8 @@ const implementations: Implementations<ApiDeps> = {
   lastFood: async ({ deps }) => (await diary(deps)).lastFoodAmounts(),
   weights: async ({ deps }) => ({ weights: await (await diary(deps)).all({ type: "weight" }) }),
   logWeight: async ({ input, auth, deps }) => (await diary(deps)).logWeight(auth.person, { at: deps.now().toISOString(), ...input }),
+  today: async ({ deps }) => (await diary(deps)).today(),
+  people: async ({ deps }) => ({ people: await new PeopleRepository(deps.db).list() }),
   week: async ({ input, deps }) => (await diary(deps)).week(input.w),
   updateMe: async ({ input, auth, deps }) => ({ person: await new PeopleRepository(deps.db, deps.now).update(auth.person.id, input) }),
   me: async ({ auth, deps }) => ({ person: auth.person, device: auth.device, household: { oidc: deps.oidc, mail: deps.mailer !== null } }),

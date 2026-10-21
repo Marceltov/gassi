@@ -1,7 +1,8 @@
 // The week (Monday to Sunday in the time zone) as the Woche page shows it: per day the walks and trainings as bars in
 // minutes since local midnight (clipped to the day, so a walk across midnight is a bar on both days), food, pee and
-// poop as ticks; above that the week's sums. A walk counts for each of its walkers, so the per-person sums can add up
-// to more than the total. A walk or training still running counts up to now.
+// poop as ticks; above that the week's sums. A walk counts fully (walk, minutes, km) for each of its walkers, so the
+// per-person sums can add up to more than the total; feedings and trainings count for whoever logged them (trainings
+// have no walkers). A walk or training still running counts up to now.
 import type { Entry } from "./entry";
 import type { ExerciseTotal } from "./exerciseTotals";
 import { dayBounds, dayOf } from "./time";
@@ -11,13 +12,14 @@ type Names = ReadonlyMap<string, string>;
 export type Bar = { type: "walk" | "training"; startMin: number; endMin: number };
 export type Tick = { type: "food" | "pee" | "poop"; min: number };
 export type WeekDay = { date: string; bars: Bar[]; ticks: Tick[]; walkMin: number; trainingMin: number };
-export type PersonMinutes = { id: string; name: string; min: number };
+export type Route = [lat: number, lon: number][];
+export type PersonWeek = { id: string; name: string; walks: number; walkMin: number; km: number; feedings: number; trainings: number; trainingMin: number; ok: number; fail: number };
 export type WeekView = {
   monday: string;
   days: WeekDay[];
-  walkMinByPerson: PersonMinutes[];
-  trainingMinByPerson: PersonMinutes[];
-  exerciseCounts: { name: string; count: number }[];
+  byPerson: PersonWeek[];
+  exercises: ExerciseTotal[];
+  routes: { walkId: number; route: Route }[];
   treats: number;
 };
 
@@ -25,6 +27,7 @@ export type WeekInput = {
   entries: readonly Entry[];
   walkers: Record<number, string[]>; // walk entry id → person ids
   trainings: Record<number, { exercises: ExerciseTotal[]; treats: number }>; // training entry id → what was practised
+  tracks: Record<number, { distanceM: number; route: Route }>; // walk entry id → its shown track
   names: Names;
   monday: string; // "2026-10-19"
   timeZone: string;
@@ -53,16 +56,14 @@ export function weekBounds(monday: string, timeZone: string): { start: number; e
 
 const minutes = (ms: number) => Math.round(ms / 60_000);
 
-function byPerson(totals: Map<string, number>, names: Names): PersonMinutes[] {
-  return [...totals]
-    .map(([id, min]) => ({ id, name: names.get(id) ?? id, min }))
-    .sort((a, b) => a.name.localeCompare(b.name, "de"));
-}
-
-export function weekView({ entries, walkers, trainings, names, monday, timeZone, now }: WeekInput): WeekView {
-  const walkTotals = new Map<string, number>();
-  const trainingTotals = new Map<string, number>();
-  const exercises = new Map<string, number>();
+export function weekView({ entries, walkers, trainings, tracks, names, monday, timeZone, now }: WeekInput): WeekView {
+  const people = new Map<string, PersonWeek>();
+  const person = (id: string) => {
+    if (!people.has(id)) people.set(id, { id, name: names.get(id) ?? id, walks: 0, walkMin: 0, km: 0, feedings: 0, trainings: 0, trainingMin: 0, ok: 0, fail: 0 });
+    return people.get(id)!;
+  };
+  const exercises = new Map<string, ExerciseTotal>();
+  const routes: WeekView["routes"] = [];
   let treats = 0;
   const week = weekBounds(monday, timeZone);
 
@@ -89,18 +90,37 @@ export function weekView({ entries, walkers, trainings, names, monday, timeZone,
   });
 
   for (const e of entries) {
-    if (e.type !== "walk" && e.type !== "training") continue;
     const at = Date.parse(e.at);
+    const startsInWeek = at >= week.start && at < week.end;
+    if (e.type === "food") {
+      if (startsInWeek) person(e.loggedBy).feedings++;
+      continue;
+    }
+    if (e.type !== "walk" && e.type !== "training") continue;
     const until = e.endedAt ? Date.parse(e.endedAt) : e.clientKey ? now : at;
     const min = minutes(Math.max(0, Math.min(until, week.end) - Math.max(at, week.start)));
     if (e.type === "walk") {
-      if (min === 0 && !(at >= week.start && at < week.end)) continue;
-      for (const u of walkers[e.id]?.length ? walkers[e.id] : [e.loggedBy]) walkTotals.set(u, (walkTotals.get(u) ?? 0) + min);
+      if (min === 0 && !startsInWeek) continue;
+      const track = tracks[e.id];
+      for (const u of walkers[e.id]?.length ? walkers[e.id] : [e.loggedBy]) {
+        const p = person(u);
+        p.walks++;
+        p.walkMin += min;
+        p.km += (track?.distanceM ?? 0) / 1000;
+      }
+      if (track) routes.push({ walkId: e.id, route: track.route });
     } else {
-      if (!(at >= week.start && at < week.end)) continue;
-      trainingTotals.set(e.loggedBy, (trainingTotals.get(e.loggedBy) ?? 0) + min);
+      if (!startsInWeek) continue;
+      const p = person(e.loggedBy);
+      p.trainings++;
+      p.trainingMin += min;
       const t = trainings[e.id];
-      for (const { name } of t?.exercises ?? []) exercises.set(name, (exercises.get(name) ?? 0) + 1);
+      for (const x of t?.exercises ?? []) {
+        const total = exercises.get(x.name) ?? { name: x.name, ok: 0, fail: 0 };
+        exercises.set(x.name, { name: x.name, ok: total.ok + x.ok, fail: total.fail + x.fail });
+        p.ok += x.ok;
+        p.fail += x.fail;
+      }
       treats += t?.treats ?? 0;
     }
   }
@@ -108,9 +128,9 @@ export function weekView({ entries, walkers, trainings, names, monday, timeZone,
   return {
     monday,
     days,
-    walkMinByPerson: byPerson(walkTotals, names),
-    trainingMinByPerson: byPerson(trainingTotals, names),
-    exerciseCounts: [...exercises].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "de")),
+    byPerson: [...people.values()].map((p) => ({ ...p, km: Math.round(p.km * 100) / 100 })).sort((a, b) => a.name.localeCompare(b.name, "de")),
+    exercises: [...exercises.values()].sort((a, b) => b.ok + b.fail - (a.ok + a.fail) || a.name.localeCompare(b.name, "de")),
+    routes,
     treats,
   };
 }
