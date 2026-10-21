@@ -7,7 +7,7 @@
 import type { DryUnit, FoodKind } from "@gassi/domain";
 import { formatCans, formSizes, parseCanSize, parseDecimal, stockParts } from "@gassi/domain";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Field } from "../ui/Field";
@@ -15,6 +15,7 @@ import { Screen } from "../ui/Screen";
 import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
 import { Segments } from "../ui/Segments";
 import { StepButton } from "../ui/Stepper";
+import { TapToEdit } from "../ui/TapToEdit";
 import { useBack } from "./back";
 import { useServer } from "./useServer";
 import { useWrite } from "./useWrite";
@@ -45,7 +46,8 @@ export function Stock() {
   const [unit, setUnit] = useState<DryUnit>("kg"); // dry food: sacks in kg, the rest of one maybe in g
   // wet food: one row per known can size, and one per size added ("+ Dosengröße"); every row's size can be edited (a
   // row counts by its size as it reads on Eintragen). Bought counts start at 0 in whole cans; counted ones at what the
-  // stock says and can be typed freely ("2,75"; the domain checks them); − and + step by a whole can
+  // stock says and can be typed freely ("2,75"; the domain checks them), − and + step by ½; sizes and counts read as text
+// and turn into a field when tapped
   const known = stock?.wet.sizes.map((s) => s.unitG) ?? [];
   const [extras, setExtras] = useState(0); // how many rows were added
   const [edits, setEdits] = useState<Record<string, { size?: string; cans?: string }>>({});
@@ -125,44 +127,36 @@ export function Stock() {
         const n = parseDecimal(r.cans) || 0;
         const name = unitG ? `à ${unitG} g` : "neuer Größe";
         const change = (d: number) => edit(r.key, { cans: decimalText(Math.min(MAX_CANS, Math.max(0, n + d))) });
+        const step = mode === "count" ? 0.5 : 1; // counted: halves (an opened can); bought: whole cans
+        const what = mode === "count" ? "½ Dose" : "1 Dose";
         // a known size's row keeps its id while its size is edited; an added one is named by the size typed
         const id = r.key.startsWith("k") ? r.key.slice(1) : (unitG ?? "new");
         return (
           <View key={r.key} testID={`count-${id}`} style={[styles.row, { backgroundColor: theme.surface }]}>
             <View style={styles.rowField}>
               <Text style={[styles.labelText, { color: theme.muted }]}>Dosen à</Text>
-              <TextInput
-                accessibilityLabel="Gramm pro Dose"
+              <TapToEdit
+                label="Dosengröße in Gramm"
                 value={r.size}
-                onChangeText={(size) => edit(r.key, { size })}
-                placeholder="…"
-                placeholderTextColor={theme.muted}
+                onChange={(size) => edit(r.key, { size })}
+                startEditing={r.key.startsWith("x")}
+                warn={!unitG}
                 inputMode="numeric"
                 keyboardType="number-pad"
-                autoFocus={r.key.startsWith("x")}
-                selectTextOnFocus
-                style={[styles.gramInput, { color: theme.ink, borderColor: unitG ? theme.line : theme.pee, backgroundColor: theme.background }]}
+                width={56}
+                style={styles.gramValue}
               />
               <Text style={[styles.labelText, { color: theme.muted }]}>g</Text>
             </View>
-            <StepButton small label={`1 Dose ${name} weniger`} sign="−" disabled={n <= 0} onPress={() => change(-1)} />
+            <StepButton small label={`${what} ${name} weniger`} sign="−" disabled={n <= 0} onPress={() => change(-step)} />
             {mode === "count" ? (
-              <TextInput
-                testID={`count-${id}-value`}
-                accessibilityLabel={`Anzahl Dosen ${name}`}
-                value={r.cans}
-                onChangeText={(cans) => edit(r.key, { cans })}
-                inputMode="decimal"
-                keyboardType="decimal-pad"
-                selectTextOnFocus
-                style={[styles.rowValue, styles.countInput, { color: theme.ink, borderColor: theme.line, backgroundColor: theme.background }]}
-              />
+              <TapToEdit testID={`count-${id}-value`} label={`Anzahl Dosen ${name}`} value={r.cans} onChange={(cans) => edit(r.key, { cans })} inputMode="decimal" keyboardType="decimal-pad" style={styles.rowValue} width={72} />
             ) : (
               <Text testID={`count-${id}-value`} style={[styles.rowValue, { color: theme.ink }]}>
                 {formatCans(n)}
               </Text>
             )}
-            <StepButton small label={`1 Dose ${name} mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => change(1)} />
+            <StepButton small label={`${what} ${name} mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => change(step)} />
             <Pressable accessibilityRole="button" accessibilityLabel="Dosengröße entfernen" hitSlop={8} onPress={() => setRemoved([...removed, r.key])} style={({ pressed }) => [styles.remove, { opacity: pressed ? 0.6 : 1 }]}>
               <Text style={[styles.removeText, { color: theme.muted }]}>×</Text>
             </Pressable>
@@ -232,8 +226,7 @@ const styles = StyleSheet.create({
   labelText: { fontSize: 14, fontWeight: "600" },
   remove: { width: 24, alignItems: "center", justifyContent: "center" },
   removeText: { fontSize: 20, fontWeight: "700" },
-  gramInput: { width: 64, borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6, fontSize: 15, fontWeight: "600" },
-  rowValue: { minWidth: 76, textAlign: "center", fontSize: 16, fontWeight: "700" },
-  countInput: { width: 76, borderRadius: 8, borderWidth: 1, paddingVertical: 6 },
+  gramValue: { textAlign: "right" },
+  rowValue: { minWidth: 72, textAlign: "center", fontSize: 16, fontWeight: "700" },
   message: { fontSize: 15, fontWeight: "600" },
 });
