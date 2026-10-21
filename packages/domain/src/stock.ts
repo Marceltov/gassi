@@ -12,8 +12,9 @@ import type { Entry } from "./entry";
 import type { FoodKind } from "./entryTypes";
 
 export type KindStock = { grams: number | null; daysLeft: number | null; belowZero: boolean };
-/** One can size: grams left (never below 0), cans (rounded down to ¼), and whether it counts below 0. */
-export type CanStock = { unitG: number; grams: number; cans: number; belowZero: boolean };
+/** One can size: grams left (never below 0), cans (rounded down to ¼), whether it counts below 0, and when it was
+ * last bought or counted with cans (null when neither). */
+export type CanStock = { unitG: number; grams: number; cans: number; belowZero: boolean; lastAt: string | null };
 /** `sizes`: every can size bought or counted, smallest first; `newestUnitG`: the size bought last. */
 export type WetStock = KindStock & { sizes: CanStock[]; newestUnitG: number | null };
 export type Stock = { wet: WetStock; dry: KindStock };
@@ -82,7 +83,8 @@ function wetStock(entries: readonly Entry[], now: number): WetStock {
     const counts = (e: Entry) => mine(e) && (checkAt ? e.at > checkAt : e.at >= from);
     const grams = sum(check.filter(mine)) + sum(restocks.filter(counts)) - feedings.filter(counts).reduce((g, e) => g + canGrams(e.amountG ?? 0, unitG), 0);
     const left = Math.max(0, grams);
-    return { unitG, grams: left, cans: cansOf(left, unitG), belowZero: grams < 0 };
+    const lastAt = [...restocks, ...check.filter((c) => (c.amountG ?? 0) > 0)].filter(mine).reduce<string | null>((t, e) => (t === null || e.at > t ? e.at : t), null);
+    return { unitG, grams: left, cans: cansOf(left, unitG), belowZero: grams < 0, lastAt };
   });
   const left = sum(sizes);
   const countStart = checkAt ?? restocks[0]?.at ?? sorted[0]?.at ?? new Date(now).toISOString();

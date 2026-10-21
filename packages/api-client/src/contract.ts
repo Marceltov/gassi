@@ -136,7 +136,7 @@ const exerciseSchema = z.object({ id: z.number(), name: z.string() });
 const treatKindSchema = z.object({ id: z.number(), name: z.string(), gramsPerPiece: z.number(), fromDry: z.boolean() });
 const treatKindInput = z.object({ name: z.string(), gramsPerPiece: z.number(), fromDry: z.boolean() });
 const kindStock = { grams: z.number().nullable(), daysLeft: z.number().nullable(), belowZero: z.boolean() };
-const canStock = z.object({ unitG: z.number(), grams: z.number(), cans: z.number(), belowZero: z.boolean() });
+const canStock = z.object({ unitG: z.number(), grams: z.number(), cans: z.number(), belowZero: z.boolean(), lastAt: z.string().nullable() });
 const stockSchema = z.object({ wet: z.object({ ...kindStock, sizes: z.array(canStock), newestUnitG: z.number().nullable() }), dry: z.object(kindStock) });
 const weekSchema = z.object({
   monday: z.string(),

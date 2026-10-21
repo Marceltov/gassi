@@ -1,8 +1,8 @@
 import { expect, test } from "vitest";
-import { canChoices, clampPortion, countLine, formSizes, mergeSizes, removeSize, countTitle, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
+import { buyingSizes, canChoices, clampPortion, countLine, formSizes, mergeSizes, stillHidden, countTitle, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
 import type { CanStock, Stock, WetStock } from "./stock";
 
-const can = (unitG: number, cans: number): CanStock => ({ unitG, grams: cans * unitG, cans, belowZero: false });
+const can = (unitG: number, cans: number): CanStock => ({ unitG, grams: cans * unitG, cans, belowZero: false, lastAt: null });
 const wetStock = (sizes: CanStock[], more: Partial<WetStock> = {}): WetStock => ({ grams: sizes.reduce((s, c) => s + c.grams, 0), daysLeft: null, belowZero: false, sizes, newestUnitG: sizes.at(-1)?.unitG ?? null, ...more });
 const UNKNOWN_WET: WetStock = { grams: null, daysLeft: null, belowZero: false, sizes: [], newestUnitG: null };
 
@@ -107,12 +107,15 @@ test("the stock screen's rows by their (maybe edited) sizes: counting, a known s
   expect(formSizes([400], [{ size: "10001", cans: "1" }, { size: "0", cans: "1" }], false).unsized).toBe(2);
 });
 
-test("removing a can size is a count of the stock as it is, with that size at 0, and asks first while it has cans", () => {
-  const stock: Stock = { wet: wetStock([{ unitG: 400, grams: 1100, cans: 2.75, belowZero: false }, can(800, 0), can(395, 1.5)]), dry: { grams: null, daysLeft: null, belowZero: false } };
-  // the other sizes keep their exact grams, not the rounded cans
-  expect(removeSize(stock, 395)).toEqual({ sizes: [{ unitG: 400, cans: 2.75 }, { unitG: 800, cans: 0 }, { unitG: 395, cans: 0 }], ask: "395 g entfernen? 1½ Dosen werden ausgebucht." });
-  expect(removeSize(stock, 800).ask).toBeNull();
-  expect(removeSize({ ...stock, wet: wetStock([can(400, 1)]) }, 400).ask).toBe("400 g entfernen? 1 Dose wird ausgebucht.");
-  // less than ¼ can left is still something to book out
-  expect(removeSize({ ...stock, wet: wetStock([{ unitG: 400, grams: 60, cans: 0, belowZero: false }]) }, 400).ask).toBe("400 g entfernen? Ein Rest wird ausgebucht.");
+test("a size hidden from the purchase rows stays hidden until it is bought or counted with cans again", () => {
+  const at = "2026-10-20T10:00:00.000Z";
+  const sized = (lastAt: string | null) => ({ ...can(800, 2), lastAt });
+  const stock: Stock = { wet: wetStock([can(400, 1), sized("2026-10-19T08:00:00.000Z")]), dry: { grams: null, daysLeft: null, belowZero: false } };
+  const hidden = [{ unitG: 800, at }];
+  expect(buyingSizes(stock, hidden)).toEqual([400]); // the stock keeps its cans; only the row goes
+  expect(stock.wet.sizes.find((x) => x.unitG === 800)?.cans).toBe(2);
+  const later: Stock = { ...stock, wet: wetStock([can(400, 1), sized("2026-10-20T11:00:00.000Z")]) };
+  expect(buyingSizes(later, hidden)).toEqual([400, 800]);
+  expect(stillHidden(later, hidden)).toEqual([]);
+  expect(buyingSizes({ ...stock, wet: wetStock([can(400, 1), sized(null)]) }, hidden)).toEqual([400]);
 });

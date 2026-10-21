@@ -136,53 +136,58 @@ test("Vorrat: a new row typed with a known size adds only what is typed to it, a
   expect(entries.find((e) => e.unitG === 400)?.amountG).toBe(Math.round((was + 0.5) * 400));
 });
 
-test("Vorrat: × removes a size at once, in either mode; with cans left it asks first", async ({ page }) => {
-  const token = await signIn(page);
-  const client = createClient({ baseUrl: BASE_URL, token });
-  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9999, cans: 1 }, { unitG: 3000, cans: 1 }] })).entries.map((e) => e.id)); // mistakes
-  made.push((await asHirsch().logEntry({ type: "food", foodKind: "wet", amountG: 3000, unitG: 3000 })).id); // 3000 g eaten down to 0
+test("Vorrat: × while buying only hides the size from the purchase rows; the stock keeps it, and buying it again brings it back", async ({ page }) => {
+  await signIn(page);
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9999, cans: 1 }] })).entries.map((e) => e.id));
   await page.goto("/mehr/vorrat");
   await page.getByRole("tab", { name: "Nass" }).click();
   await page.getByRole("tab", { name: "Eingekauft" }).click();
   await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
-  await page.getByTestId("count-new").getByRole("button", { name: "Dosengröße entfernen" }).click(); // an unsaved row: just gone
+  await page.getByTestId("count-new").getByRole("button", { name: "Dosengröße entfernen" }).click(); // an added row: just gone
   await expect(page.getByTestId("count-new")).toHaveCount(0);
-  await page.getByRole("button", { name: "1 Dose à 9999 g mehr" }).click(); // an unsaved edit in that row
-
-  const asked = page.getByTestId("remove-size");
-  // with none left: removed without asking (first: any count retires the sizes it has at 0, see Ruling V)
-  const again = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
-  await page.getByTestId("count-3000").getByRole("button", { name: "Dosengröße entfernen" }).click();
-  made.push(...((await (await again).json()) as { entries: { id: number }[] }).entries.map((e) => e.id));
-  await expect(asked).toHaveCount(0);
-  await expect(page.getByTestId("count-3000")).toHaveCount(0);
-
-  // with cans left: asks, then removes; the unsaved edit in that row stayed until then
-  await expect(page.getByTestId("count-9999-value")).toHaveText("1 Dose");
-  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
-  const remove9999 = page.getByTestId("count-9999").getByRole("button", { name: "Dosengröße entfernen" });
-  await remove9999.click();
-  await expect(page.getByRole("dialog", { name: "Dosengröße entfernen" })).toContainText("9999 g entfernen? 1 Dose wird ausgebucht.");
-  await expect(asked.getByRole("button", { name: "Entfernen" })).toBeFocused(); // the sheet takes the focus
-  await asked.getByRole("button", { name: "Abbrechen" }).click();
-  await expect(asked).toHaveCount(0);
-  await expect(remove9999).toBeFocused(); // and gives it back
-  await remove9999.click();
-  await asked.getByRole("button", { name: "Entfernen" }).click();
-  made.push(...((await (await counted).json()) as { entries: { id: number }[] }).entries.map((e) => e.id));
-  await expect(page.getByTestId("stock-message")).toHaveText("9999 g entfernt.");
+  await page.getByTestId("count-9999").getByRole("button", { name: "Dosengröße entfernen" }).click();
   await expect(page.getByTestId("count-9999")).toHaveCount(0);
-  expect((await client.stock()).wet.sizes.some((x) => x.unitG === 9999)).toBe(false);
+  await expect(page.getByTestId("stock-wet")).toContainText("1 × 9999 g"); // the stock didn't change
 
-  // gone in both modes and on the card, also after a reload
+  await page.reload(); // remembered on this phone
+  await page.getByRole("tab", { name: "Nass" }).click();
+  await expect(page.getByTestId("stock-wet")).toContainText("1 × 9999 g");
+  await page.getByRole("tab", { name: "Eingekauft" }).click();
+  await expect(page.getByTestId("count-9999")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Nachgezählt" }).click();
+  await expect(page.getByTestId("count-9999")).toBeVisible(); // counting still lists it
+
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9999, cans: 1 }] })).entries.map((e) => e.id)); // bought again
+  await page.reload();
+  await page.getByRole("tab", { name: "Nass" }).click();
+  await page.getByRole("tab", { name: "Eingekauft" }).click();
+  await expect(page.getByTestId("count-9999")).toBeVisible();
+});
+
+test("Vorrat: × while counting sets the size to 0; Eintragen retires it", async ({ page }) => {
+  const token = await signIn(page);
+  const client = createClient({ baseUrl: BASE_URL, token });
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9998, cans: 1 }] })).entries.map((e) => e.id));
+  await page.goto("/mehr/vorrat");
+  await page.getByRole("tab", { name: "Nass" }).click();
+  await page.getByRole("tab", { name: "Nachgezählt" }).click();
+  await page.getByTestId("count-9998").getByRole("button", { name: "Dosengröße entfernen" }).click();
+  await expect(page.getByTestId("count-9998")).toHaveCount(0);
+  await expect(page.getByTestId("stock-wet")).toContainText("1 × 9998 g"); // not before Eintragen
+  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Eintragen" }).click();
+  const { entries } = (await (await counted).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
+  made.push(...entries.map((e) => e.id));
+  expect(entries.find((e) => e.unitG === 9998)?.amountG).toBe(0);
+  expect((await client.stock()).wet.sizes.some((x) => x.unitG === 9998)).toBe(false);
+
   await page.reload();
   await page.getByRole("tab", { name: "Nass" }).click();
   await expect(page.getByTestId("stock-wet")).not.toContainText("…"); // the stock is in
-  await expect(page.getByTestId("stock-wet")).not.toContainText("9999");
+  await expect(page.getByTestId("stock-wet")).not.toContainText("9998");
   for (const mode of ["Eingekauft", "Nachgezählt"]) {
     await page.getByRole("tab", { name: mode }).click();
-    await expect(page.getByTestId("count-9999")).toHaveCount(0);
-    await expect(page.getByTestId("count-3000")).toHaveCount(0);
+    await expect(page.getByTestId("count-9998")).toHaveCount(0);
   }
 });
 

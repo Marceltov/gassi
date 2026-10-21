@@ -2,24 +2,25 @@
 // (from the server, worked out by the domain) on top; at the bottom what was bought (Eingekauft) or what is there when
 // counted by hand (Nachgezählt), the same way in both: wet food one row per can size with − and + (bought: whole cans
 // from 0; counted: from what the stock says, in halves for an opened can), a row of another
-// size added with "+ Dosengröße" ("Dosen à [ ] g"; one without grams isn't recorded), × on a known size removes it at
-// once (a count with it at 0, asking first while it has cans), on an added row just drops it; dry food one amount in
-// g or kg. One Eintragen records it all.
+// size added with "+ Dosengröße" ("Dosen à [ ] g"; one without grams isn't recorded). × buying hides that size from
+// the purchase rows on this phone (the stock stays); counting it sets the size to 0, which retires it on Eintragen; on
+// an added row it just drops it. Dry food is one amount in g or kg. One Eintragen records it all.
 import type { DryUnit, FoodKind } from "@gassi/domain";
-import { formatCans, formSizes, parseCanSize, parseDecimal, removeSize, stockParts } from "@gassi/domain";
+import { buyingSizes, formatCans, formSizes, type HiddenSize, parseCanSize, parseDecimal, stockParts } from "@gassi/domain";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
-import { Sheet } from "../ui/Sheet";
 import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
 import { Segments } from "../ui/Segments";
 import { StepButton } from "../ui/Stepper";
 import { TapToEdit } from "../ui/TapToEdit";
+import { useGassi } from "../data/GassiProvider";
 import { useBack } from "./back";
 import { useServer } from "./useServer";
+import { loadHidden, saveHidden } from "./hidden";
 import { useWrite } from "./useWrite";
 
 type Mode = "restock" | "count";
@@ -42,6 +43,7 @@ export function Stock() {
   const back = useBack();
   const { data: stock, error, reload } = useServer((a) => a.stock());
   const { message, setMessage, run } = useWrite();
+  const { me } = useGassi();
   const [kind, setKind] = useState<FoodKind>("wet");
   const [mode, setMode] = useState<Mode>("restock");
   const [amount, setAmount] = useState("");
@@ -53,27 +55,21 @@ export function Stock() {
   const known = stock?.wet.sizes.map((s) => s.unitG) ?? [];
   const [extras, setExtras] = useState(0); // how many rows were added
   const [edits, setEdits] = useState<Record<string, { size?: string; cans?: string }>>({});
-  const [removed, setRemoved] = useState<string[]>([]); // added rows taken away with × (never saved)
-  const [gone, setGone] = useState<{ unitG: number; of: typeof stock }[]>([]); // sizes removed with ×, for the stock read then
-  const [asking, setAsking] = useState<{ unitG: number; text: string } | null>(null); // × on a size that has cans
-
-  // × on a known size removes it at once (Ruling Y): a count of the stock as it is with that size at 0; it needs the
-  // server. Unsaved edits in the other rows stay.
-  const removeKnown = (unitG: number, sure = false) => {
-    if (!stock) return;
-    const { sizes: count, ask } = removeSize(stock, unitG);
-    if (ask && !sure) return setAsking({ unitG, text: ask });
-    setAsking(null);
-    void run(async (api) => {
-      await api.correctStock({ foodKind: "wet", sizes: count });
-      // gone at once, until the stock is read anew (it agrees; bought again later, the size shows again)
-      setGone((g) => [...g, { unitG, of: stock }]);
-      reload();
-    }, `${unitG} g entfernt.`);
+  const [removed, setRemoved] = useState<string[]>([]); // rows taken away with × in this form
+  // Eingekauft: sizes hidden from the purchase rows on this phone (Ruling Z); the stock doesn't change. Counting, × sets
+  // the size to 0 for this count (it is in no row), and Eintragen retires it.
+  const personId = me?.id ?? "";
+  const [hidden, setHidden] = useState<HiddenSize[]>(() => loadHidden(personId));
+  const offered = mode === "restock" && stock ? buyingSizes(stock, hidden) : known;
+  const removeRow = (key: string) => {
+    if (mode === "restock" && key.startsWith("k")) {
+      const next = [...hidden.filter((h) => `k${h.unitG}` !== key), { unitG: Number(key.slice(1)), at: new Date().toISOString() }];
+      setHidden(next);
+      saveHidden(personId, next);
+    } else setRemoved([...removed, key]);
   };
-  const removeRow = (key: string) => (key.startsWith("k") ? removeKnown(Number(key.slice(1))) : setRemoved([...removed, key]));
   const rows = [
-    ...known.filter((u) => !gone.some((g) => g.unitG === u && g.of === stock)).map((u) => ({ key: `k${u}`, size: String(u), cans: decimalText(mode === "count" ? (stock?.wet.sizes.find((s) => s.unitG === u)?.cans ?? 0) : 0) })),
+    ...offered.map((u) => ({ key: `k${u}`, size: String(u), cans: decimalText(mode === "count" ? (stock?.wet.sizes.find((s) => s.unitG === u)?.cans ?? 0) : 0) })),
     ...Array.from({ length: extras }, (_, i) => ({ key: `x${i}`, size: "", cans: "0" })),
   ]
     .filter((r) => !removed.includes(r.key))
@@ -225,15 +221,6 @@ export function Stock() {
           )}
           <BigButton kind="food" size="l" label="Eintragen" disabled={!ready} onPress={save} />
           <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />
-          <Sheet open={asking !== null} onClose={() => setAsking(null)} label="Dosengröße entfernen">
-            {asking ? (
-              <View testID="remove-size" style={styles.sheet}>
-                <Text style={[styles.sheetText, { color: theme.ink }]}>{asking.text}</Text>
-                <BigButton kind="neutral" size="l" label="Entfernen" onPress={() => removeKnown(asking.unitG, true)} />
-                <BigButton kind="neutral" size="m" label="Abbrechen" onPress={() => setAsking(null)} />
-              </View>
-            ) : null}
-          </Sheet>
         </>
       }
       topMin={150}
@@ -257,7 +244,5 @@ const styles = StyleSheet.create({
   removeText: { fontSize: 20, fontWeight: "700" },
   gramValue: { textAlign: "right" },
   rowValue: { minWidth: 72, textAlign: "center", fontSize: 16, fontWeight: "700" },
-  sheet: { gap: 10 },
-  sheetText: { fontSize: 16, fontWeight: "600" },
   message: { fontSize: 15, fontWeight: "600" },
 });
