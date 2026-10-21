@@ -15,6 +15,15 @@ test("/ and a deep link like /verlauf open the web app", async ({ page }) => {
   }
 });
 
+test("a missing build file is a 404, not the app's HTML (a stale tab asking for an old chunk)", async ({ request }) => {
+  for (const path of ["/_next/static/nope.js", "/_expo/static/js/web/nope.js", "/assets/nope.png", "/nope.js", "/verlauf/nope.css"]) {
+    expect((await request.get(path)).status(), path).toBe(404);
+  }
+  const app = await request.get("/verlauf");
+  expect(app.status()).toBe(200);
+  expect(await app.text()).toContain("<title>Gassi</title>");
+});
+
 test("the app's fallback doesn't swallow the API, /health or the link pages", async ({ page, request }) => {
   const me = await request.get("/api/me");
   expect(me.status()).toBe(401);

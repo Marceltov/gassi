@@ -32,7 +32,7 @@ const schema = z
     TZ: optional(z.string().refine(validTimeZone, "is not a time zone")).default("Europe/Berlin"),
     LOG_LEVEL: optional(z.enum(LOG_LEVELS)).default("info"),
     SETUP_LINK_FILE: optional(z.string()),
-    CORS_ORIGIN: optional(z.url({ protocol: /^https?$/ })).transform((u) => u?.replace(/\/+$/, "")),
+    CORS_ORIGIN: optional(z.url({ protocol: /^https?$/ })).transform((u) => u && new URL(u).origin),
   })
   .refine((c) => new Set([!!c.OIDC_ISSUER, !!c.OIDC_CLIENT_ID, !!c.OIDC_CLIENT_SECRET]).size === 1, { path: ["OIDC_ISSUER"], message: "OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET go together" });
 

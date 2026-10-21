@@ -1,5 +1,4 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
-import "react-native-reanimated";
 import { useColorScheme } from "@/components/useColorScheme";
 
 export {

@@ -14,8 +14,9 @@ const nextConfig: NextConfig = {
   },
   // The Expo web app (apps/mobile, copied into public/ by scripts/web.mjs) is a single page: every path nothing else
   // answers gets its index.html. The fallback phase comes after public files, app routes and dynamic routes, so /api,
-  // /l/<token>, /health and the OIDC routes win.
-  rewrites: async () => ({ beforeFiles: [], afterFiles: [], fallback: [{ source: "/:path*", destination: "/index.html" }] }),
+  // /l/<token>, /health and the OIDC routes win. A missing build file (under _next/, _expo/ or assets/, or with a dot
+  // in its last segment, e.g. an old hashed chunk a stale tab asks for) stays a 404 rather than HTML.
+  rewrites: async () => ({ beforeFiles: [], afterFiles: [], fallback: [{ source: "/:path((?!_next/|_expo/|assets/)(?!.*\\.[^/]*$).*)", destination: "/index.html" }] }),
 };
 
 export default nextConfig;

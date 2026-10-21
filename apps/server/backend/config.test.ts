@@ -33,8 +33,9 @@ describe("parseConfig", () => {
     expect(parseConfig({ ...ENV, SMTP_URL: "smtps://mail.example", MAIL_FROM: "Gassi <hund@example.org>" }).smtp).toEqual({ url: "smtps://mail.example", from: "Gassi <hund@example.org>" });
   });
 
-  test("CORS_ORIGIN is an http(s) origin, without a trailing slash", () => {
+  test("CORS_ORIGIN is an http(s) origin: scheme, host and port, nothing after", () => {
     expect(parseConfig({ ...ENV, CORS_ORIGIN: "http://localhost:8081/" }).corsOrigin).toBe("http://localhost:8081");
+    expect(parseConfig({ ...ENV, CORS_ORIGIN: "HTTP://LocalHost:8081/app/?x=1#y" }).corsOrigin).toBe("http://localhost:8081");
     expect(parseConfig({ ...ENV, CORS_ORIGIN: "" }).corsOrigin).toBeNull();
     expect(() => parseConfig({ ...ENV, CORS_ORIGIN: "localhost:8081" })).toThrow("CORS_ORIGIN");
   });
