@@ -5,7 +5,7 @@ import { radius, useTheme } from "../theme";
 export function Tile({ label, value, by }: { label: string; value: string; by?: string }) {
   const theme = useTheme();
   return (
-    <View style={[styles.tile, { backgroundColor: theme.surface }]}>
+    <View testID={`tile-${label}`} style={[styles.tile, { backgroundColor: theme.surface }]}>
       <Text style={[styles.small, { color: theme.muted }]}>{label}</Text>
       <Text style={[styles.value, { color: theme.ink }]}>{value}</Text>
       {by ? <Text style={[styles.small, { color: theme.muted }]}>{by}</Text> : null}

@@ -1,7 +1,7 @@
 // Start: the day at a glance on top, three big buttons at the bottom. A running walk or training is led back into.
 import { formatAgo, newId } from "@gassi/domain";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { useTheme } from "../theme";
@@ -25,19 +25,32 @@ export function Start() {
   const theme = useTheme();
   const { view, send } = useGassi();
   const today = useToday();
-  const now = useNow(1000, !!view.walk);
-  const minute = useNow(30_000, !view.walk);
-  const clock = view.walk ? now : minute;
+  const now = useNow(view.walk ? 1000 : 30_000);
   // The food sheet opens here; Task 6 fills it with the portion, kind and dogs.
   const [foodOpen, setFoodOpen] = useState(false);
 
+  // A second tap before the screen has caught up must not start a second walk or training.
+  const leaving = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      leaving.current = false;
+    }, []),
+  );
+
+  const open = (path: "/runde" | "/training") => {
+    if (leaving.current) return;
+    leaving.current = true;
+    router.push(path);
+  };
   const startWalk = () => {
+    if (leaving.current) return;
     send({ id: newId(), at: new Date().toISOString(), kind: "walk.start", walkKey: newId() });
-    router.push("/runde");
+    open("/runde");
   };
   const startTraining = () => {
+    if (leaving.current) return;
     send({ id: newId(), at: new Date().toISOString(), kind: "training.start", trainingKey: newId(), walkKey: view.walk?.key });
-    router.push("/training");
+    open("/training");
   };
 
   return (
@@ -45,25 +58,25 @@ export function Start() {
       top={
         <>
           <View style={styles.row}>
-            {tile("Draußen", today?.walk ?? null, clock)}
-            {tile("Gefressen", today?.food ?? null, clock)}
+            {tile("Draußen", today?.walk ?? null, now)}
+            {tile("Gefressen", today?.food ?? null, now)}
           </View>
           <View style={styles.row}>
-            {tile("Pipi", today?.pee ?? null, clock)}
-            {tile("Poopoo", today?.poop ?? null, clock)}
+            {tile("Pipi", today?.pee ?? null, now)}
+            {tile("Poopoo", today?.poop ?? null, now)}
           </View>
         </>
       }
       bottom={
         <>
           {view.walk ? (
-            <BigButton kind="walk" label={`Runde läuft · ${walkClock(view.walk, now)}`} onPress={() => router.push("/runde")} />
+            <BigButton kind="walk" label={`Runde läuft · ${walkClock(view.walk, now)}`} onPress={() => open("/runde")} />
           ) : (
             <BigButton kind="walk" label="🐕 Gassi gehen" onPress={startWalk} />
           )}
           <BigButton kind="food" size="l" label="🥣 Futter geben" onPress={() => setFoodOpen(true)} />
           {view.training ? (
-            <BigButton kind="training" size="l" label="Training läuft" onPress={() => router.push("/training")} />
+            <BigButton kind="training" size="l" label="Training läuft" onPress={() => open("/training")} />
           ) : (
             <BigButton kind="training" size="l" label="🎯 Training starten" onPress={startTraining} />
           )}

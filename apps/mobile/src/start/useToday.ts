@@ -11,10 +11,13 @@ export function useToday(): Today | null {
   const { api, view, unsent } = useGassi();
   const [today, setToday] = useState<Today | null>(null);
   const focused = useRef(false);
+  const latest = useRef(0);
   const load = useCallback(async () => {
     if (!api) return;
+    const mine = ++latest.current;
     try {
-      setToday(await api.today());
+      const fresh = await api.today();
+      if (mine === latest.current) setToday(fresh); // an older, slower answer never replaces a newer one
     } catch {
       // keep what we have
     }
@@ -30,7 +33,10 @@ export function useToday(): Today | null {
     }, [load]),
   );
   const changed = `${view.walk?.key}:${view.walk?.pauses.length}:${view.training?.key}:${unsent}`;
+  const seen = useRef(changed);
   useEffect(() => {
+    if (seen.current === changed) return; // the focus effect makes the first load
+    seen.current = changed;
     if (focused.current) void load();
   }, [changed, load]);
   return today;
