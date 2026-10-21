@@ -18,7 +18,6 @@ import { Segments } from "../ui/Segments";
 import { StepButton } from "../ui/Stepper";
 import { TapToEdit } from "../ui/TapToEdit";
 import { useGassi } from "../data/GassiProvider";
-import { useBack } from "./back";
 import { useServer } from "./useServer";
 import { loadHidden, saveHidden } from "./hidden";
 import { useWrite } from "./useWrite";
@@ -40,7 +39,6 @@ const decimalText = (n: number): string => n.toLocaleString("de-DE", { maximumFr
 
 export function Stock() {
   const theme = useTheme();
-  const back = useBack();
   const { data: stock, error, reload } = useServer((a) => a.stock());
   const { message, setMessage, run } = useWrite();
   const { me } = useGassi();
@@ -224,7 +222,6 @@ export function Stock() {
             </View>
           )}
           <BigButton kind="food" size="l" icon="check" label="Eintragen" disabled={!ready} onPress={save} />
-          <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />
         </>
       }
       topMin={150}

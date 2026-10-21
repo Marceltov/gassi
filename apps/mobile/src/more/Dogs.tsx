@@ -10,7 +10,6 @@ import { BigButton } from "../ui/BigButton";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
-import { useBack } from "./back";
 import { Group, Row } from "./List";
 import { useServer } from "./useServer";
 import { useWrite } from "./useWrite";
@@ -21,7 +20,6 @@ type Editing = { dog: Dog | null; name: string; color: string };
 
 export function Dogs() {
   const theme = useTheme();
-  const back = useBack();
   const { refresh } = useGassi();
   const { data, error, reload } = useServer((a) => a.dogs({ archived: "1" }));
   const { message, setMessage, run } = useWrite();
@@ -89,7 +87,6 @@ export function Dogs() {
       bottom={
         <>
           <BigButton kind="walk" size="l" icon="add" label="Hund hinzufügen" onPress={() => open(null)} />
-          <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />
         </>
       }
     />

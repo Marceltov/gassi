@@ -1,6 +1,6 @@
 // Mehr: the data first (Gewicht, Vorrat), then the settings (Hunde; Übungen und Leckerli; Haushalt; Meine Geräte) and
 // the Garmin watch, which comes later. Each row says in short what is behind it; without reception the rows that need
-// the server stay without that line.
+// the server stay without that line. Its screens have no Zurück: the tab bar stays, and the Mehr tab leads back here.
 import { formatAgo, formatKg, stockSummary } from "@gassi/domain";
 import { type Href, useRouter } from "expo-router";
 import { StyleSheet, Text } from "react-native";

@@ -84,7 +84,7 @@ export function EntryDetail({ id }: { id: number }) {
 
   if (!entry || !form) {
     const waitText = <Text style={[styles.small, { color: theme.muted }]}>{message ?? "Lädt …"}</Text>;
-    return <Screen top={waitText} bottom={<BigButton kind="neutral" size="l" label="Zurück" onPress={back} />} />;
+    return <Screen top={waitText} />;
   }
 
   const change = (c: Partial<Form>) => setForm({ ...form, ...c });
@@ -165,14 +165,7 @@ export function EntryDetail({ id }: { id: number }) {
       bottom={
         <>
           <BigButton kind={BUTTON[entry.type] ?? "neutral"} size="l" icon="check" label="Speichern" onPress={() => void save(entry, form)} />
-          <View style={styles.pair}>
-            <View style={styles.half}>
-              <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />
-            </View>
-            <View style={styles.half}>
-              <BigButton kind="neutral" size="m" label="Löschen" onPress={() => setAsking(true)} />
-            </View>
-          </View>
+          <BigButton kind="neutral" size="m" label="Löschen" onPress={() => setAsking(true)} />
         </>
       }
     />
@@ -279,6 +272,4 @@ const styles = StyleSheet.create({
   note: { borderRadius: 12, padding: 12, minHeight: 60, fontSize: 15 },
   sheet: { gap: 10 },
   sheetTitle: { fontSize: 17, fontWeight: "700" },
-  pair: { flexDirection: "row", gap: 8 },
-  half: { flex: 1 },
 });

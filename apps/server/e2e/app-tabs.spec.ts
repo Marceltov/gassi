@@ -49,13 +49,14 @@ test("the tab bar keeps its labels above the home indicator: its bottom padding 
   expect(back.y + back.height).toBeLessThanOrEqual(top);
 });
 
-test("Mehr's screens keep the tab bar with Mehr highlighted, also opened directly; Zurück and the tab lead back to Mehr", async ({ page }) => {
+test("Mehr's screens keep the tab bar with Mehr highlighted, also opened directly; the tab and the browser's back lead back to Mehr", async ({ page }) => {
   await signIn(page);
   await page.goto("/mehr/vorrat");
   await homeIndicator(page);
   await expect(page.getByRole("tab", { name: "Nass" })).toBeVisible();
   await expectTabBar(page, "Mehr");
-  await page.getByRole("button", { name: "Zurück" }).click();
+  await expect(page.getByRole("button", { name: "Zurück" })).toHaveCount(0);
+  await tab(page, "Mehr").click(); // opened directly: the tab still leads to Mehr
   await expect(page).toHaveURL(`${BASE_URL}/mehr`);
   await page.getByRole("button", { name: /^Hunde/ }).click();
   await expect(page).toHaveURL(`${BASE_URL}/mehr/hunde`);
@@ -116,15 +117,19 @@ test("an entry keeps the tab bar: opened directly on Verlauf, opened from Gewich
   await homeIndicator(page);
   await expect(page.getByRole("button", { name: "Löschen", exact: true })).toBeVisible();
   await expectTabBar(page, "Verlauf");
-  await page.getByRole("button", { name: "Zurück" }).click();
+  await tab(page, "Verlauf").click();
   await expect(page).toHaveURL(`${BASE_URL}/verlauf`); // a clean URL: the deep link's id stays with the entry
 
   await page.goto("/mehr/gewicht");
   await page.getByTestId("weight-list").getByRole("button", { name: /11,8 kg/ }).first().click();
   await expect(page).toHaveURL(`${BASE_URL}/eintrag/${weight.id}`);
   await expectTabBar(page, "Mehr");
-  await page.getByRole("button", { name: "Zurück" }).click();
+  await page.goBack(); // the browser's back goes to where it was opened; the tab to Mehr
   await expect(page).toHaveURL(`${BASE_URL}/mehr/gewicht`);
+  await page.getByTestId("weight-list").getByRole("button", { name: /11,8 kg/ }).first().click();
+  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${weight.id}`);
+  await tab(page, "Mehr").click();
+  await expect(page).toHaveURL(`${BASE_URL}/mehr`);
 });
 
 test("the food sheet sits above the tab bar, which stays tappable; another tab closes the sheet", async ({ page }) => {
