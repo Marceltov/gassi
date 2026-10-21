@@ -2,7 +2,7 @@
 // Geräte (sign out), the Garmin placeholder. And the installable web app: its manifest, the Apple tags, and the app
 // shell that opens without reception after the first visit. The server is shared: each test removes what it made.
 import { createClient } from "@gassi/api-client";
-import { formatCans } from "@gassi/domain";
+import { formatCanCount } from "@gassi/domain";
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
 import { asHirsch } from "./sessions";
@@ -45,23 +45,54 @@ test("Gewicht: 12,4 kg logged shows in the list, on the curve and on Mehr", asyn
   await expect(page.getByTestId("more-Gewicht")).toContainText("12,4 kg · gerade eben");
 });
 
-test("Vorrat: 6 cans bought add to what is left", async ({ page }) => {
+test("Vorrat: 6 cans of a known size bought add to that size; the total follows", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });
-  const unitG = (await client.stock()).wet.canSizeG ?? 400;
+  made.push((await asHirsch().restock({ foodKind: "wet", cans: 1, unitG: 800 })).id); // 800 g is a known size
   await page.goto("/mehr/vorrat");
   await page.getByRole("tab", { name: "Nass" }).click();
   await page.getByRole("tab", { name: "Eingekauft" }).click();
-  await page.getByLabel("Dosen").fill("6");
-  await page.getByLabel("Gramm pro Dose").fill(String(unitG));
+  await page.getByRole("button", { name: "Dosen à 800 g" }).click();
+  await page.getByLabel("Dosen", { exact: true }).fill("6");
   const bought = page.waitForResponse((r) => r.url().endsWith("/api/stock/restock") && r.request().method() === "POST");
   await page.getByRole("button", { name: "Eintragen" }).click();
   const { id } = (await (await bought).json()) as { id: number };
   made.push(id);
-  expect((await client.entry({ id })).amountG).toBe(6 * unitG);
-  const after = await client.stock();
-  await expect(page.getByTestId("stock-wet")).toContainText(formatCans(after.wet.cans!));
+  expect(await client.entry({ id })).toMatchObject({ amountG: 6 * 800, unitG: 800 });
+  const after = (await client.stock()).wet;
+  const size = after.sizes.find((s) => s.unitG === 800)!;
+  await expect(page.getByTestId("stock-wet")).toContainText(formatCanCount(size));
+  await expect(page.getByTestId("stock-wet")).toContainText("zusammen ");
   await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
+  // the message is about that purchase: it goes when the form turns to something else
+  await page.getByRole("tab", { name: "Nachgezählt" }).click();
+  await expect(page.getByTestId("stock-message")).toBeHidden();
+});
+
+test("Vorrat: a wet count sets every can size at once, a new size typed in without any purchase of it", async ({ page }) => {
+  const token = await signIn(page);
+  const client = createClient({ baseUrl: BASE_URL, token });
+  const before = (await client.stock()).wet.sizes;
+  await page.goto("/mehr/vorrat");
+  await page.getByRole("tab", { name: "Nass" }).click();
+  await page.getByRole("tab", { name: "Nachgezählt" }).click();
+  for (const s of before) await expect(page.getByTestId(`count-${s.unitG}-value`)).toBeVisible(); // one row per known size
+  await page.getByRole("button", { name: "andere Größe" }).click();
+  await page.getByLabel("Gramm pro Dose").fill("1234");
+  await page.getByRole("button", { name: "½ Dose à 1234 g mehr" }).click();
+  await page.getByRole("button", { name: "½ Dose à 1234 g mehr" }).click();
+  await page.getByRole("button", { name: "½ Dose à 1234 g mehr" }).click();
+  await expect(page.getByTestId("count-1234-value")).toHaveText("1½ Dosen");
+  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Eintragen" }).click();
+  const { entries } = (await (await counted).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
+  made.push(...entries.map((e) => e.id));
+  expect(entries.find((e) => e.unitG === 1234)?.amountG).toBe(1851);
+  expect(entries.map((e) => e.unitG).sort()).toEqual([...before.map((s) => s.unitG), 1234].sort());
+  await expect(page.getByTestId("stock-wet")).toContainText("1½ × 1234 g");
+  await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
+  await page.getByRole("tab", { name: "Trocken" }).click();
+  await expect(page.getByTestId("stock-message")).toBeHidden();
 });
 
 test("Haushalt: an invite shows its link, its code and when it ends; Zurückziehen takes it back", async ({ page }) => {

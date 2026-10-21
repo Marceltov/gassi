@@ -17,9 +17,12 @@ export function messageFor(messages: FieldMessages, error: z.ZodError): string {
 const decimal = (v: unknown) => (typeof v === "string" ? (v.trim() ? Number(v.trim().replace(",", ".")) : NaN) : v);
 const instant = z.iso.datetime({ offset: true }).transform((v) => new Date(v).toISOString());
 
+/** Grams per can: a whole number from 1 to 10000. */
+const canSize = z.coerce.number().int().min(1).max(10_000);
+
 /** Bought food: wet as cans × grams per can, dry in grams. */
 export const restockInput = z.discriminatedUnion("foodKind", [
-  z.object({ foodKind: z.literal("wet"), cans: z.coerce.number().int().min(1).max(1000), unitG: z.coerce.number().int().min(1).max(10_000) }),
+  z.object({ foodKind: z.literal("wet"), cans: z.coerce.number().int().min(1).max(1000), unitG: canSize }),
   z.object({ foodKind: z.literal("dry"), grams: z.coerce.number().int().min(1).max(1_000_000) }),
 ]);
 export const RESTOCK_MESSAGES: FieldMessages = {
@@ -29,14 +32,18 @@ export const RESTOCK_MESSAGES: FieldMessages = {
   grams: "Wie viel Gramm hast du gekauft?",
 };
 
-/** What is there now, counted by hand: wet in cans (of the last can size bought; "2,5" or 2.5), dry in grams. */
+/** What is there now, counted by hand: wet in cans per can size ("2,5" or 2.5 for an opened can; every size at once,
+ * a size left out is 0), dry in grams. */
 export const stockCountInput = z.discriminatedUnion("foodKind", [
-  z.object({ foodKind: z.literal("wet"), cans: z.preprocess(decimal, z.number().min(0).max(1000)) }),
+  z
+    .object({ foodKind: z.literal("wet"), sizes: z.array(z.object({ unitG: canSize, cans: z.preprocess(decimal, z.number().min(0).max(1000)) })).min(1).max(20) })
+    .refine((r) => new Set(r.sizes.map((s) => s.unitG)).size === r.sizes.length, { path: ["unitG"], message: "twice" }),
   z.object({ foodKind: z.literal("dry"), grams: z.coerce.number().int().min(0).max(1_000_000) }),
 ]);
 export const STOCK_COUNT_MESSAGES: FieldMessages = {
   foodKind: "Diese Futterart gibt es nicht.",
-  cans: "Wie viele Dosen sind noch da?",
+  sizes: "Wie viele Dosen jeder Größe sind noch da?",
+  unitG: "Jede Dosengröße nur einmal.",
   grams: "Wie viel Gramm sind noch da?",
 };
 

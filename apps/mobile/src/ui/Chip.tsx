@@ -11,6 +11,7 @@ export function Chip({ label, onPress, on = true, color, a11y }: Props) {
       accessibilityRole="button"
       accessibilityLabel={a11y ?? label}
       accessibilityState={{ selected: on }}
+      aria-pressed={on}
       onPress={onPress}
       style={({ pressed }) => [styles.chip, { backgroundColor: on ? theme.surface : "transparent", borderColor: on ? theme.surface : theme.line, opacity: pressed ? 0.7 : 1 }]}
     >

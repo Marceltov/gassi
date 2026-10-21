@@ -1,6 +1,10 @@
 import { expect, test } from "vitest";
-import { clampPortion, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
-import type { Stock } from "./stock";
+import { canChoices, clampPortion, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
+import type { CanStock, Stock, WetStock } from "./stock";
+
+const can = (unitG: number, cans: number): CanStock => ({ unitG, grams: cans * unitG, cans, belowZero: false });
+const wetStock = (sizes: CanStock[], more: Partial<WetStock> = {}): WetStock => ({ grams: sizes.reduce((s, c) => s + c.grams, 0), daysLeft: null, belowZero: false, sizes, newestUnitG: sizes.at(-1)?.unitG ?? null, ...more });
+const UNKNOWN_WET: WetStock = { grams: null, daysLeft: null, belowZero: false, sizes: [], newestUnitG: null };
 
 const wet = (amountG: number) => ({ foodKind: "wet" as const, amountG });
 const dry = (amountG: number) => ({ foodKind: "dry" as const, amountG });
@@ -24,24 +28,44 @@ test("quick amounts: recent portions of the kind without repeats, and half and w
   expect(quickPortions([wet(200)], "wet", 400).map((q) => q.label)).toEqual(["½ Dose", "1 Dose"]); // the same amount only once
 });
 
-test("the stock line says what is left and for how long", () => {
-  const stock: Stock = { wet: { grams: 3600, cans: 9, canSizeG: 400, daysLeft: 12.4, belowZero: false }, dry: { grams: 1200, daysLeft: 1, belowZero: false } };
-  expect(stockLine(stock, "wet")).toBe("Vorrat: noch 9 Dosen · reicht etwa 12 Tage");
+test("a can size's count: whole and half cans × grams", () => {
+  expect(formatCanCount(can(400, 3))).toBe("3 × 400 g");
+  expect(formatCanCount(can(800, 2.5))).toBe("2½ × 800 g");
+  expect(formatCanCount(can(400, 0.5))).toBe("½ × 400 g");
+});
+
+test("the stock line says what is left per can size and for how long", () => {
+  const stock: Stock = { wet: wetStock([can(400, 3), can(800, 2)], { daysLeft: 9.2 }), dry: { grams: 1200, daysLeft: 1, belowZero: false } };
+  expect(stockLine(stock, "wet")).toBe("Vorrat: noch 3 × 400 g · 2 × 800 g · reicht etwa 9 Tage");
   expect(stockLine(stock, "dry")).toBe("Vorrat: noch 1,2 kg · reicht etwa 1 Tag");
   expect(stockLine({ ...stock, dry: { grams: null, daysLeft: null, belowZero: false } }, "dry")).toBeNull();
   expect(stockLine({ ...stock, dry: { grams: 0, daysLeft: 0, belowZero: true } }, "dry")).toBe("Vorrat aufgebraucht");
   expect(stockLine({ ...stock, dry: { grams: 300, daysLeft: 0.4, belowZero: false } }, "dry")).toBe("Vorrat: noch 300 g · reicht weniger als einen Tag");
   expect(stockLine({ ...stock, dry: { grams: 0, daysLeft: 0, belowZero: false } }, "dry")).toBe("Vorrat aufgebraucht");
-  expect(stockLine({ ...stock, wet: { grams: 0, cans: 0, canSizeG: 400, daysLeft: 0, belowZero: false } }, "wet")).toBe("Vorrat aufgebraucht");
+  expect(stockLine({ ...stock, wet: wetStock([can(400, 0), can(800, 0)]) }, "wet")).toBe("Vorrat aufgebraucht");
 });
 
-test("the stock in parts, for the stock screen: what is left, for how long, and whether it ran out", () => {
-  const stock: Stock = { wet: { grams: 3600, cans: 9, canSizeG: 400, daysLeft: 12.4, belowZero: false }, dry: { grams: 300, daysLeft: 0.4, belowZero: false } };
-  expect(stockParts(stock, "wet")).toEqual({ left: "9 Dosen", lasts: "reicht etwa 12 Tage", empty: false });
-  expect(stockParts(stock, "dry")).toEqual({ left: "300 g", lasts: "reicht weniger als einen Tag", empty: false });
-  expect(stockParts({ ...stock, dry: { grams: null, daysLeft: null, belowZero: false } }, "dry")).toEqual({ left: null, lasts: null, empty: false });
-  expect(stockParts({ ...stock, dry: { grams: 0, daysLeft: 0, belowZero: true } }, "dry")).toEqual({ left: "0 g", lasts: null, empty: true });
-  expect(stockParts({ ...stock, wet: { grams: 1000, cans: 2.5, canSizeG: 400, daysLeft: null, belowZero: false } }, "wet")).toEqual({ left: "2½ Dosen", lasts: null, empty: false });
+test("the stock in parts, for the stock screen: per can size, the total, for how long, and whether it ran out", () => {
+  const stock: Stock = { wet: wetStock([can(400, 3), can(800, 2)], { daysLeft: 9.2 }), dry: { grams: 300, daysLeft: 0.4, belowZero: false } };
+  expect(stockParts(stock, "wet")).toEqual({ left: "3 × 400 g · 2 × 800 g", sizes: ["3 × 400 g", "2 × 800 g"], total: "zusammen 2,8 kg", lasts: "reicht etwa 9 Tage", empty: false });
+  expect(stockParts({ ...stock, wet: wetStock([can(400, 0), can(800, 2.5)]) }, "wet")).toMatchObject({ sizes: ["2½ × 800 g"], total: "zusammen 2 kg" });
+  expect(stockParts(stock, "dry")).toEqual({ left: "300 g", sizes: [], total: null, lasts: "reicht weniger als einen Tag", empty: false });
+  expect(stockParts({ ...stock, dry: { grams: null, daysLeft: null, belowZero: false } }, "dry")).toEqual({ left: null, sizes: [], total: null, lasts: null, empty: false });
+  expect(stockParts({ ...stock, dry: { grams: 0, daysLeft: 0, belowZero: true } }, "dry")).toMatchObject({ left: "0 g", lasts: null, empty: true });
+  expect(stockParts({ ...stock, wet: UNKNOWN_WET }, "wet")).toEqual({ left: null, sizes: [], total: null, lasts: null, empty: false });
+  // one size below zero doesn't make the other run out
+  expect(stockParts({ ...stock, wet: wetStock([{ ...can(400, 0), belowZero: true }, can(800, 1)], { belowZero: true }) }, "wet")).toMatchObject({ sizes: ["1 × 800 g"], empty: false });
+  expect(stockParts({ ...stock, wet: wetStock([can(400, 0)]) }, "wet")).toMatchObject({ left: "0 Dosen", empty: true, total: null });
+});
+
+test("the can sizes to feed from: the known ones, pre-set to the last used one, else the one bought last", () => {
+  const stock: Stock = { wet: wetStock([can(400, 3), can(800, 2)], { newestUnitG: 400 }), dry: { grams: null, daysLeft: null, belowZero: false } };
+  expect(canChoices(stock, { wet: 100, dry: null, wetUnitG: 800 })).toEqual({ sizes: [400, 800], preset: 800 });
+  expect(canChoices(stock, { wet: 100, dry: null, wetUnitG: null })).toEqual({ sizes: [400, 800], preset: 400 });
+  expect(canChoices(stock, { wet: 100, dry: null, wetUnitG: 200 })).toEqual({ sizes: [400, 800], preset: 400 }); // a size no longer known
+  expect(canChoices({ ...stock, wet: wetStock([can(400, 1)], { newestUnitG: null }) }, null)).toEqual({ sizes: [400], preset: 400 });
+  expect(canChoices(null, { wet: 100, dry: null, wetUnitG: 800 })).toEqual({ sizes: [800], preset: 800 }); // nothing kept from the server yet
+  expect(canChoices({ ...stock, wet: UNKNOWN_WET }, null)).toEqual({ sizes: [], preset: null });
 });
 
 test("a portion is a whole number from 1 to 5000 grams", () => {
@@ -51,8 +75,8 @@ test("a portion is a whole number from 1 to 5000 grams", () => {
 });
 
 test("both kinds' stock in one form: what is left or that it ran out; a kind never entered stays out", () => {
-  const stock: Stock = { wet: { grams: 3600, cans: 9, canSizeG: 400, daysLeft: 12.4, belowZero: false }, dry: { grams: 1200, daysLeft: 1, belowZero: false } };
-  expect(stockSummary(stock)).toBe("Nass: 9 Dosen · Trocken: 1,2 kg");
-  expect(stockSummary({ ...stock, wet: { ...stock.wet, grams: 0, cans: 0, belowZero: false }, dry: { grams: null, daysLeft: null, belowZero: false } })).toBe("Nass: aufgebraucht");
-  expect(stockSummary({ wet: { grams: null, cans: null, canSizeG: null, daysLeft: null, belowZero: false }, dry: { grams: null, daysLeft: null, belowZero: false } })).toBeNull();
+  const stock: Stock = { wet: wetStock([can(400, 3), can(800, 2)]), dry: { grams: 1200, daysLeft: 1, belowZero: false } };
+  expect(stockSummary(stock)).toBe("Nass: 3 × 400 g, 2 × 800 g · Trocken: 1,2 kg");
+  expect(stockSummary({ wet: wetStock([can(400, 0)]), dry: { grams: null, daysLeft: null, belowZero: false } })).toBe("Nass: aufgebraucht");
+  expect(stockSummary({ wet: UNKNOWN_WET, dry: { grams: null, daysLeft: null, belowZero: false } })).toBeNull();
 });

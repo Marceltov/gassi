@@ -18,6 +18,9 @@ test("a food command needs a sensible amount and a kind of wet or dry", () => {
   expect(commandSchema.safeParse({ ...food, amountG: 0 }).success).toBe(false);
   expect(commandSchema.safeParse({ ...food, amountG: 5001 }).success).toBe(false);
   expect(commandSchema.safeParse({ ...food, foodKind: "raw" }).success).toBe(false);
+  // a wet feeding may name the can size it came out of
+  expect(commandSchema.parse({ ...food, unitG: 800 })).toMatchObject({ unitG: 800 });
+  expect(commandSchema.safeParse({ ...food, unitG: 0 }).success).toBe(false);
 });
 
 afterEach(() => vi.unstubAllGlobals());

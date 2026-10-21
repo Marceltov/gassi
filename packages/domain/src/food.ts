@@ -1,14 +1,19 @@
 // Food amounts in words and the food sheet's starting values, for the stock screen and the food sheet.
 import { FOOD_MAX_G, FOOD_MIN_G } from "./commands";
 import { FOOD_KINDS, FOOD_SHORT, type FoodKind } from "./entryTypes";
-import type { Stock } from "./stock";
+import type { CanStock, Stock } from "./stock";
+
+/** "11½", "½", "0": whole and half cans. */
+const halves = (cans: number): string => {
+  const whole = Math.floor(cans);
+  return `${whole === 0 && cans % 1 ? "" : whole}${cans % 1 ? "½" : ""}`;
+};
 
 /** "11½ Dosen", "1 Dose", "½ Dose". */
-export function formatCans(cans: number): string {
-  const whole = Math.floor(cans);
-  const text = `${whole === 0 && cans % 1 ? "" : whole}${cans % 1 ? "½" : ""}`;
-  return `${text} ${cans > 0 && cans <= 1 ? "Dose" : "Dosen"}`;
-}
+export const formatCans = (cans: number): string => `${halves(cans)} ${cans > 0 && cans <= 1 ? "Dose" : "Dosen"}`;
+
+/** One can size's count: "3 × 400 g", "2½ × 800 g". */
+export const formatCanCount = (s: Pick<CanStock, "unitG" | "cans">): string => `${halves(s.cans)} × ${s.unitG} g`;
 
 /** "4,4 kg" from 1 kg on, else "800 g". */
 export const formatWeight = (grams: number): string =>
@@ -18,7 +23,8 @@ export const formatWeight = (grams: number): string =>
 export const parseDecimal = (v: string): number => (v.trim() ? Number(v.trim().replace(",", ".")) : NaN);
 
 export type Portion = { foodKind: FoodKind; amountG: number };
-type LastFood = { wet: number | null; dry: number | null };
+/** Each kind's last portion, and the can size the last wet feeding came out of (when it said). */
+type LastFood = { wet: number | null; dry: number | null; wetUnitG?: number | null };
 
 /** What the food sheet offers when nothing else is known (no feeding yet). */
 export const DEFAULT_PORTION_G: Record<FoodKind, number> = { wet: 100, dry: 50 };
@@ -46,20 +52,35 @@ export function quickPortions(recent: readonly Portion[], kind: FoodKind, canSiz
   return [...grams.slice(0, 4 - cans.length).map((amountG) => ({ label: `${amountG} g`, amountG })), ...cans];
 }
 
-/** The stock of a kind in parts: what is left ("9 Dosen", "1,2 kg"; null when it isn't known), for how long ("reicht
- * etwa 12 Tage"; null without use to go by or when it ran out), and whether it ran out (or counts below zero). */
-export function stockParts(stock: Stock, kind: FoodKind): { left: string | null; lasts: string | null; empty: boolean } {
-  const s = kind === "wet" ? stock.wet : { ...stock.dry, cans: null };
-  const amount = s.cans ?? s.grams;
-  const empty = s.belowZero || amount === 0;
-  const left = amount === null ? null : s.cans !== null ? formatCans(s.cans) : formatWeight(s.grams ?? 0);
-  const days = s.daysLeft === null ? null : Math.round(s.daysLeft);
-  const lasts = s.daysLeft === null || empty ? null : s.daysLeft < 0.5 ? "reicht weniger als einen Tag" : `reicht etwa ${days} ${days === 1 ? "Tag" : "Tage"}`;
-  return { left, lasts, empty };
+/** The can sizes a wet feeding can come out of (the known ones, smallest first; without the server's stock yet the
+ * last used one), and the one to start with: the last used one while it is known, else the one bought last. */
+export function canChoices(stock: Stock | null, last: LastFood | null): { sizes: number[]; preset: number | null } {
+  const used = last?.wetUnitG ?? null;
+  if (!stock) return { sizes: used ? [used] : [], preset: used };
+  const sizes = stock.wet.sizes.map((s) => s.unitG);
+  const preset = [used, stock.wet.newestUnitG, stock.wet.sizes.findLast((s) => s.cans > 0)?.unitG, sizes.at(-1)].find((u) => u != null && sizes.includes(u)) ?? null;
+  return { sizes, preset };
 }
 
-/** The stock of a kind in one line: "Vorrat: noch 9 Dosen · reicht etwa 12 Tage", "Vorrat aufgebraucht"; null when
- * it isn't known. */
+/** The stock of a kind in parts: what is left ("3 × 400 g · 2 × 800 g", "1,2 kg"; null when it isn't known), for wet
+ * food each can size that has some left ("3 × 400 g") and the total ("zusammen 2,8 kg"), for how long ("reicht etwa
+ * 12 Tage"; null without use to go by or when it ran out), and whether it ran out (or counts below zero). */
+export function stockParts(stock: Stock, kind: FoodKind): { left: string | null; sizes: string[]; total: string | null; lasts: string | null; empty: boolean } {
+  const s = kind === "wet" ? stock.wet : stock.dry;
+  if (s.grams === null) return { left: null, sizes: [], total: null, lasts: null, empty: false };
+  const cans = kind === "wet" ? stock.wet.sizes.filter((c) => c.cans > 0) : [];
+  // wet food has run out when no size has half a can left; one size counting below zero leaves the others
+  const empty = kind === "wet" ? !cans.length : s.belowZero || s.grams === 0;
+  const sizes = cans.map(formatCanCount);
+  const left = kind === "dry" ? formatWeight(s.grams) : empty ? formatCans(0) : sizes.join(" · ");
+  const total = kind === "wet" && !empty ? `zusammen ${formatWeight(s.grams)}` : null;
+  const days = s.daysLeft === null ? null : Math.round(s.daysLeft);
+  const lasts = s.daysLeft === null || empty ? null : s.daysLeft < 0.5 ? "reicht weniger als einen Tag" : `reicht etwa ${days} ${days === 1 ? "Tag" : "Tage"}`;
+  return { left, sizes, total, lasts, empty };
+}
+
+/** The stock of a kind in one line: "Vorrat: noch 3 × 400 g · 2 × 800 g · reicht etwa 9 Tage", "Vorrat
+ * aufgebraucht"; null when it isn't known. */
 export function stockLine(stock: Stock, kind: FoodKind): string | null {
   const { left, lasts, empty } = stockParts(stock, kind);
   if (empty) return "Vorrat aufgebraucht";
@@ -67,12 +88,12 @@ export function stockLine(stock: Stock, kind: FoodKind): string | null {
   return `Vorrat: noch ${left}${lasts ? ` · ${lasts}` : ""}`;
 }
 
-/** Both kinds' stock in one line, the same form for each: "Nass: 9 Dosen · Trocken: 1,2 kg", "Nass: aufgebraucht";
- * a kind never entered stays out; null when neither is known. */
+/** Both kinds' stock in one line, the same form for each: "Nass: 3 × 400 g, 2 × 800 g · Trocken: 1,2 kg", "Nass:
+ * aufgebraucht"; a kind never entered stays out; null when neither is known. */
 export function stockSummary(stock: Stock): string | null {
   const parts = FOOD_KINDS.flatMap((k) => {
-    const { left, empty } = stockParts(stock, k);
-    return empty ? [`${FOOD_SHORT[k]}: aufgebraucht`] : left ? [`${FOOD_SHORT[k]}: ${left}`] : [];
+    const { left, sizes, empty } = stockParts(stock, k);
+    return empty ? [`${FOOD_SHORT[k]}: aufgebraucht`] : left ? [`${FOOD_SHORT[k]}: ${sizes.length ? sizes.join(", ") : left}`] : [];
   });
   return parts.length ? parts.join(" · ") : null;
 }

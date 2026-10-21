@@ -50,6 +50,7 @@ test("food, weight, restock and stock", () => {
   expect(text(entry({ type: "restock", foodKind: "wet", amountG: 4800, unitG: 400 }))).toBe("Einkauf Nassfutter, 12 × 400 g von Hirsch");
   expect(text(entry({ type: "restock", foodKind: "dry", amountG: 10_000 }))).toBe("Einkauf Trockenfutter, 10 kg von Hirsch");
   expect(text(entry({ type: "stockcheck", foodKind: "dry", amountG: 3500 }))).toBe("Bestand Trockenfutter, 3,5 kg von Hirsch");
+  expect(text(entry({ type: "stockcheck", foodKind: "wet", amountG: 1000, unitG: 400 }))).toBe("Bestand Nassfutter, 2½ × 400 g von Hirsch");
 });
 
 test("a distance reads in metres under a kilometre, else in km with one decimal", () => {

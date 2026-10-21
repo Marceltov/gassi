@@ -350,6 +350,13 @@ describe("food", () => {
     const active = (await new DogRepository(db()).activeIds()).sort();
     expect([...all[0].dogIds].sort()).toEqual(active);
   });
+
+  test("a wet feeding keeps the can size it came out of; dry food has none", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(5, { kind: "food", amountG: 400, foodKind: "wet", unitG: 800 }), cmd(6, { kind: "food", amountG: 40, foodKind: "dry", unitG: 800 })]);
+    const all = await new EntryRepository(db()).list({ type: "food" });
+    expect(all.map((e) => [e.foodKind, e.unitG])).toEqual([["dry", null], ["wet", 800]]);
+  });
 });
 
 describe("changing walkers and dogs", () => {

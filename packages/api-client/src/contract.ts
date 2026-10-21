@@ -134,7 +134,8 @@ const exerciseSchema = z.object({ id: z.number(), name: z.string() });
 const treatKindSchema = z.object({ id: z.number(), name: z.string(), gramsPerPiece: z.number(), fromDry: z.boolean() });
 const treatKindInput = z.object({ name: z.string(), gramsPerPiece: z.number(), fromDry: z.boolean() });
 const kindStock = { grams: z.number().nullable(), daysLeft: z.number().nullable(), belowZero: z.boolean() };
-const stockSchema = z.object({ wet: z.object({ ...kindStock, cans: z.number().nullable(), canSizeG: z.number().nullable() }), dry: z.object(kindStock) });
+const canStock = z.object({ unitG: z.number(), grams: z.number(), cans: z.number(), belowZero: z.boolean() });
+const stockSchema = z.object({ wet: z.object({ ...kindStock, sizes: z.array(canStock), newestUnitG: z.number().nullable() }), dry: z.object(kindStock) });
 const weekSchema = z.object({
   monday: z.string(),
   days: z.array(
@@ -255,8 +256,10 @@ export const contract = {
   }),
   stock: endpoint({ method: "GET", path: "/api/stock", input: none, output: stockSchema }),
   restock: endpoint({ method: "POST", path: "/api/stock/restock", input: restockInput, output: entryViewSchema, messages: RESTOCK_MESSAGES }),
-  correctStock: endpoint({ method: "POST", path: "/api/stock/correct", input: stockCountInput, output: entryViewSchema, messages: STOCK_COUNT_MESSAGES }),
-  lastFood: endpoint({ method: "GET", path: "/api/food/last", input: none, output: z.object({ wet: z.number().nullable(), dry: z.number().nullable() }) }),
+  // a wet count is one entry per can size
+  correctStock: endpoint({ method: "POST", path: "/api/stock/correct", input: stockCountInput, output: z.object({ entries: z.array(entryViewSchema) }), messages: STOCK_COUNT_MESSAGES }),
+  // each kind's last portion, and the can size the last wet feeding came out of
+  lastFood: endpoint({ method: "GET", path: "/api/food/last", input: none, output: z.object({ wet: z.number().nullable(), dry: z.number().nullable(), wetUnitG: z.number().nullable() }) }),
   weights: endpoint({ method: "GET", path: "/api/weight", input: none, output: z.object({ weights: z.array(entryViewSchema) }) }),
   logWeight: endpoint({ method: "POST", path: "/api/weight", input: weightInput, output: entryViewSchema, messages: WEIGHT_MESSAGES }),
   today: endpoint({ method: "GET", path: "/api/today", input: none, output: z.object({ walk: entryViewSchema.nullable(), food: entryViewSchema.nullable(), pee: entryViewSchema.nullable(), poop: entryViewSchema.nullable() }) }),

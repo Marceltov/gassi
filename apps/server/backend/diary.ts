@@ -170,11 +170,12 @@ export class Diary {
     return this.entries.remove(id);
   }
 
-  /** The amount of the newest feeding of each kind, offered as the usual portion. */
-  async lastFoodAmounts(): Promise<Record<FoodKind, number | null>> {
+  /** The amount of the newest feeding of each kind, offered as the usual portion, and the can size of the newest wet
+   * feeding that named one, offered as the can to feed from. */
+  async lastFoodAmounts(): Promise<Record<FoodKind, number | null> & { wetUnitG: number | null }> {
     const food = await this.entries.list({ type: "food" });
     const last = (kind: FoodKind) => food.find((e) => e.foodKind === kind)?.amountG ?? null;
-    return { wet: last("wet"), dry: last("dry") };
+    return { wet: last("wet"), dry: last("dry"), wetUnitG: food.find((e) => e.foodKind === "wet" && e.unitG)?.unitG ?? null };
   }
 
   /** Bought food: wet as cans × grams per can, dry in grams. */
@@ -184,16 +185,19 @@ export class Diary {
     return this.create(user, { type: "restock", foodKind: r.foodKind, ...amount });
   }
 
-  /** What is there now, counted by hand: wet in cans (of the last can size bought), dry in grams. */
-  async correctStock(user: Person, input: unknown): Promise<EntryView> {
+  /** What is there now, counted by hand: wet in cans per can size, one entry per size at the same time (a size left
+   * out is 0 from then on), dry in grams. */
+  async correctStock(user: Person, input: unknown): Promise<{ entries: EntryView[] }> {
     const r = parse(stockCountInput, input, STOCK_COUNT_MESSAGES);
-    let grams: number;
-    if (r.foodKind === "wet") {
-      const canSizeG = (await this.stock()).wet.canSizeG;
-      if (!canSizeG) throw new InputError("Trag erst einen Einkauf mit Dosengröße ein.");
-      grams = Math.round(r.cans * canSizeG);
-    } else grams = r.grams;
-    return this.create(user, { type: "stockcheck", foodKind: r.foodKind, amountG: grams, unitG: null });
+    const rows = r.foodKind === "wet" ? r.sizes.map((s) => ({ amountG: Math.round(s.cans * s.unitG), unitG: s.unitG })) : [{ amountG: r.grams, unitG: null }];
+    const at = this.deps.now().toISOString();
+    const entries = await this.deps.db.transaction().execute(async (tx) => {
+      const repo = new EntryRepository(tx, this.deps.now);
+      const made: Entry[] = [];
+      for (const row of rows) made.push(await repo.create({ type: "stockcheck", foodKind: r.foodKind, ...row, at, endedAt: null, note: null, dogIds: [], loggedBy: user.id }));
+      return made;
+    });
+    return { entries: await this.views(entries) };
   }
 
   /** A dog's weight in kg (one decimal), stored as grams; the time defaults to now. */

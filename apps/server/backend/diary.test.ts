@@ -76,11 +76,12 @@ test("filter keeps only known types and people", () => {
 describe("food and stock", () => {
   test("suggests the last amount per food kind", async () => {
     const d = diary();
-    expect(await d.lastFoodAmounts()).toEqual({ wet: null, dry: null });
-    await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 200, at: "2026-10-20T07:00:00Z" });
+    expect(await d.lastFoodAmounts()).toEqual({ wet: null, dry: null, wetUnitG: null });
+    await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 200, unitG: 800, at: "2026-10-20T07:00:00Z" });
     await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 180, at: "2026-10-20T08:00:00Z" });
     await d.log(HIRSCH, { type: "food", foodKind: "dry", amountG: 80, at: "2026-10-20T08:30:00Z" });
-    expect(await d.lastFoodAmounts()).toEqual({ wet: 180, dry: 80 });
+    // the size of the newest wet feeding that named one
+    expect(await d.lastFoodAmounts()).toEqual({ wet: 180, dry: 80, wetUnitG: 800 });
   });
 
   test("restocks: cans × grams per can for wet food, grams for dry food", async () => {
@@ -90,7 +91,7 @@ describe("food and stock", () => {
     expect(await d.restock(HIRSCH, { foodKind: "dry", grams: 10_000 })).toMatchObject({ type: "restock", foodKind: "dry", amountG: 10_000, unitG: null });
     await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 200, at: "2026-10-20T10:30:00Z" });
     clock = new Date("2026-10-20T11:00:00Z");
-    expect((await d.stock()).wet).toMatchObject({ grams: 4600, cans: 11.5 });
+    expect((await d.stock()).wet).toMatchObject({ grams: 4600, sizes: [{ unitG: 400, cans: 11.5 }] });
   });
 
   test("a restock needs cans and can size, or grams", async () => {
@@ -99,16 +100,24 @@ describe("food and stock", () => {
     await expect(diary().restock(HIRSCH, { foodKind: "canned", grams: 10 })).rejects.toThrow(InputError);
   });
 
-  test("correcting the stock: wet in cans of the last can size, dry in grams", async () => {
+  test("correcting the stock: wet in cans per size (every size at once, no purchase needed), dry in grams", async () => {
     clock = new Date("2026-10-20T10:00:00Z");
     const d = diary();
-    await expect(d.correctStock(HIRSCH, { foodKind: "wet", cans: 5 })).rejects.toThrow(new InputError("Trag erst einen Einkauf mit Dosengröße ein."));
-    await d.restock(HIRSCH, { foodKind: "wet", cans: 12, unitG: 400 });
+    const first = await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: "2,5" }] });
+    expect(first.entries).toMatchObject([{ type: "stockcheck", foodKind: "wet", amountG: 1000, unitG: 400 }]);
+    await d.restock(HIRSCH, { foodKind: "wet", cans: 2, unitG: 800 });
     clock = new Date("2026-10-20T10:05:00Z");
-    expect(await d.correctStock(HIRSCH, { foodKind: "wet", cans: 5 })).toMatchObject({ type: "stockcheck", foodKind: "wet", amountG: 2000 });
-    expect(await d.correctStock(HIRSCH, { foodKind: "dry", grams: 0 })).toMatchObject({ type: "stockcheck", foodKind: "dry", amountG: 0 });
+    const both = await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: 5 }, { unitG: 800, cans: 1 }] });
+    expect(both.entries.map((e) => [e.amountG, e.unitG, e.at])).toEqual([[2000, 400, clock.toISOString()], [800, 800, clock.toISOString()]]);
+    expect((await d.correctStock(HIRSCH, { foodKind: "dry", grams: 0 })).entries).toMatchObject([{ type: "stockcheck", foodKind: "dry", amountG: 0, unitG: null }]);
     clock = new Date("2026-10-20T10:10:00Z");
-    expect(await d.stock()).toMatchObject({ wet: { grams: 2000, cans: 5 }, dry: { grams: 0 } });
+    const stock = await d.stock();
+    expect(stock.wet.sizes.map((s) => [s.unitG, s.cans])).toEqual([[400, 5], [800, 1]]);
+    expect(stock).toMatchObject({ wet: { grams: 2800 }, dry: { grams: 0 } });
+    // a size left out of a count is 0
+    clock = new Date("2026-10-20T10:15:00Z");
+    await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 800, cans: 2 }] });
+    expect((await d.stock()).wet.sizes.map((s) => [s.unitG, s.cans])).toEqual([[400, 0], [800, 2]]);
   });
 });
 
