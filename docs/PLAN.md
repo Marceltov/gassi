@@ -1,6 +1,32 @@
 # Plan
 
-## Goal
+## From 0.3: phone apps, a Garmin app and a server anyone can run
+
+Gassi becomes something a household uses on the phone for everything around its dogs, so easily that it really logs
+everything, and something other households can run themselves (agreed with Marcel on 2026-10-20).
+
+- **Phone app** (React Native with Expo) for iOS and Android with native look and feel: walks with start/stop,
+  pauses, several walkers and the GPS track recorded in the background; pee/poop per dog; training; food and stock;
+  weight; history; statistics and maps.
+- **Garmin app** (Connect IQ, Forerunner 165 first): start/stop, pee, poop, training and treats from the wrist; the
+  watch records the track and saves the walk as a Garmin activity (from there Komoot and Apple Health).
+- **Web dashboard** for looking at the data on a big screen (week, statistics, maps, weight, stock).
+- **Self-hostable:** one container per household, only `PUBLIC_URL` required; sign-in by setup link, invite links,
+  magic links by e-mail (with SMTP) or the household's OIDC provider; open source (AGPL-3.0) when released.
+- **Several dogs** per household; walks, trainings and feedings for one or more, pee/poop and weight for one.
+- **Monorepo, no redundancy:** `packages/domain` holds the rules once, `packages/api-client` the API once.
+
+Order, each with its own design and plan: 1 foundation (done: monorepo, API with device tokens and links, dogs,
+tracks) · 2 the app (Android first, then iOS) · 3 the Garmin app · 4 the dashboard · 5 release (stores, open source,
+self-hosting guide). Non-goals for now: a hosted service, several households per server, reminders, training plans,
+vet records. Versions stay 0.x until real data of others exists; nobody depends on 0.2, so no compatibility layers.
+
+## Before the rebuild (0.1 and 0.2, replaced)
+
+The web app below served one household with one dog. Its ideas carry over (everything is an entry; taps as commands,
+ADR 0001; "during a walk" by time, ADR 0002); its screens are gone since 0.3.
+
+### Goal
 
 Two people (Hirsch and Herzii) share one dog (Toffee). Either of them should be able to log what just happened
 in one tap, and see at a glance what has happened today: when the dog was last out, last ate, last peed and
@@ -9,7 +35,7 @@ pooped, and who did it.
 Non-goals: vet records, training plans, multi-household SaaS, GPS tracking, several dogs, reminders. If we miss one
 of these later, it's a later version.
 
-## The core idea
+### The core idea
 
 Everything is an **entry**: *who* did *what* with *which dog*, *when*, with an optional end, amount and note.
 Walks, trainings, meals, pee, poop, weight, restocks and stock counts are entry types. That keeps the data model and
@@ -40,7 +66,7 @@ Dog
 Pee/poop during a walk are separate entries. "During a walk" is decided by time (an entry whose `at` lies between
 the walk's start and end), not by links (ADR 0002).
 
-## First version (0.1)
+### First version (0.1)
 
 1. **One-tap logging:** big buttons with icons for walk, food, pee and poop. A tap logs "now, by me". A long
    press or a follow-up sheet adjusts time, duration, amount or note.
@@ -49,7 +75,7 @@ the walk's start and end), not by links (ADR 0002).
 4. **Built for phones:** installable PWA ("Add to Home Screen"), German UI, large touch targets, dark mode.
 5. **Data:** SQLite in a mounted volume, plus a CSV export.
 
-## 0.2
+### 0.2
 
 1. **Walks with start and stop ("Runde"):** the Gassi tile starts a walk at the door; `/runde` has a running clock,
    Pipi, Poopoo, Pause/Weiter, Training and Zuhause (stop, then a summary with a note). Several people can walk
@@ -63,12 +89,12 @@ the walk's start and end), not by links (ADR 0002).
 4. **Woche:** sums per person, exercises, treats, a column per day, a 0–24 h strip per day; a day opens its Verlauf.
 5. **Weight** in kg with a curve. **Daily backup** of `gassi.db` (14 kept).
 
-## Later, only if we miss it
+### Later, only if we miss it
 
 - Reminders as push notifications of the installed PWA, with rules editable in the app (no ntfy)
 - Several dogs (the model already has `dogId`)
 
-## Authentication
+### Authentication
 
 Gassi is its own OIDC client of authentik (an OAuth2/OpenID provider and application named `gassi`), built like
 notefeed's sign-in (`notefeed/notefeed`, `backend/oidc/`) without an auth library:
@@ -90,7 +116,7 @@ is `${PUBLIC_URL}/api/oidc/callback`. Caddy only reverse-proxies; no forward aut
 
 The REST API (if any) uses a static bearer token from env.
 
-## Stack
+### Stack
 
 Modelled on notefeed (`notefeed/notefeed`), which already runs the same kind of app here:
 
@@ -104,7 +130,7 @@ Modelled on notefeed (`notefeed/notefeed`), which already runs the same kind of 
 Considered and rejected for 0.1: a separate API and SPA (twice the moving parts), Postgres (one household doesn't
 need it).
 
-## Tests
+### Tests
 
 The same layers as notefeed:
 
@@ -124,7 +150,7 @@ The same layers as notefeed:
 Scripts: `npm test` (`vitest run`), `npm run test:e2e` (`next build && playwright test`), `npm run typecheck`,
 `npm run lint`.
 
-## Deployment
+### Deployment
 
 - `Dockerfile` in this repo. GitHub Actions builds and pushes `ghcr.io/marceltov/gassi` on every push to `main`
   (tags: `main`, the short sha) and on version tags.
@@ -134,7 +160,7 @@ Scripts: `npm test` (`vitest run`), `npm run test:e2e` (`next build && playwrigh
 - Cut-over: Housetrained kept running until Gassi 0.1 worked. No data migration, since Housetrained held no real
   history.
 
-## Build
+### Build
 
 0.1 was built in one run and is live since 2026-10-20 (it was first tagged `v1.0.0`; that tag was retired, and versions stay 0.x until there is real data to keep); see [BUILD.md](BUILD.md) for the goal statement, the fixed implementation
 decisions, the phases and their checks, and the manual steps after the build (authentik, compose, hostname).

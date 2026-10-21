@@ -4,32 +4,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Gassi is a self-hosted dog diary for one household (walks, food, pee, poop). 0.1 is built. `docs/PLAN.md` is the
-source of truth for scope, data model, stack, auth and tests; `docs/BUILD.md` holds the implementation decisions,
-including "Decisions made during the build"; `docs/ALTERNATIVES.md` records why existing tools were rejected.
+Gassi is a self-hosted dog diary (walks with GPS tracks, training, food and stock, weight) being rebuilt as phone
+apps, a Garmin app and a self-hostable server. Step 1 (foundation: monorepo, API, sign-in by links, dogs, tracks) is
+built; the app, the Garmin app and the dashboard follow (`docs/PLAN.md`). Versions stay 0.x until there is real data.
+`docs/BUILD.md` holds the implementation decisions, `docs/adr/` the architecture decisions.
 
-## Commands
+## Commands (from the repo root)
 
-- `npm run dev` (needs `.env.local`, see `.env.example`; `npm run oidc-stub` stands in for authentik)
-- `npm test` (Vitest); one test: `npx vitest run <path> -t <name>`
-- `npm run test:e2e` (`next build` then Playwright on desktop Chromium, iPhone 13, Pixel 7); one test:
-  `npx playwright test -g <name>` (after a build)
+- `npm test` (Vitest over all workspaces); one test: `npx vitest run <path> -t <name>`
+- `npm run test:e2e` (builds the server, then Playwright: the API through the typed client, the link page in Chromium)
 - `npm run typecheck`, `npm run lint`
-- `npm run icons` after changing `public/icon.svg`
+- `npm run dev -w @gassi/server` (needs `apps/server/.env.local`, see `apps/server/.env.example`)
 - `scripts/quiet.sh <command>` prints only failures and the summary of a long run
+- Installs run without scripts (`.npmrc`): better-sqlite3 loads its prebuilt binary.
 
 ## Code layout
 
-- `backend/` is framework-free (lint-enforced) and reached from `app/`, `components/` and `proxy.ts` only through
-  `backend/index.ts`. Layers: `entries/repository.ts` (SQL) → `diary.ts` (use cases, validation, German errors) →
-  `app/actions.ts` (server actions; each calls `requireUser()`) and the route handlers (`backend/http/*`,
-  `backend/oidc/routes.ts`, mounted in `app/**/route.ts`). Walks/trainings: `sessions.ts` applies the taps
-  (commands, `POST /api/commands`; ADR 0001); `stock.ts`, `week.ts` and `backup.ts` are the pure/ops parts.
-- `shared/` runs in the browser too (entry types and labels, Intl-only time zone helpers, `commands.ts`,
-  `sessionProjection.ts`). The phone's command queue is `components/commandQueue.ts` + `useSessions.ts`.
+- `packages/domain` (`@gassi/domain`): pure TypeScript shared by server, app and dashboard — entry types and schemas,
+  dog rules, commands and the offline projection and queue, stock, week, track metrics, time helpers. No Node, React,
+  Next or database (lint-enforced, `tooling/boundaries.test.ts`).
+- `packages/api-client` (`@gassi/api-client`): the API contract (one table of endpoints with zod in/out) and the typed
+  client built from it. The server's router validates against the same table (ADR 0003).
+- `apps/server` (`@gassi/server`): Next.js. `backend/` is framework-free and reached from `app/` only through
+  `backend/index.ts`. `backend/http/router.ts` serves the contract from one catch-all route (`app/api/[...path]`);
+  `backend/http/api.ts` maps each endpoint to a use case (`diary.ts`, `sessions.ts`, `tracks.ts`, `catalog.ts`,
+  `dogs.ts`, `auth/*`). Devices sign in with Bearer tokens from one-time links (ADR 0004).
 - Tests sit next to the code. Outside calls are injected (`fetch`, `now`, the database), not mocked:
-  `backend/oidc/testing.ts` is a stub issuer, `backend/db/testing.ts` a fresh database per test,
-  `backend/testing/env.ts` a valid environment. e2e specs share one server and database and run serially.
+  `backend/db/testing.ts` is a fresh database per test (seeded with Toffee, Hirsch, Herzii unless `{ empty: true }`),
+  `backend/http/testing.ts` calls the API with device tokens, `backend/oidc/testing.ts` is a stub issuer.
 
 ## Repo layout
 
@@ -38,26 +40,19 @@ gitignores. `/root/services/gassi/` belongs to the `services` repo and only hold
 `.env`, `./data`). The parent `/root/services/CLAUDE.md` describes homelab conventions (gethomepage network,
 labels, ports); they apply to that deployment folder, not to the app code here.
 
-## Decisions to respect (from docs/PLAN.md)
+## Decisions to respect
 
-- **One model for everything:** an `Entry` (`dogId`, `type`, `at`, optional `endedAt`/`amountG`/`foodKind`/`note`,
-  `loggedBy`). New kinds of events are new `type` values, not new tables; walkers, pauses, exercises and treats are
-  child rows. "During a walk" is decided by time, not links (ADR 0002).
-- **Auth is a real OIDC client of authentik**, modelled on `notefeed/notefeed` (`backend/oidc/`): code flow +
-  PKCE, state/nonce in a short-lived signed cookie, id_token claims checked, signed session cookie with expiry.
-  No auth library, no forward-auth header. authentik's application bindings decide who gets in; users are keyed by
-  `preferred_username` and shown by the `name` claim (recorded in the `person` table at sign-in).
-- **Stack and tests follow `notefeed/notefeed`** (not Healthy): Next.js App Router + server actions, TypeScript,
-  Kysely on better-sqlite3, Tailwind, pino, zod, PWA. Vitest for units with injected `fetch`/`now` instead of
-  mocks; Playwright against `next start` with phone projects and a stub OIDC issuer; an image smoke test in CI.
-  Details in PLAN.md "Tests". A separate API/SPA and Postgres were explicitly rejected for 0.1.
-- **UI:** German, phone-first, large touch targets, dark mode, Tabler Icons (`@tabler/icons-react`).
-- **Scope:** 0.1 and 0.2 are the lists in PLAN.md. Items under "Later" and the non-goals (vet records, training,
-  multi-household, GPS) stay out unless asked.
-- **Deployment:** `Dockerfile` here; GitHub Actions pushes `ghcr.io/marceltov/gassi` (tags `main`, short sha,
-  version tags). Watchtower in the homelab pulls updates. Expose a healthcheck endpoint.
-
-<!-- BEGIN:nextjs-agent-rules -->
+- **Rebuild plan:** `docs/PLAN.md` (apps, Garmin, dashboard, self-hosting) in five steps; each step gets its own design
+  and plan. Nobody depends on 0.2; no compatibility layers.
+- **One model:** an `Entry` for one or more dogs (`dogIds`; pee/poop/weight exactly one, restock/stockcheck/note none),
+  with optional `endedAt`/`amountG`/`foodKind`/`note`. Walkers, pauses, exercises, treats and GPS tracks are child rows.
+  "During a walk" is decided by time (ADR 0002). Taps are idempotent commands with client ids (ADR 0001).
+- **No redundancy:** domain rules exist once in `packages/domain`; the API exists once in the contract.
+- **Sign-in:** setup link (printed at first start), invite links, magic links (SMTP), optional OIDC; devices hold
+  tokens stored only as hashes (ADR 0004). Only `PUBLIC_URL` is required.
+- **UI (apps, dashboard):** German, phone-first, native look and feel in the apps, dark mode.
+- **Deployment:** one container (`Dockerfile`, standalone server at `apps/server/server.js`); GitHub Actions pushes
+  `ghcr.io/marceltov/gassi`; Watchtower pulls `:main` in the homelab.
 
 # This is NOT the Next.js you know
 
