@@ -108,7 +108,8 @@ test("filtered by Herzii, the walk she went on stays and Hirsch's feeding goes; 
   await expect(page.getByRole("button", { name: "Wer: Herzii" })).toBeVisible();
   await expect(page.getByTestId(`entry-${food.id}`)).toHaveCount(0);
   const walkRow = page.getByTestId(`entry-${walk.id}`);
-  await expect(walkRow).toContainText("Gassi · 28 Min.");
+  await expect(walkRow).toContainText("Gassi");
+  await expect(page.getByTestId(`entry-${walk.id}-extra`)).toContainText("28 Min.");
   await expect(page.getByTestId(`entry-${walk.id}-more`)).toHaveText("1× Pipi");
   await expect(walkRow).toContainText("Hirsch + Herzii");
 

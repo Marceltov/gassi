@@ -1,7 +1,7 @@
 // Mehr's lists: rows in rounded groups, each a name with a short value on the right; tappable ones open something.
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { radius, useTheme } from "../theme";
+import { type ListTone, radius, useTheme } from "../theme";
 import { Icon, type IconName } from "../ui/Icon";
 
 export function Group({ title, children }: { title?: string; children: ReactNode }) {
@@ -14,14 +14,18 @@ export function Group({ title, children }: { title?: string; children: ReactNode
   );
 }
 
-type RowProps = { label: string; value?: string; icon?: IconName; dot?: string; onPress?: () => void; testID?: string; muted?: boolean; right?: ReactNode };
+type RowProps = { label: string; value?: string; icon?: IconName; tone?: ListTone; square?: string; dot?: string; onPress?: () => void; testID?: string; muted?: boolean; right?: ReactNode };
 
-export function Row({ label, value, icon, dot, onPress, testID, muted, right }: RowProps) {
+export function Row({ label, value, icon, tone, square, dot, onPress, testID, muted, right }: RowProps) {
   const theme = useTheme();
   const content = (
     <>
       {dot ? <View style={[styles.dot, { backgroundColor: dot }]} /> : null}
-      {icon ? <Icon name={icon} size={20} color={theme.muted} /> : null}
+      {icon ? (
+        <View style={[styles.square, { backgroundColor: square ?? (tone ? theme[tone] : theme.neutral), opacity: muted ? 0.6 : 1 }]}>
+          <Icon name={icon} size={17} color={tone || square ? "#fff" : theme.muted} />
+        </View>
+      ) : null}
       <Text style={[styles.label, { color: muted ? theme.muted : theme.ink }]} numberOfLines={1}>
         {label}
       </Text>
@@ -63,6 +67,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 13, marginLeft: 4, marginTop: 6 },
   group: { borderRadius: radius.tile + 2, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 48, paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  square: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   dot: { width: 12, height: 12, borderRadius: 6 },
   label: { fontSize: 15, flexShrink: 1 },
   value: { flex: 1, fontSize: 13, textAlign: "right" },

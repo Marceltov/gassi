@@ -6,6 +6,8 @@ import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { FoodSheet } from "../food/FoodSheet";
 import { useGassi } from "../data/GassiProvider";
+import type { TileKind } from "../theme";
+import type { IconName } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
 import { Tile } from "../ui/Tile";
 import { useLeaving } from "../ui/useLeaving";
@@ -17,9 +19,9 @@ import { type Today, useToday } from "./useToday";
 
 type Entry = Today["walk"];
 
-function tile(label: string, entry: Entry, now: number) {
+function tile(label: string, entry: Entry, now: number, kind: TileKind, icon: IconName) {
   const when = entry ? formatAgo(Date.parse(entry.endedAt ?? entry.at), now) : "noch nicht";
-  return <Tile label={label} value={when} by={entry?.byName} />;
+  return <Tile label={label} value={when} by={entry?.byName} kind={kind} icon={icon} />;
 }
 
 export function Start() {
@@ -48,12 +50,12 @@ export function Start() {
       top={
         <>
           <View style={styles.row}>
-            {tile("Draußen", today.walk, now)}
-            {tile("Gefressen", today.food, now)}
+            {tile("Draußen", today.walk, now, "walk", "walk")}
+            {tile("Gefressen", today.food, now, "food", "food")}
           </View>
           <View style={styles.row}>
-            {tile("Pipi", today.pee, now)}
-            {tile("Poopoo", today.poop, now)}
+            {tile("Pipi", today.pee, now, "pee", "pee")}
+            {tile("Poopoo", today.poop, now, "poop", "poop")}
           </View>
         </>
       }
