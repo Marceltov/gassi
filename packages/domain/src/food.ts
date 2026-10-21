@@ -116,3 +116,18 @@ export function mergeSizes(rows: readonly { unitG: number; cans: number }[]): { 
   for (const r of rows) by.set(r.unitG, (by.get(r.unitG) ?? 0) + r.cans);
   return [...by].map(([unitG, cans]) => ({ unitG, cans }));
 }
+
+/** A can size typed in: whole grams from 1 to 10000 ("400", " 400 "), else null. */
+export const parseCanSize = (v: string): number | null => (/^\d{1,5}$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= 10_000 ? Number(v) : null);
+
+/** What the stock screen's rows send (Ruling X): each row by its size as it now reads, its count as typed. Counting,
+ * a known size that is in no row any more is 0 (retired), so correcting "10000" to "1000" retires 10000 g; buying, an
+ * edited size only changes what is bought. Rows without a valid size are left out and counted in `unsized`. */
+export function formSizes<C extends string | number>(known: readonly number[], rows: readonly { size: string; cans: C }[], counting: boolean): { sizes: { unitG: number; cans: C | "0" }[]; unsized: number } {
+  const sized = rows.flatMap((r) => {
+    const unitG = parseCanSize(r.size);
+    return unitG ? [{ unitG, cans: r.cans as C | "0" }] : [];
+  });
+  const gone = counting ? known.filter((u) => !sized.some((s) => s.unitG === u)).map((unitG) => ({ unitG, cans: "0" as const })) : [];
+  return { sizes: [...sized, ...gone], unsized: rows.length - sized.length };
+}

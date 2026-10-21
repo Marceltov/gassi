@@ -58,11 +58,12 @@ test("Vorrat: cans bought are entered per size in rows, a new size in a row of i
   await page.getByRole("button", { name: "1 Dose à 800 g mehr" }).click();
   await page.getByRole("button", { name: "1 Dose à 800 g mehr" }).click();
   await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
-  await page.getByLabel("Gramm pro Dose").fill("1234");
+  await page.getByTestId("count-new").getByLabel("Gramm pro Dose").fill("1234");
   await page.getByRole("button", { name: "1 Dose à 1234 g mehr" }).click();
   // a new row left without grams isn't recorded
   await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
   await page.getByRole("button", { name: "1 Dose neuer Größe mehr" }).click();
+  await expect(page.getByTestId("stock-unsized")).toHaveText("Eine Zeile ohne Dosengröße wird nicht eingetragen.");
   await expect(page.getByTestId("count-1234-value")).toHaveText("1 Dose");
   const bought = page.waitForResponse((r) => r.url().endsWith("/api/stock/restock") && r.request().method() === "POST");
   await page.getByRole("button", { name: "Eintragen" }).click();
@@ -92,7 +93,7 @@ test("Vorrat: a wet count sets every can size at once, typed freely or by whole 
   await expect(page.getByTestId("stock-message")).toHaveText("Wie viele Dosen sind noch da? Eine Zahl, z. B. 2,75.");
   await page.getByLabel("Anzahl Dosen à 400 g").fill("2,75");
   await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
-  await page.getByLabel("Gramm pro Dose").fill("1235");
+  await page.getByTestId("count-new").getByLabel("Gramm pro Dose").fill("1235");
   for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "1 Dose à 1235 g mehr" }).click();
   await expect(page.getByTestId("count-1235-value")).toHaveValue("3");
   const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
@@ -118,7 +119,7 @@ test("Vorrat: a new row typed with a known size adds only what is typed to it, a
   await page.getByRole("tab", { name: "Nass" }).click();
   await page.getByRole("tab", { name: "Nachgezählt" }).click();
   await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
-  await page.getByLabel("Gramm pro Dose").fill("400");
+  await page.getByTestId("count-new").getByLabel("Gramm pro Dose").fill("400");
   await expect(page.getByTestId("count-400-value")).toHaveCount(2);
   await expect(page.getByTestId("count-400-value").last()).toHaveValue("0"); // only the known row starts at the stock
   await page.getByRole("button", { name: "1 Dose à 400 g mehr" }).last().click();
@@ -155,6 +156,28 @@ test("Vorrat: × takes a size away: buying only from this form, counting it to 0
   await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
   await expect(page.getByTestId("stock-wet")).not.toContainText("9999");
   await expect(page.getByTestId("count-9999")).toHaveCount(0);
+});
+
+test("Vorrat: every size can be corrected; counting, 10000 g corrected to 1000 g retires 10000 g", async ({ page }) => {
+  const token = await signIn(page);
+  const client = createClient({ baseUrl: BASE_URL, token });
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 10_000, cans: 2 }] })).entries.map((e) => e.id)); // meant 1000 g
+  await page.goto("/mehr/vorrat");
+  await page.getByRole("tab", { name: "Nass" }).click();
+  await page.getByRole("tab", { name: "Nachgezählt" }).click();
+  const row = page.getByTestId("count-10000");
+  await expect(row.getByLabel("Gramm pro Dose")).toHaveValue("10000");
+  await row.getByLabel("Gramm pro Dose").fill("1000");
+  await expect(row.getByLabel("Anzahl Dosen à 1000 g")).toHaveValue("2");
+  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Eintragen" }).click();
+  const { entries } = (await (await counted).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
+  made.push(...entries.map((e) => e.id));
+  expect(entries.find((e) => e.unitG === 1000)?.amountG).toBe(2000);
+  expect(entries.find((e) => e.unitG === 10_000)?.amountG).toBe(0);
+  await expect(page.getByTestId("stock-wet")).toContainText("2 × 1000 g");
+  await expect(page.getByTestId("stock-wet")).not.toContainText("10000");
+  expect((await client.stock()).wet.sizes.some((x) => x.unitG === 10_000)).toBe(false);
 });
 
 test("Vorrat: dry food bought in kg with a decimal comma, counted in g", async ({ page }) => {

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { canChoices, clampPortion, countLine, mergeSizes, countTitle, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
+import { canChoices, clampPortion, countLine, formSizes, mergeSizes, countTitle, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
 import type { CanStock, Stock, WetStock } from "./stock";
 
 const can = (unitG: number, cans: number): CanStock => ({ unitG, grams: cans * unitG, cans, belowZero: false });
@@ -91,4 +91,18 @@ test("a wet count as one thing: its title and its sizes", () => {
 
 test("rows of the same can size add up (a new row typed with a known size)", () => {
   expect(mergeSizes([{ unitG: 400, cans: 2 }, { unitG: 800, cans: 1 }, { unitG: 400, cans: 1.5 }])).toEqual([{ unitG: 400, cans: 3.5 }, { unitG: 800, cans: 1 }]);
+});
+
+test("the stock screen's rows by their (maybe edited) sizes: counting, a known size in no row is 0; rows without a size stay out", () => {
+  const rows = [
+    { size: "1000", cans: "2" }, // was 10000 g, corrected
+    { size: "400", cans: "3" },
+    { size: "", cans: "1" }, // no size: not recorded
+    { size: "abc", cans: "1" },
+  ];
+  expect(formSizes([10_000, 400], rows, true)).toEqual({ sizes: [{ unitG: 1000, cans: "2" }, { unitG: 400, cans: "3" }, { unitG: 10_000, cans: "0" }], unsized: 2 });
+  // buying: an edited size only changes what is bought
+  expect(formSizes([10_000, 400], rows, false)).toEqual({ sizes: [{ unitG: 1000, cans: "2" }, { unitG: 400, cans: "3" }], unsized: 2 });
+  expect(formSizes([400], [{ size: " 400 ", cans: "1" }, { size: "400", cans: "2" }], true).sizes).toEqual([{ unitG: 400, cans: "1" }, { unitG: 400, cans: "2" }]); // they add up in the input
+  expect(formSizes([400], [{ size: "10001", cans: "1" }, { size: "0", cans: "1" }], false).unsized).toBe(2);
 });

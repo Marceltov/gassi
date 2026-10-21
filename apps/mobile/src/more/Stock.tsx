@@ -5,7 +5,7 @@
 // size added with "+ Dosengröße" ("Dosen à [ ] g"; one without grams isn't recorded), × on a row takes it away
 // (counting, a known size is then 0, which retires it); dry food one amount in g or kg. One Eintragen records it all.
 import type { DryUnit, FoodKind } from "@gassi/domain";
-import { formatCans, parseDecimal, stockParts } from "@gassi/domain";
+import { formatCans, formSizes, parseCanSize, parseDecimal, stockParts } from "@gassi/domain";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { radius, useTheme } from "../theme";
@@ -33,8 +33,6 @@ const MAX_CANS = 1000;
 /** A number of cans as the count field shows it: "2,75", "3". */
 const decimalText = (n: number): string => n.toLocaleString("de-DE", { maximumFractionDigits: 2, useGrouping: false });
 
-/** A whole number of grams per can typed in, else null. */
-const typedSize = (v: string): number | null => (/^\d{1,5}$/.test(v.trim()) && Number(v) > 0 ? Number(v) : null);
 
 export function Stock() {
   const theme = useTheme();
@@ -45,31 +43,28 @@ export function Stock() {
   const [mode, setMode] = useState<Mode>("restock");
   const [amount, setAmount] = useState("");
   const [unit, setUnit] = useState<DryUnit>("kg"); // dry food: sacks in kg, the rest of one maybe in g
-  // wet food: one row per known can size, and one per size typed in ("+ Dosengröße"); bought counts start at 0 in
-  // whole cans, counted ones at what the stock says and can be typed freely ("2,75"; the domain checks them); − and +
-  // step by a whole can
+  // wet food: one row per known can size, and one per size added ("+ Dosengröße"); every row's size can be edited (a
+  // row counts by its size as it reads on Eintragen). Bought counts start at 0 in whole cans; counted ones at what the
+  // stock says and can be typed freely ("2,75"; the domain checks them); − and + step by a whole can
   const known = stock?.wet.sizes.map((s) => s.unitG) ?? [];
-  const [extras, setExtras] = useState<string[]>([]);
-  const [counts, setCounts] = useState<Record<string, string>>({});
-  // rows taken away with ×: counting, a known size is then 0 (and retired); buying, it is only left out of this form
-  const [removed, setRemoved] = useState<string[]>([]);
+  const [extras, setExtras] = useState(0); // how many rows were added
+  const [edits, setEdits] = useState<Record<string, { size?: string; cans?: string }>>({});
+  const [removed, setRemoved] = useState<string[]>([]); // rows taken away with ×
   const rows = [
-    ...known.map((u) => ({ key: `k${u}`, unitG: u as number | null, extra: null as number | null })),
-    ...extras.map((text, i) => ({ key: `x${i}`, unitG: typedSize(text), extra: i })),
-  ];
-  // only a known size's row starts at the stock: a new row (even of a known size) starts at 0, so it adds what is typed
-  const textOf = (key: string, unitG: number | null) => counts[key] ?? decimalText(mode === "count" && unitG && key.startsWith("k") ? (stock?.wet.sizes.find((s) => s.unitG === unitG)?.cans ?? 0) : 0);
-  const countOf = (key: string, unitG: number | null) => parseDecimal(textOf(key, unitG)) || 0;
-  const gone = (key: string) => removed.includes(key);
-  const shown = rows.filter((r) => !gone(r.key));
-  // what Eintragen sends: bought whole cans, counted ones as typed; a size in two rows adds up (the domain does that)
-  const sizes = rows.flatMap((r) => (!r.unitG || (gone(r.key) && r.extra !== null) ? [] : [{ unitG: r.unitG, cans: gone(r.key) ? "0" : textOf(r.key, r.unitG) }]));
+    ...known.map((u) => ({ key: `k${u}`, size: String(u), cans: decimalText(mode === "count" ? (stock?.wet.sizes.find((s) => s.unitG === u)?.cans ?? 0) : 0) })),
+    ...Array.from({ length: extras }, (_, i) => ({ key: `x${i}`, size: "", cans: "0" })),
+  ]
+    .filter((r) => !removed.includes(r.key))
+    .map((r) => ({ ...r, ...edits[r.key] }));
+  const edit = (key: string, change: { size?: string; cans?: string }) => setEdits({ ...edits, [key]: { ...edits[key], ...change } });
+  // what Eintragen sends (Ruling X, in the domain): rows by their sizes; counting, a known size in no row is 0
+  const { sizes, unsized } = formSizes(known, rows, mode === "count");
 
   // a message is about what was entered, and the rows are for one mode: both go when the form changes
   const reset = () => {
     setMessage(null);
-    setCounts({});
-    setExtras([]);
+    setEdits({});
+    setExtras(0);
     setRemoved([]);
     setAmount("");
   };
@@ -91,8 +86,8 @@ export function Stock() {
       } else if (mode === "restock") await api.restock({ foodKind: "wet", sizes: sizes.map((s) => ({ unitG: s.unitG, cans: parseDecimal(s.cans) || 0 })) });
       else await api.correctStock({ foodKind: "wet", sizes });
       setAmount("");
-      setCounts({});
-      setExtras([]);
+      setEdits({});
+      setExtras(0);
       setRemoved([]);
       reload();
     }, "Eingetragen.");
@@ -125,57 +120,61 @@ export function Stock() {
 
   const wet = (
     <>
-      {shown.map((r) => {
-        const n = countOf(r.key, r.unitG);
-        const name = r.unitG ? `à ${r.unitG} g` : "neuer Größe";
-        const change = (d: number) => setCounts({ ...counts, [r.key]: decimalText(Math.min(MAX_CANS, Math.max(0, n + d))) });
-        const what = "1 Dose";
+      {rows.map((r) => {
+        const unitG = parseCanSize(r.size);
+        const n = parseDecimal(r.cans) || 0;
+        const name = unitG ? `à ${unitG} g` : "neuer Größe";
+        const change = (d: number) => edit(r.key, { cans: decimalText(Math.min(MAX_CANS, Math.max(0, n + d))) });
+        // a known size's row keeps its id while its size is edited; an added one is named by the size typed
+        const id = r.key.startsWith("k") ? r.key.slice(1) : (unitG ?? "new");
         return (
-          <View key={r.key} testID={r.unitG ? `count-${r.unitG}` : "count-new"} style={[styles.row, { backgroundColor: theme.surface }]}>
-            {r.extra === null ? (
-              <Text style={[styles.rowLabel, { color: theme.muted }]}>Dosen à {r.unitG} g</Text>
-            ) : (
-              <View style={styles.rowField}>
-                <Text style={[styles.labelText, { color: theme.muted }]}>Dosen à</Text>
-                <TextInput
-                  accessibilityLabel="Gramm pro Dose"
-                  value={extras[r.extra]}
-                  onChangeText={(v) => setExtras(extras.map((x, i) => (i === r.extra ? v : x)))}
-                  placeholder="…"
-                  placeholderTextColor={theme.muted}
-                  inputMode="numeric"
-                  keyboardType="number-pad"
-                  autoFocus
-                  style={[styles.gramInput, { color: theme.ink, borderColor: theme.line, backgroundColor: theme.background }]}
-                />
-                <Text style={[styles.labelText, { color: theme.muted }]}>g</Text>
-              </View>
-            )}
-            <StepButton small label={`${what} ${name} weniger`} sign="−" disabled={n <= 0} onPress={() => change(-1)} />
+          <View key={r.key} testID={`count-${id}`} style={[styles.row, { backgroundColor: theme.surface }]}>
+            <View style={styles.rowField}>
+              <Text style={[styles.labelText, { color: theme.muted }]}>Dosen à</Text>
+              <TextInput
+                accessibilityLabel="Gramm pro Dose"
+                value={r.size}
+                onChangeText={(size) => edit(r.key, { size })}
+                placeholder="…"
+                placeholderTextColor={theme.muted}
+                inputMode="numeric"
+                keyboardType="number-pad"
+                autoFocus={r.key.startsWith("x")}
+                selectTextOnFocus
+                style={[styles.gramInput, { color: theme.ink, borderColor: unitG ? theme.line : theme.pee, backgroundColor: theme.background }]}
+              />
+              <Text style={[styles.labelText, { color: theme.muted }]}>g</Text>
+            </View>
+            <StepButton small label={`1 Dose ${name} weniger`} sign="−" disabled={n <= 0} onPress={() => change(-1)} />
             {mode === "count" ? (
               <TextInput
-                testID={r.unitG ? `count-${r.unitG}-value` : undefined}
+                testID={`count-${id}-value`}
                 accessibilityLabel={`Anzahl Dosen ${name}`}
-                value={textOf(r.key, r.unitG)}
-                onChangeText={(v) => setCounts({ ...counts, [r.key]: v })}
+                value={r.cans}
+                onChangeText={(cans) => edit(r.key, { cans })}
                 inputMode="decimal"
                 keyboardType="decimal-pad"
                 selectTextOnFocus
                 style={[styles.rowValue, styles.countInput, { color: theme.ink, borderColor: theme.line, backgroundColor: theme.background }]}
               />
             ) : (
-              <Text testID={r.unitG ? `count-${r.unitG}-value` : undefined} style={[styles.rowValue, { color: theme.ink }]}>
+              <Text testID={`count-${id}-value`} style={[styles.rowValue, { color: theme.ink }]}>
                 {formatCans(n)}
               </Text>
             )}
-            <StepButton small label={`${what} ${name} mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => change(1)} />
+            <StepButton small label={`1 Dose ${name} mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => change(1)} />
             <Pressable accessibilityRole="button" accessibilityLabel="Dosengröße entfernen" hitSlop={8} onPress={() => setRemoved([...removed, r.key])} style={({ pressed }) => [styles.remove, { opacity: pressed ? 0.6 : 1 }]}>
               <Text style={[styles.removeText, { color: theme.muted }]}>×</Text>
             </Pressable>
           </View>
         );
       })}
-      <BigButton kind="neutral" size="m" label="+ Dosengröße" a11y="Dosengröße hinzufügen" onPress={() => setExtras([...extras, ""])} />
+      {unsized ? (
+        <Text testID="stock-unsized" style={[styles.small, { color: theme.muted }]}>
+          {unsized === 1 ? "Eine Zeile ohne Dosengröße wird nicht eingetragen." : `${unsized} Zeilen ohne Dosengröße werden nicht eingetragen.`}
+        </Text>
+      ) : null}
+      <BigButton kind="neutral" size="m" label="+ Dosengröße" a11y="Dosengröße hinzufügen" onPress={() => setExtras(extras + 1)} />
     </>
   );
 
