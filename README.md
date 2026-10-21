@@ -2,11 +2,11 @@
 
 A self-hosted dog diary for a household: walks with their GPS track, pee and poop, training with exercises and
 treats, wet and dry food with what is left in stock, weight, and the week at a glance. One server per household;
-the people of the household use it from their phones (apps for iOS and Android are being built, and a Garmin app),
-and a dashboard in the browser.
+the people of the household use it from their phones (an installable web app, an Android app that records the
+route, and a Garmin app; iOS is open to the community), and the web app doubles as a dashboard in the browser.
 
-**Status:** being rebuilt for apps (version 0.x). The server and its API are ready (step 1); the phone app, the
-Garmin app and the dashboard come next ([docs/PLAN.md](docs/PLAN.md)).
+**Status:** being rebuilt (version 0.x). The server and its API are ready (step 1); the web app, the Android app and
+the Garmin app come next ([docs/PLAN.md](docs/PLAN.md)).
 
 ## Run your own server
 
