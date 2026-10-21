@@ -3,6 +3,7 @@
 // answering without reception). It shows only the running walk and training, so the rules for taps after an end and
 // for which dogs a start takes (sessionRules.ts) are applied by the server, whose answer replaces this view.
 import type { Command } from "./commands";
+import { keepsOne } from "./sessionRules";
 
 export type Person = { id: string; name: string };
 export type WalkView = { key: string; startedAt: string; dogIds: number[]; walkers: Person[]; pauses: { startedAt: string; endedAt: string | null }[]; paused: boolean };
@@ -13,7 +14,7 @@ export type SessionsView = { walk: WalkView | null; training: TrainingView | nul
 
 const byTime = (a: Command, b: Command) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
 
-function step(v: SessionsView, c: Command, user: Person): SessionsView {
+function step(v: SessionsView, c: Command, user: Person, people: readonly Person[]): SessionsView {
   const { walk, training } = v;
   switch (c.kind) {
     case "walk.start":
@@ -23,6 +24,20 @@ function step(v: SessionsView, c: Command, user: Person): SessionsView {
       // is an old one (a page cached by the service worker), the taps still reach the walk just started.
       const keyed = c.kind === "walk.start" ? { ...walk, key: c.walkKey } : walk;
       return walk.walkers.some((w) => w.id === user.id) ? { ...v, walk: keyed } : { ...v, walk: { ...keyed, walkers: [...walk.walkers, user] } };
+    }
+    case "walk.walker": {
+      if (!walk) return v;
+      if (c.on) {
+        // a person the phone doesn't know by name can't be shown; the server's answer will bring them
+        const person = people.find((p) => p.id === c.personId);
+        return !person || walk.walkers.some((w) => w.id === c.personId) ? v : { ...v, walk: { ...walk, walkers: [...walk.walkers, person] } };
+      }
+      return keepsOne(walk.walkers.map((w) => w.id), c.personId) ? { ...v, walk: { ...walk, walkers: walk.walkers.filter((w) => w.id !== c.personId) } } : v;
+    }
+    case "walk.dog": {
+      if (!walk) return v;
+      if (c.on) return walk.dogIds.includes(c.dogId) ? v : { ...v, walk: { ...walk, dogIds: [...walk.dogIds, c.dogId].sort((a, b) => a - b) } };
+      return keepsOne(walk.dogIds, c.dogId) ? { ...v, walk: { ...walk, dogIds: walk.dogIds.filter((d) => d !== c.dogId) } } : v;
     }
     case "walk.pause":
       return !walk || walk.paused ? v : { ...v, walk: { ...walk, paused: true, pauses: [...walk.pauses, { startedAt: c.at, endedAt: null }] } };
@@ -54,7 +69,8 @@ function step(v: SessionsView, c: Command, user: Person): SessionsView {
   }
 }
 
-/** The server's view with the `pending` commands by `user` applied, in time order. */
-export function project(view: SessionsView, pending: readonly Command[], user: Person): SessionsView {
-  return [...pending].sort(byTime).reduce((v, c) => step(v, c, user), view);
+/** The server's view with the `pending` commands by `user` applied, in time order. `people` are the household's
+ * members, whose names a pending walker change shows. */
+export function project(view: SessionsView, pending: readonly Command[], user: Person, people: readonly Person[] = [user]): SessionsView {
+  return [...pending].sort(byTime).reduce((v, c) => step(v, c, user, people), view);
 }

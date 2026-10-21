@@ -347,3 +347,60 @@ describe("food", () => {
     expect([...all[0].dogIds].sort()).toEqual(active);
   });
 });
+
+describe("changing walkers and dogs", () => {
+  const addDog = async (name: string, archived = false) =>
+    (await db().insertInto("dog").values({ name, color: "#3a6fc0", archived: archived ? 1 : 0, created_at: "2026-01-01T00:00:00.000Z" }).returning("id").executeTakeFirstOrThrow()).id;
+
+  test("any walker adds another household member and removes them again", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" })]);
+    const add = cmd(1, { kind: "walk.walker", walkKey: "w", personId: "bille", on: true });
+    expect(await s.apply(HIRSCH, [add])).toEqual({ applied: [add.id], dropped: [] });
+    expect(await s.apply(HIRSCH, [add])).toEqual({ applied: [add.id], dropped: [] }); // a resend is harmless
+    expect((await s.current()).walk!.walkers).toEqual([HIRSCH, HERZII]);
+    await s.apply(HERZII, [cmd(2, { kind: "walk.walker", walkKey: "w", personId: "marcel", on: false })]);
+    expect((await s.current()).walk!.walkers).toEqual([HERZII]);
+  });
+
+  test("the only walker cannot be removed, an unknown person cannot be added", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" })]);
+    const last = cmd(1, { kind: "walk.walker", walkKey: "w", personId: "marcel", on: false });
+    const unknown = cmd(2, { kind: "walk.walker", walkKey: "w", personId: "nobody", on: true });
+    expect(await s.apply(HIRSCH, [last, unknown])).toEqual({ applied: [], dropped: [last.id, unknown.id] });
+    expect((await s.current()).walk!.walkers).toEqual([HIRSCH]);
+  });
+
+  test("a dog is added and removed on a running walk; trainings stay as they are", async () => {
+    const bruno = await addDog("Bruno");
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w", dogIds: [1] }), cmd(1, { kind: "training.start", trainingKey: "t", walkKey: "w", dogIds: [1] })]);
+    await s.apply(HIRSCH, [cmd(2, { kind: "walk.dog", walkKey: "w", dogId: bruno, on: true }), cmd(3, { kind: "walk.dog", walkKey: "w", dogId: bruno, on: true })]);
+    expect((await s.current()).walk!.dogIds).toEqual([1, bruno]);
+    await s.apply(HIRSCH, [cmd(4, { kind: "walk.dog", walkKey: "w", dogId: 1, on: false })]);
+    const view = await s.current();
+    expect(view.walk!.dogIds).toEqual([bruno]);
+    expect(view.training!.dogIds).toEqual([1]);
+  });
+
+  test("the only dog cannot be removed, an archived or unknown dog cannot be added", async () => {
+    const old = await addDog("Alt", true);
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w", dogIds: [1] })]);
+    const last = cmd(1, { kind: "walk.dog", walkKey: "w", dogId: 1, on: false });
+    const archived = cmd(2, { kind: "walk.dog", walkKey: "w", dogId: old, on: true });
+    const unknown = cmd(3, { kind: "walk.dog", walkKey: "w", dogId: 999, on: true });
+    expect(await s.apply(HIRSCH, [last, archived, unknown])).toEqual({ applied: [], dropped: [last.id, archived.id, unknown.id] });
+    expect((await s.current()).walk!.dogIds).toEqual([1]);
+  });
+
+  test("a change at or after the end of the walk is dropped", async () => {
+    const bruno = await addDog("Bruno");
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w", dogIds: [1] }), cmd(30, { kind: "walk.stop", walkKey: "w" })]);
+    const walker = cmd(30, { kind: "walk.walker", walkKey: "w", personId: "bille", on: true });
+    const dog = cmd(31, { kind: "walk.dog", walkKey: "w", dogId: bruno, on: true });
+    expect(await s.apply(HIRSCH, [walker, dog])).toEqual({ applied: [], dropped: [walker.id, dog.id] });
+  });
+});

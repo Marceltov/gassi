@@ -70,3 +70,19 @@ test("with no dogs listed (the server picks them) a rep is kept", () => {
   const open: SessionsView = { walk: null, training: { ...repTraining.training!, dogIds: [] } };
   expect(project(open, [rep("01", 3, true)], HIRSCH).training!.reps).toEqual([{ exerciseId: 1, dogId: 3, ok: 1, fail: 0 }]);
 });
+
+test("a pending walker is added once with the name from the people, and removed again, but never the last one", () => {
+  const people = [HIRSCH, HERZII];
+  const add = c("01", { kind: "walk.walker", walkKey: "w", personId: "bille", on: true });
+  expect(project(walking, [add, c("02", { kind: "walk.walker", walkKey: "w", personId: "bille", on: true })], HIRSCH, people).walk!.walkers).toEqual([HIRSCH, HERZII]);
+  expect(project(walking, [add, c("02", { kind: "walk.walker", walkKey: "w", personId: "marcel", on: false })], HIRSCH, people).walk!.walkers).toEqual([HERZII]);
+  expect(project(walking, [c("02", { kind: "walk.walker", walkKey: "w", personId: "marcel", on: false })], HIRSCH, people).walk!.walkers).toEqual([HIRSCH]);
+  expect(project(walking, [c("01", { kind: "walk.walker", walkKey: "w", personId: "unknown", on: true })], HIRSCH, people).walk!.walkers).toEqual([HIRSCH]);
+});
+
+test("a pending dog is added once and removed again, but never the last one", () => {
+  const add = c("01", { kind: "walk.dog", walkKey: "w", dogId: 2, on: true });
+  expect(project(walking, [add, c("02", { kind: "walk.dog", walkKey: "w", dogId: 2, on: true })], HIRSCH).walk!.dogIds).toEqual([1, 2]);
+  expect(project(walking, [add, c("02", { kind: "walk.dog", walkKey: "w", dogId: 1, on: false })], HIRSCH).walk!.dogIds).toEqual([2]);
+  expect(project(walking, [c("02", { kind: "walk.dog", walkKey: "w", dogId: 1, on: false })], HIRSCH).walk!.dogIds).toEqual([1]);
+});

@@ -11,6 +11,9 @@ const base = { id: z.string().min(1).max(64), at: z.iso.datetime({ offset: true 
 export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("walk.start"), walkKey: key, dogIds }),
   z.object({ ...base, kind: z.literal("walk.join"), walkKey: key }),
+  // another member of the household joins or leaves the walk / a dog joins or leaves it (any walker's phone may send these)
+  z.object({ ...base, kind: z.literal("walk.walker"), walkKey: key, personId: z.string().min(1).max(64), on: z.boolean() }),
+  z.object({ ...base, kind: z.literal("walk.dog"), walkKey: key, dogId, on: z.boolean() }),
   z.object({ ...base, kind: z.literal("walk.pause"), walkKey: key }),
   z.object({ ...base, kind: z.literal("walk.resume"), walkKey: key }),
   z.object({ ...base, kind: z.literal("walk.stop"), walkKey: key }),

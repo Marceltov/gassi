@@ -24,6 +24,9 @@ export function resolveDogs(requested: readonly number[] | undefined, active: re
   return named.length ? named : [...active];
 }
 
+/** Whether a walk's walkers (or dogs) are not left empty by removing `removing`: the last one stays. */
+export const keepsOne = (ids: readonly (string | number)[], removing: string | number): boolean => ids.some((id) => id !== removing);
+
 /** Ms paused between `from` and `to` (a walk's start and end); parts of a pause outside them don't count. */
 export function pausedWithin(pauses: readonly Pause[], from: string, to: string): number {
   return pauses.reduce((sum, p) => sum + Math.max(0, Date.parse(earlier(p.endedAt ?? to, to)) - Date.parse(later(p.startedAt, from))), 0);

@@ -10,7 +10,7 @@
 //   alias of the running walk, so its later taps land there. A start arriving after the stop joins the walk that was
 //   running at its time. Trainings do the same; a training started on a walk that has since ended ends with it.
 import { sql, type Kysely } from "kysely";
-import { type Command, type Entry, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView } from "@gassi/domain";
+import { type Command, type Entry, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, keepsOne, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView } from "@gassi/domain";
 import type { DB } from "./db/open";
 import type { Schema } from "./db/schema";
 import { DogRepository } from "./dogs";
@@ -173,6 +173,10 @@ class Step {
         return this.start("walk", c.walkKey, c.at, null, c.dogIds);
       case "walk.join":
         return this.onWalk(c.walkKey, c.at, (w) => this.addWalker(w.id));
+      case "walk.walker":
+        return this.onWalk(c.walkKey, c.at, (w) => this.setWalker(w, c.personId, c.on));
+      case "walk.dog":
+        return this.onWalk(c.walkKey, c.at, (w) => this.setDog(w, c.dogId, c.on));
       case "walk.pause":
         return this.onWalk(c.walkKey, c.at, (w) => this.pause(w, c.at));
       case "walk.resume":
@@ -256,11 +260,10 @@ class Step {
     return hit && this.entries.get(hit.id);
   }
 
-  private async onWalk(key: string, at: string, act: (w: Entry) => Promise<void>): Promise<Outcome> {
+  private async onWalk(key: string, at: string, act: (w: Entry) => Promise<Outcome | void>): Promise<Outcome> {
     const w = await this.find(key, "walk");
     if (!w || isOver(w.endedAt, at)) return "dropped";
-    await act(w);
-    return "applied";
+    return (await act(w)) ?? "applied";
   }
 
   private async onTraining(key: string, at: string, act: (t: Entry) => Promise<Outcome>): Promise<Outcome> {
@@ -275,6 +278,31 @@ class Step {
       .values({ entry_id: entryId, person_id: this.user.id })
       .onConflict((oc) => oc.doNothing())
       .execute();
+  }
+
+  // Adding what is there already, or removing what is not, changes nothing; the last walker (or dog) stays.
+  private async setWalker(w: Entry, personId: string, on: boolean): Promise<Outcome> {
+    const rows = await this.tx.selectFrom("walk_walker").select("person_id").where("entry_id", "=", w.id).execute();
+    if (on) {
+      if (!(await this.tx.selectFrom("person").select("id").where("id", "=", personId).executeTakeFirst())) return "dropped";
+      await this.tx.insertInto("walk_walker").values({ entry_id: w.id, person_id: personId }).onConflict((oc) => oc.doNothing()).execute();
+    } else {
+      if (!keepsOne(rows.map((r) => r.person_id), personId)) return "dropped";
+      await this.tx.deleteFrom("walk_walker").where("entry_id", "=", w.id).where("person_id", "=", personId).execute();
+    }
+    return "applied";
+  }
+
+  // Trainings keep the dogs they started with.
+  private async setDog(w: Entry, dogId: number, on: boolean): Promise<Outcome> {
+    if (on) {
+      if (!(await this.activeDogs()).includes(dogId)) return "dropped";
+      await this.tx.insertInto("entry_dog").values({ entry_id: w.id, dog_id: dogId }).onConflict((oc) => oc.doNothing()).execute();
+    } else {
+      if (!keepsOne(w.dogIds, dogId)) return "dropped";
+      await this.tx.deleteFrom("entry_dog").where("entry_id", "=", w.id).where("dog_id", "=", dogId).execute();
+    }
+    return "applied";
   }
 
   // On a walk that has already ended (the stop arrived first), the pause ends with the walk until a resume says otherwise.

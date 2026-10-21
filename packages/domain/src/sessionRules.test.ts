@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { isOver, joinsEndedSession, pausedWithin, resolveDogs, startedTrainingEndsAt } from "./sessionRules";
+import { isOver, joinsEndedSession, keepsOne, pausedWithin, resolveDogs, startedTrainingEndsAt } from "./sessionRules";
 
 const at = (m: number) => `2026-10-20T09:${String(m).padStart(2, "0")}:00.000Z`;
 
@@ -32,5 +32,13 @@ describe("the rules for taps on walks and trainings", () => {
   test("pauses count only between start and end", () => {
     expect(pausedWithin([{ startedAt: at(10), endedAt: at(15) }, { startedAt: at(25), endedAt: null }], at(0), at(30))).toBe(10 * 60_000);
     expect(pausedWithin([{ startedAt: at(30), endedAt: at(40) }], at(0), at(35))).toBe(5 * 60_000);
+  });
+});
+
+describe("keepsOne", () => {
+  test("the last one stays, another may go", () => {
+    expect(keepsOne(["a"], "a")).toBe(false);
+    expect(keepsOne(["a", "b"], "a")).toBe(true);
+    expect(keepsOne([1], 2)).toBe(true);
   });
 });
