@@ -1,5 +1,5 @@
-import { RunningPlaceholder } from "@/src/start/RunningPlaceholder";
+import { Walk } from "@/src/walk/Walk";
 
 export default function RundeScreen() {
-  return <RunningPlaceholder title="Runde" kind="walk" />;
+  return <Walk />;
 }

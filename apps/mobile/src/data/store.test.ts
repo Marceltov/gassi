@@ -73,3 +73,28 @@ test("a refresh that goes wrong in an unexpected way keeps the state and rejects
   await expect(store.refresh()).resolves.toBeUndefined();
   expect(store.get().me).toEqual(HIRSCH);
 });
+
+test("a sessions answer asked for before a tap's answer came back does not undo the tap", async () => {
+  const server = household();
+  const walk = { key: "w1", startedAt: "2026-10-21T10:00:00.000Z", dogIds: [1], walkers: [HIRSCH], pauses: [], paused: false };
+  server.handlers["POST /api/commands"] = () => ({ applied: ["s1"], dropped: [], view: { walk, training: null } });
+  // the sessions answer is held back until the tap's answer is in: it shows the server before the tap
+  let release = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  const fetchFn: typeof fetch = async (input, init) => {
+    if (String(input).endsWith("/api/sessions")) {
+      await held;
+      return new Response(JSON.stringify({ walk: null, training: null }), { headers: { "content-type": "application/json" } });
+    }
+    return server.fetch(input, init);
+  };
+  const store = createGassiStore({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: fetchFn });
+  const refreshing = store.refresh();
+  await new Promise((r) => setTimeout(r, 20)); // the refresh now waits for the sessions answer
+  store.send(start("s1"));
+  await settle();
+  expect(store.get()).toMatchObject({ unsent: 0, view: { walk: { key: "w1" } } });
+  release();
+  await refreshing;
+  expect(store.get().view.walk).toMatchObject({ key: "w1" });
+});

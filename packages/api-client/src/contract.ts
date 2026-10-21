@@ -126,6 +126,7 @@ export const walkSummarySchema = z.object({
   pees: z.array(markSchema),
   poops: z.array(markSchema),
 });
+const walkOutput = z.object({ summary: walkSummarySchema, track: z.object({ source: z.enum(["phone", "watch"]), points: z.array(trackPointSchema), metrics: metricsSchema }).nullable() });
 
 const exerciseSchema = z.object({ id: z.number(), name: z.string() });
 const treatKindSchema = z.object({ id: z.number(), name: z.string(), gramsPerPiece: z.number(), fromDry: z.boolean() });
@@ -234,12 +235,10 @@ export const contract = {
     input: z.object({ trackId: z.string().min(1).max(64), walkKey: z.string().min(1).max(64), source: z.enum(["phone", "watch"]), seq: z.number().int().min(0), points: z.array(trackPointSchema).min(1).max(2000) }),
     output: z.object({ stored: z.boolean() }),
   }),
-  walk: endpoint({
-    method: "GET",
-    path: "/api/walks/:id",
-    input: z.object({ id }),
-    output: z.object({ summary: walkSummarySchema, track: z.object({ source: z.enum(["phone", "watch"]), points: z.array(trackPointSchema), metrics: metricsSchema }).nullable() }),
-  }),
+  walk: endpoint({ method: "GET", path: "/api/walks/:id", input: z.object({ id }), output: walkOutput }),
+  // the same for the walk a phone started (or joined) with `key`, before it knows the walk's id; 404 while the server
+  // doesn't know the key yet
+  walkByKey: endpoint({ method: "GET", path: "/api/walks/key/:key", input: z.object({ key: z.string().min(1).max(64) }), output: walkOutput }),
   exercises: endpoint({ method: "GET", path: "/api/exercises", input: none, output: z.object({ exercises: z.array(exerciseSchema) }) }),
   addExercise: endpoint({ method: "POST", path: "/api/exercises", input: z.object({ name: z.string() }), output: exerciseSchema }),
   updateExercise: endpoint({ method: "PATCH", path: "/api/exercises/:id", input: z.object({ id, name: z.string().optional(), archived: z.literal(true).optional() }), output: z.object({ updated: z.literal(true) }) }),

@@ -77,6 +77,11 @@ const implementations: Implementations<ApiDeps> = {
     const [summary, track] = await Promise.all([(await sessions(deps)).summary(input.id), new Tracks(deps.db, deps.now).forWalk(input.id)]);
     return { summary, track };
   },
+  walkByKey: async ({ input, deps }) => {
+    const summary = await (await sessions(deps)).summaryFor(input.key);
+    if (!summary) throw new NotFound("Diese Runde gibt es nicht.");
+    return { summary, track: await new Tracks(deps.db, deps.now).forWalk(summary.id) };
+  },
   exercises: async ({ deps }) => ({ exercises: await new Catalog(deps.db).exercises() }),
   addExercise: async ({ input, deps }) => new Catalog(deps.db).addExercise(input.name),
   updateExercise: async ({ input, deps }) => {

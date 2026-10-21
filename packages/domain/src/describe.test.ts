@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { type DescribableEntry, describeEntry } from "./describe";
+import { type DescribableEntry, describeEntry, formatDistance } from "./describe";
 
 const entry = (more: Partial<DescribableEntry>): DescribableEntry => ({
   type: "walk",
@@ -40,4 +40,8 @@ test("food, weight, restock and stock", () => {
   expect(text(entry({ type: "restock", foodKind: "wet", amountG: 4800, unitG: 400 }))).toBe("Einkauf Nassfutter, 12 × 400 g von Hirsch");
   expect(text(entry({ type: "restock", foodKind: "dry", amountG: 10_000 }))).toBe("Einkauf Trockenfutter, 10 kg von Hirsch");
   expect(text(entry({ type: "stockcheck", foodKind: "dry", amountG: 3500 }))).toBe("Bestand Trockenfutter, 3,5 kg von Hirsch");
+});
+
+test("a distance reads in metres under a kilometre, else in km with one decimal", () => {
+  expect([formatDistance(0), formatDistance(849.6), formatDistance(1000), formatDistance(3149)]).toEqual(["0 m", "850 m", "1,0 km", "3,1 km"]);
 });

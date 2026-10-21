@@ -1,22 +1,11 @@
 // The Start screen: four tiles on top, three buttons at the bottom, and a walk that starts with one tap. The server is
 // shared, so each test starts with nothing running and ends what it started.
-import { readFileSync } from "node:fs";
 import { createClient } from "@gassi/api-client";
 import { expect, test } from "@playwright/test";
-import { BASE_URL, TOKEN_FILE } from "../playwright.config";
+import { BASE_URL } from "../playwright.config";
+import { asHirsch, stopEverything } from "./sessions";
 import { signIn } from "./signed-in";
 
-const asHirsch = () => createClient({ baseUrl: BASE_URL, token: readFileSync(TOKEN_FILE, "utf8").trim() });
-async function stopEverything() {
-  const client = asHirsch();
-  const { walk, training } = await client.sessions();
-  const at = new Date().toISOString();
-  const commands = [
-    ...(training ? [{ id: `stop-t-${Date.now()}`, at, kind: "training.stop" as const, trainingKey: training.key }] : []),
-    ...(walk ? [{ id: `stop-w-${Date.now()}`, at, kind: "walk.stop" as const, walkKey: walk.key }] : []),
-  ];
-  if (commands.length) await client.commands({ commands });
-}
 test.beforeEach(stopEverything);
 test.afterEach(stopEverything);
 

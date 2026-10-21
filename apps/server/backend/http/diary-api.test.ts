@@ -73,6 +73,18 @@ describe("tracks over the API", () => {
     expect(Math.round(body.track.metrics.distanceM)).toBe(1000);
   });
 
+  test("the phone that started a walk finds it by its key, also a key that joined; an unknown key is 404", async () => {
+    const [hirsch, herzii] = [await tokenFor(HIRSCH.id), await tokenFor(HERZII.id)];
+    await json("/api/commands", { method: "POST", token: hirsch, body: { commands: [{ id: "k-s", at: "2026-10-20T07:00:00.000Z", kind: "walk.start", walkKey: "k1" }] } });
+    await json("/api/commands", { method: "POST", token: herzii, body: { commands: [{ id: "k-s2", at: "2026-10-20T07:01:00.000Z", kind: "walk.start", walkKey: "k2" }, { id: "k-p", at: "2026-10-20T07:05:00.000Z", kind: "log", type: "pee", dogId: 1 }, { id: "k-e", at: "2026-10-20T07:10:00.000Z", kind: "walk.stop", walkKey: "k2" }] } });
+    const { body: entries } = await json("/api/entries?type=walk&day=2026-10-20", { token: hirsch });
+    const walk = entries.entries.find((e: { clientKey: string }) => e.clientKey === "k1");
+    const { status, body } = await json("/api/walks/key/k2", { token: herzii });
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ summary: { id: walk.id, totalMin: 10, walkers: [HIRSCH, HERZII], pees: [{ at: "2026-10-20T07:05:00.000Z", dogId: 1 }] }, track: null });
+    expect((await json("/api/walks/key/nope", { token: hirsch })).status).toBe(404);
+  });
+
   test("a point out of range or too many points are refused; a walk id that isn't a walk is 404", async () => {
     const token = await tokenFor(HIRSCH.id);
     const bad = { trackId: "t", walkKey: "w", source: "phone", seq: 0, points: [{ ...point(0, 0), lat: 91 }] };

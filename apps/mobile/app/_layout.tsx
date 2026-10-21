@@ -29,6 +29,7 @@ function Screens() {
       <Stack.Protected guard={signedIn} redirectTo="/anmelden">
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="runde" />
+        <Stack.Screen name="runde/[id]" />
         <Stack.Screen name="training" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn} redirectTo="/">

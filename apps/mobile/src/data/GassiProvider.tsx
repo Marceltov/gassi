@@ -12,7 +12,7 @@ import { createGassiStore, type GassiState, type GassiStore } from "./store";
 export type Gassi = GassiState & { signedIn: boolean; api: Client | null; send(cmd: Command): void; refresh(): Promise<void> };
 
 const REFRESH_MS = 30_000;
-const signedOut: GassiState = { me: null, household: null, people: [], dogs: [], exercises: [], treatKinds: [], view: { walk: null, training: null }, unsent: 0, online: true };
+const signedOut: GassiState = { me: null, household: null, people: [], dogs: [], exercises: [], treatKinds: [], view: { walk: null, training: null }, pending: [], unsent: 0, online: true };
 const noStore = { subscribe: () => () => {}, get: () => signedOut };
 
 const GassiContext = createContext<Gassi | null>(null);

@@ -26,7 +26,8 @@ export type GassiState = {
   treatKinds: TreatKind[];
   /** the server's walk and training with the unsent taps laid over */
   view: SessionsView;
-  /** taps not yet confirmed by the server */
+  /** taps not yet confirmed by the server, and how many */
+  pending: readonly Command[];
   unsent: number;
   /** whether the last call reached the server */
   online: boolean;
@@ -43,7 +44,7 @@ export type GassiStore = {
   start(): () => void;
 };
 
-type Known = Omit<GassiState, "view" | "unsent" | "online" | "me"> & { me: Person };
+type Known = Omit<GassiState, "view" | "pending" | "unsent" | "online" | "me"> & { me: Person };
 
 const NOTHING_RUNS: SessionsView = { walk: null, training: null };
 
@@ -65,6 +66,8 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
     ? { me: kept.me, household: kept.household, people: kept.people, dogs: kept.dogs, exercises: kept.exercises, treatKinds: kept.treatKinds }
     : { me: device.person, household: null, people: [device.person], dogs: [], exercises: [], treatKinds: [] };
   let serverView = kept?.view ?? NOTHING_RUNS;
+  // counts the queue's answers: a sessions answer asked for before one of them is older than it and is not shown
+  let answers = 0;
   let state: GassiState;
   const listeners = new Set<() => void>();
 
@@ -72,7 +75,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
     const { me, people, dogs } = household;
     const pending = queue.pending();
     const activeDogs = dogs.filter((d) => !d.archived).map((d) => d.id);
-    state = { ...household, me, view: project(serverView, pending, me, people, activeDogs), unsent: pending.length, online };
+    state = { ...household, me, view: project(serverView, pending, me, people, activeDogs), pending, unsent: pending.length, online };
     listeners.forEach((fn) => fn());
   }
   const keep = () => saveSnapshot({ ...household, view: serverView });
@@ -92,6 +95,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
   const queue = createCommandQueue({ storage: queueStorage(), send: sendCommands, key: queueKey });
   queue.subscribe((_, view) => {
     if (view) {
+      answers++;
       serverView = view;
       keep();
     }
@@ -104,8 +108,12 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
       const [me, people, dogs, exercises, treatKinds] = await Promise.all([api.me(), api.people(), api.dogs(), api.exercises(), api.treatKinds()]);
       household = { me: me.person, household: me.household, people: people.people, dogs: dogs.dogs, exercises: exercises.exercises, treatKinds: treatKinds.treatKinds };
       await queue.flush();
-      serverView = await api.sessions();
-      keep();
+      const asked = answers;
+      const sessions = await api.sessions();
+      if (asked === answers) {
+        serverView = sessions;
+        keep();
+      }
     } catch {
       // no reception, signed out (the 401 already cleared the device), or an answer that didn't fit: keep showing
       // what we have; the next refresh tries again
