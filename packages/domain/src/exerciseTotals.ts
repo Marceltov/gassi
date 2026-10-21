@@ -12,3 +12,9 @@ export function exerciseTotals(rows: readonly ExerciseTotal[]): ExerciseTotal[] 
   }
   return [...totals.values()].filter((t) => t.ok + t.fail > 0);
 }
+
+/** The running training's summary: "Sitz 4/5 · Platz 2/4 · 5 Leckerli" (successes/repetitions per exercise, then all treats). */
+export function trainingSummaryLine(rows: readonly ExerciseTotal[], treats: number): string {
+  const parts = [...exerciseTotals(rows).map((t) => `${t.name} ${t.ok}/${t.ok + t.fail}`), ...(treats > 0 ? [`${treats} Leckerli`] : [])];
+  return parts.length ? parts.join(" · ") : "Noch nichts";
+}

@@ -13,6 +13,7 @@ import { useTheme } from "../theme";
 import { hhmm } from "../time";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
+import { DogChoiceSheet } from "../ui/DogChoiceSheet";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
 import { saveEnded } from "./ended";
@@ -142,14 +143,14 @@ export function Walk() {
           </View>
           <BigButton kind="walk" size="l" label="🏠 Zuhause" onPress={home} />
 
-          <Sheet open={choosing !== null} onClose={() => setChoosing(null)}>
-            <View testID="dog-choice" style={styles.sheet}>
-              <Text style={[styles.title, { color: theme.ink }]}>{choosing ? `${LABEL[choosing]} – welcher Hund?` : ""}</Text>
-              {walkDogs.map((id) => (
-                <BigButton key={id} kind={choosing ?? "pee"} size="l" label={dogName(id)} onPress={() => choosing && log(choosing, id)} />
-              ))}
-            </View>
-          </Sheet>
+          <DogChoiceSheet
+            open={choosing !== null}
+            title={choosing ? `${LABEL[choosing]} – welcher Hund?` : ""}
+            kind={choosing ?? "pee"}
+            dogs={walkDogs.map((id) => ({ id, name: dogName(id) }))}
+            onPick={(id) => choosing && log(choosing, id)}
+            onClose={() => setChoosing(null)}
+          />
           <Sheet open={adding} onClose={() => setAdding(false)}>
             <View style={styles.sheet}>
               <Text style={[styles.title, { color: theme.ink }]}>Wer kommt mit?</Text>

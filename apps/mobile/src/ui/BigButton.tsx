@@ -10,16 +10,21 @@ type Props = {
   sub?: string;
   onPress?: () => void;
   size?: keyof typeof sizes;
+  /** Held down: for the "undo" of a counting tap. */
+  onLongPress?: () => void;
+  /** What a screen reader says, when the label alone is not enough (a "✓" per exercise). */
+  a11y?: string;
 };
 
-export function BigButton({ kind, label, sub, onPress, size = "xl" }: Props) {
+export function BigButton({ kind, label, sub, onPress, onLongPress, a11y, size = "xl" }: Props) {
   const theme = useTheme();
   const { height, font } = sizes[size];
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={sub ? `${label}, ${sub}` : label}
+      accessibilityLabel={a11y ?? (sub ? `${label}, ${sub}` : label)}
       onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => [styles.button, { height, backgroundColor: theme[kind], opacity: pressed ? 0.8 : 1 }]}
     >
       <Text style={[styles.label, { fontSize: font, color: kind === "neutral" ? theme.ink : "#fff" }]}>{label}</Text>

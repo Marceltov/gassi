@@ -1,5 +1,5 @@
-import { RunningPlaceholder } from "@/src/start/RunningPlaceholder";
+import { Training } from "@/src/training/Training";
 
 export default function TrainingScreen() {
-  return <RunningPlaceholder title="Training" kind="training" />;
+  return <Training />;
 }
