@@ -29,6 +29,10 @@ const SYMBOLS = {
   cross: sym("xmark", "close"),
   next: sym("chevron.right", "chevron_right"),
   back: sym("chevron.left", "chevron_left"),
+  add: sym("plus", "add"),
+  invite: sym("person.badge.plus", "person_add"),
+  treat: sym("gift.fill", "pet_supplies"),
+  signIn: sym("arrow.right.circle.fill", "login"),
 };
 
 export type IconName = keyof typeof SYMBOLS | "poop";

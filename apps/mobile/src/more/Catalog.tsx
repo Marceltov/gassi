@@ -97,7 +97,7 @@ export function Catalog() {
                   </>
                 ) : null}
                 {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-                <BigButton kind="training" size="l" label={editing.item ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />
+                <BigButton kind="training" size="l" icon={editing.item ? "check" : "add"} label={editing.item ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />
                 {editing.item ? <BigButton kind="neutral" size="m" label="Entfernen" onPress={() => remove(editing)} /> : null}
                 <BigButton kind="neutral" size="m" label="Abbrechen" onPress={() => setEditing(null)} />
               </View>
@@ -109,10 +109,10 @@ export function Catalog() {
         <>
           <View style={styles.pair}>
             <View style={styles.half}>
-              <BigButton kind="training" size="l" label="Übung dazu" onPress={() => open({ what: "exercise", item: null, name: "" })} />
+              <BigButton kind="training" size="l" icon="add" label="Übung dazu" onPress={() => open({ what: "exercise", item: null, name: "" })} />
             </View>
             <View style={styles.half}>
-              <BigButton kind="training" size="l" label="Leckerli dazu" onPress={() => open(newTreat)} />
+              <BigButton kind="training" size="l" icon="add" label="Leckerli dazu" onPress={() => open(newTreat)} />
             </View>
           </View>
           <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />

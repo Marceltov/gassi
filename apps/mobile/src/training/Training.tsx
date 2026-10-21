@@ -165,7 +165,7 @@ export function Training() {
             <View style={[styles.row, styles.wrap]}>
               {treatKinds.map((k) => (
                 <View key={k.id} style={[styles.cell, styles.treat]}>
-                  <BigButton kind="food" size="m" label={`${k.name} · ${training.treats[k.id] ?? 0}`} sub="+1" a11y={`${k.name} +1`} onPress={() => treat(k.id, 1)} onLongPress={() => treat(k.id, -1)} />
+                  <BigButton kind="food" size="m" icon="treat" label={`${k.name} · ${training.treats[k.id] ?? 0}`} sub="+1" a11y={`${k.name} +1`} onPress={() => treat(k.id, 1)} onLongPress={() => treat(k.id, -1)} />
                 </View>
               ))}
             </View>
@@ -194,7 +194,7 @@ export function Training() {
                     {message}
                   </Text>
                 ) : null}
-                <BigButton kind="training" size="l" label="Anlegen" disabled={!naming.trim()} onPress={create} />
+                <BigButton kind="training" size="l" icon="add" label="Anlegen" disabled={!naming.trim()} onPress={create} />
               </View>
             )}
           </Sheet>

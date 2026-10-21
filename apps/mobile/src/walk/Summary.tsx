@@ -110,7 +110,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
           {shown.id !== null && !local ? <BigButton kind="neutral" size="m" label="Zeit, Hunde, Löschen …" onPress={() => router.push(`/eintrag/${shown.id}`)} /> : null}
         </>
       }
-      bottom={<BigButton kind="walk" size="l" label="Fertig" onPress={done} />}
+      bottom={<BigButton kind="walk" size="l" icon="check" label="Fertig" onPress={done} />}
     />
   );
 

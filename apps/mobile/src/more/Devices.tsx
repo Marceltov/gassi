@@ -100,7 +100,7 @@ export function Devices() {
       bottom={
         <>
           {message ?? invites.message ? <Text style={[styles.message, { color: theme.ink }]}>{message ?? invites.message}</Text> : null}
-          <BigButton kind="walk" size="l" label="Gerät hinzufügen" onPress={invites.create} />
+          <BigButton kind="walk" size="l" icon="add" label="Gerät hinzufügen" onPress={invites.create} />
           <View style={styles.pair}>
             <View style={styles.half}>
               <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />

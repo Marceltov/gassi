@@ -164,7 +164,7 @@ export function EntryDetail({ id }: { id: number }) {
       }
       bottom={
         <>
-          <BigButton kind={BUTTON[entry.type] ?? "neutral"} size="l" label="Speichern" onPress={() => void save(entry, form)} />
+          <BigButton kind={BUTTON[entry.type] ?? "neutral"} size="l" icon="check" label="Speichern" onPress={() => void save(entry, form)} />
           <View style={styles.pair}>
             <View style={styles.half}>
               <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />

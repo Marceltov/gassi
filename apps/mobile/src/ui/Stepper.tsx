@@ -14,7 +14,7 @@ export function StepButton({ label, sign, disabled, small, onPress }: StepProps)
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [small ? styles.small : styles.big, { backgroundColor: small ? theme.neutral : theme.surface, opacity: disabled ? 0.4 : pressed ? 0.7 : 1 }]}
+      style={({ pressed }) => [small ? styles.small : styles.big, { backgroundColor: small ? theme.neutral : theme.surface, boxShadow: disabled ? undefined : theme.calm, opacity: disabled ? 0.4 : pressed ? 0.7 : 1 }]}
     >
       <Text style={[small ? styles.smallText : styles.bigText, { color: theme.ink }]}>{sign}</Text>
     </Pressable>

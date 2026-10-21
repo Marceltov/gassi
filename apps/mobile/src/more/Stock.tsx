@@ -223,7 +223,7 @@ export function Stock() {
               </View>
             </View>
           )}
-          <BigButton kind="food" size="l" label="Eintragen" disabled={!ready} onPress={save} />
+          <BigButton kind="food" size="l" icon="check" label="Eintragen" disabled={!ready} onPress={save} />
           <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />
         </>
       }

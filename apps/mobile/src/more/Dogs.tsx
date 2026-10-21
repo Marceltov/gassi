@@ -76,7 +76,7 @@ export function Dogs() {
                   ))}
                 </View>
                 {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-                <BigButton kind="walk" size="l" label={editing.dog ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />
+                <BigButton kind="walk" size="l" icon={editing.dog ? "check" : "add"} label={editing.dog ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />
                 {editing.dog ? (
                   <BigButton kind="neutral" size="m" label={editing.dog.archived ? "Zurückholen" : "Archivieren"} onPress={() => editing.dog && archive(editing.dog, !editing.dog.archived)} />
                 ) : null}
@@ -88,7 +88,7 @@ export function Dogs() {
       }
       bottom={
         <>
-          <BigButton kind="walk" size="l" label="Hund hinzufügen" onPress={() => open(null)} />
+          <BigButton kind="walk" size="l" icon="add" label="Hund hinzufügen" onPress={() => open(null)} />
           <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />
         </>
       }

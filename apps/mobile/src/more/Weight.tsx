@@ -71,7 +71,7 @@ export function Weight() {
         <>
           {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
           <Field label="Gewicht in kg" value={kg} onChangeText={setKg} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" onSubmitEditing={() => kg.trim() && save()} />
-          <BigButton kind="walk" size="l" label="Eintragen" disabled={!kg.trim()} onPress={save} />
+          <BigButton kind="walk" size="l" icon="check" label="Eintragen" disabled={!kg.trim()} onPress={save} />
           <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />
         </>
       }
