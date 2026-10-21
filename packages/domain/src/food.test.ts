@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { canChoices, clampPortion, countLine, countTitle, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
+import { canChoices, clampPortion, countLine, mergeSizes, countTitle, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
 import type { CanStock, Stock, WetStock } from "./stock";
 
 const can = (unitG: number, cans: number): CanStock => ({ unitG, grams: cans * unitG, cans, belowZero: false });
@@ -85,4 +85,8 @@ test("a wet count as one thing: its title and its sizes", () => {
   expect(countTitle("2026-10-20T08:05:00.000Z", "Europe/Berlin")).toBe("Zählung vom 20.10., 10:05");
   expect(countLine([{ unitG: 400, amountG: 1200 }, { unitG: 800, amountG: 800 }])).toBe("3 × 400 g, 1 × 800 g");
   expect(countLine([{ unitG: 395, amountG: 592 }, { unitG: 800, amountG: 0 }])).toBe("1½ × 395 g, 0 × 800 g");
+});
+
+test("rows of the same can size add up (a new row typed with a known size)", () => {
+  expect(mergeSizes([{ unitG: 400, cans: 2 }, { unitG: 800, cans: 1 }, { unitG: 400, cans: 1.5 }])).toEqual([{ unitG: 400, cans: 3.5 }, { unitG: 800, cans: 1 }]);
 });

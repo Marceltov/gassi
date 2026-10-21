@@ -5,7 +5,7 @@
 // size added with "+ Dosengröße" (its grams typed in the row; one without grams isn't recorded); dry food one amount in
 // g or kg. One Eintragen records it all.
 import type { DryUnit, FoodKind } from "@gassi/domain";
-import { formatCans, stockParts } from "@gassi/domain";
+import { formatCans, mergeSizes, stockParts } from "@gassi/domain";
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import { radius, useTheme } from "../theme";
@@ -54,7 +54,7 @@ export function Stock() {
   ];
   const countOf = (key: string, unitG: number | null) => counts[key] ?? (mode === "count" && unitG ? (stock?.wet.sizes.find((s) => s.unitG === unitG)?.cans ?? 0) : 0);
   const sized = rows.flatMap((r) => (r.unitG ? [{ unitG: r.unitG, cans: countOf(r.key, r.unitG) }] : []));
-  const sizes = [...new Map(sized.map((s) => [s.unitG, s])).values()]; // a typed size that is known already counts once
+  const sizes = mergeSizes(sized); // a new row typed with a known size adds to that size
 
   // a message is about what was entered, and the rows are for one mode: both go when the form changes
   const reset = () => {

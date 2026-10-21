@@ -21,6 +21,10 @@ export type Treat = { at: string; grams: number };
 /** Grams lost to rounding ½ Dose (395 g → 198 g) that must not take a half can away. */
 const HALF_SLACK_G = 5;
 
+/** What a feeding takes out of cans of `unitG` grams: ½ Dose (stored as whole grams, 395 g → 198 g) is exactly half a
+ * can, so that many halves don't drift; anything else is its grams. */
+export const canGrams = (grams: number, unitG: number): number => (grams === Math.round(unitG / 2) ? unitG / 2 : grams);
+
 /** Whole and half cans in `grams` of cans of `unitG` grams, rounded down to ½, give or take a few grams. */
 export const cansOf = (grams: number, unitG: number): number => Math.max(0, Math.floor(((grams + HALF_SLACK_G) / unitG) * 2) / 2);
 
@@ -72,7 +76,7 @@ function wetStock(entries: readonly Entry[], now: number): WetStock {
     // after a count: what it said for this size (0 when it left the size out); else from this size's first restock
     const from = checkAt ?? restocks.find(mine)?.at ?? "";
     const counts = (e: Entry) => mine(e) && (checkAt ? e.at > checkAt : e.at >= from);
-    const grams = sum(check.filter(mine)) + sum(restocks.filter(counts)) - sum(feedings.filter(counts));
+    const grams = sum(check.filter(mine)) + sum(restocks.filter(counts)) - feedings.filter(counts).reduce((g, e) => g + canGrams(e.amountG ?? 0, unitG), 0);
     const left = Math.max(0, grams);
     return { unitG, grams: left, cans: cansOf(left, unitG), belowZero: grams < 0 };
   });

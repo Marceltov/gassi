@@ -107,3 +107,10 @@ export function countTitle(at: string, timeZone: string): string {
   const local = utcToLocal(Date.parse(at), timeZone); // "2026-10-20T10:05"
   return `Zählung vom ${local.slice(8, 10)}.${local.slice(5, 7)}., ${local.slice(11)}`;
 }
+
+/** Cans per size from the stock screen's rows: rows of the same size (a new row typed with a known size) add up. */
+export function mergeSizes(rows: readonly { unitG: number; cans: number }[]): { unitG: number; cans: number }[] {
+  const by = new Map<number, number>();
+  for (const r of rows) by.set(r.unitG, (by.get(r.unitG) ?? 0) + r.cans);
+  return [...by].map(([unitG, cans]) => ({ unitG, cans }));
+}

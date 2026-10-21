@@ -152,6 +152,14 @@ describe("a wet count is one thing", () => {
     expect(await counts(d)).toEqual([[400, 3], [800, 1]]);
   });
 
+  test("a count can't be moved onto another count's time", async () => {
+    const { d, entries } = await twoSizes();
+    const other = (await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: 9 }] })).entries[0];
+    await expect(d.edit(entries[0].id, { at: other.at, amountG: 1200, foodKind: "wet", unitG: 400 })).rejects.toThrow(new InputError("Zu dieser Zeit gibt es schon eine Zählung."));
+    expect((await d.get(entries[1].id))?.at).toBe(entries[1].at); // nothing moved
+    expect((await d.edit(entries[0].id, { at: entries[0].at, amountG: 1200, foodKind: "wet", unitG: 400, note: "gleiche Zeit" }))?.note).toBe("gleiche Zeit"); // its own time is fine
+  });
+
   test("deleting one row deletes the whole count", async () => {
     const { d, entries } = await twoSizes();
     expect(await d.remove(entries[0].id)).toBe(true);

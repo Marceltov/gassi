@@ -68,6 +68,14 @@ describe("computeStock", () => {
     expect(cansOf(395 * 2, 395)).toBe(2);
   });
 
+  test("½ Dose and 1 Dose come out exactly, however many: 20 halves of 395 g and of 425 g", () => {
+    const halves = (unitG: number, n: number) => Array.from({ length: n }, (_, i) => feedCan(day(1 + i * 0.01), Math.round(unitG / 2), unitG));
+    expect(wetOf(stock([restockWet(day(3), 12, 395), ...halves(395, 11)]))).toEqual([[395, 6.5]]);
+    expect(wetOf(stock([restockWet(day(3), 12, 395), ...halves(395, 20)]))).toEqual([[395, 2]]);
+    expect(wetOf(stock([restockWet(day(3), 12, 425), ...halves(425, 21)]))).toEqual([[425, 1.5]]);
+    expect(wetOf(stock([restockWet(day(3), 3, 395), feedCan(day(1), 395, 395)]))).toEqual([[395, 2]]);
+  });
+
   test("dry treats count against dry food", () => {
     const s = stock([e("restock", day(3), { foodKind: "dry", amountG: 10_000 }), feed(day(1), "dry", 80)], [{ at: day(1), grams: 5 }, { at: day(4), grams: 50 }]);
     expect(s.dry.grams).toBe(10_000 - 80 - 5);

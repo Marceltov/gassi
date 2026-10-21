@@ -114,6 +114,12 @@ export class Diary {
     }
     // without an end it would run again (it was started on the walk screen); a walk logged afterwards may lose its end
     if (before?.clientKey && before.endedAt && !fields.endedAt) throw new InputError(before.type === "walk" ? "Eine beendete Runde braucht ein Ende." : "Ein beendetes Training braucht ein Ende.");
+    // a count moved onto another count's time would become one count with that one's sizes twice
+    if (before && isWetCount(before) && fields.at && new Date(fields.at).toISOString() !== before.at) {
+      const at = new Date(fields.at).toISOString();
+      const taken = await this.deps.db.selectFrom("entry").select("id").where("type", "=", "stockcheck").where("food_kind", "=", "wet").where("at", "=", at).executeTakeFirst();
+      if (taken) throw new InputError("Zu dieser Zeit gibt es schon eine Zählung.");
+    }
     // the entry and its walkers change together or not at all
     const entry = await this.deps.db.transaction().execute(async (tx) => {
       const updated = await new EntryRepository(tx, this.deps.now).update(id, fields);
