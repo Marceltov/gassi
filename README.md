@@ -5,8 +5,8 @@ treats, wet and dry food with what is left in stock, weight, and the week at a g
 the people of the household use it from their phones (an installable web app, an Android app that records the
 route, and a Garmin app; iOS is open to the community), and the web app doubles as a dashboard in the browser.
 
-**Status:** being rebuilt (version 0.x). The server and its API are ready (step 1); the web app, the Android app and
-the Garmin app come next ([docs/PLAN.md](docs/PLAN.md)).
+**Status:** being rebuilt (version 0.x). The server, its API and the web app are ready (steps 1 and 2); the Android
+app and the Garmin app come next ([docs/PLAN.md](docs/PLAN.md)).
 
 ## Run your own server
 
@@ -29,11 +29,13 @@ Only `PUBLIC_URL` is required. On first start the log shows a setup link:
 Gassi einrichten: https://gassi.example.org/l/…
 ```
 
-Open it on your phone: it opens the Gassi app (or shows a QR code for it), you enter your name and your dog's, and
-the server is set up. A new link is printed on each start until then. Everyone else joins through an invite link
-you create in the app and send them; each phone, the watch or a script gets its own device, which you can sign out.
-Each link's page (and a sign-in mail) also shows a short code: the web app installed on an iPhone's home screen
-doesn't share Safari's storage, so there you type the code instead of opening the link.
+Open it on your phone: it opens the web app (the server serves it at its own address), you enter your name and your
+dog's, and the server is set up. A new link is printed on each start until then. Everyone else joins through an
+invite link you create in the app (Mehr → Haushalt) and send them; each phone, the watch or a script gets its own
+device, which you can sign out (Mehr → Meine Geräte). Each link's page (and a sign-in mail) also shows a short code:
+the web app installed on an iPhone's home screen doesn't share Safari's storage, so there you install first
+(Teilen → Zum Home-Bildschirm) and type the code in the installed app. On Android, Chrome offers to install it. After
+the first visit the web app opens without reception too, and taps wait until it is back.
 
 Optional settings:
 
@@ -61,7 +63,9 @@ for TypeScript. A script gets its token like any device: through an invite link 
 ## Develop
 
 Node 22 (`.nvmrc`), npm workspaces: `packages/domain` (the rules, shared), `packages/api-client` (contract and client),
-`apps/server` (Next.js server). From the repo root: `npm install`, `npm test`, `npm run test:e2e`, `npm run lint`,
-`npm run typecheck`; `npm run dev -w @gassi/server` with `apps/server/.env.local` (see `.env.example` there).
+`apps/mobile` (the Expo app, for the web and Android), `apps/server` (Next.js server, which also serves the web app).
+From the repo root: `npm install`, `npm test`, `npm run test:e2e`, `npm run lint`, `npm run typecheck`;
+`npm run dev -w @gassi/server` with `apps/server/.env.local` (see `.env.example` there) and the app with
+`npm run web -w @gassi/mobile` (see `apps/mobile/.env.example`).
 
 How it is planned and built: [docs/PLAN.md](docs/PLAN.md), [docs/BUILD.md](docs/BUILD.md), [docs/adr/](docs/adr/).

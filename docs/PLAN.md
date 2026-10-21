@@ -9,7 +9,7 @@ on 2026-10-21, ADR 0005).
 - **Web app** (installable PWA, phone-first): logging, including walks without a track (start/stop, pauses, several
   walkers, pee/poop during the walk), food and stock, training, weight; today, history, week, statistics and maps;
   also the dashboard on a big screen. Taps queue on the device without reception.
-- **Android app** (React Native with Expo) with native look and feel: everything for daily use, plus the walk's GPS
+- **Android app** (the same Expo app, ADR 0006) with native look and feel: everything for daily use, plus the walk's GPS
   track recorded in the background. Built with EAS during development. An iOS app is left to the community.
 - **Garmin app** (Connect IQ, Forerunner 165 first): start/stop, pee, poop, training and treats from the wrist; the
   watch records the track and saves the walk as a Garmin activity (from there Komoot and Apple Health). It gets its
@@ -20,7 +20,7 @@ on 2026-10-21, ADR 0005).
 - **Monorepo, no redundancy:** `packages/domain` holds the rules once, `packages/api-client` the API once.
 
 Order, each with its own design and plan: 1 foundation (done: monorepo, API with device tokens and links, dogs,
-tracks) · 2 the web app · 3 the Android app · 4 the Garmin app · 5 release (open source, APK on GitHub, self-hosting
+tracks) · 2 the web app (done: one Expo app in `apps/mobile`, exported for the web, ADR 0006) · 3 the Android app · 4 the Garmin app · 5 release (open source, APK on GitHub, self-hosting
 guide, the update path for other households, optional Play Store). Non-goals for now: a hosted service, several
 households per server, reminders, training plans, vet records, an iOS app built by us. Versions stay 0.x until real data of others exists; nobody depends on 0.2, so no compatibility layers.
 

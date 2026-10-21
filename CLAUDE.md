@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Gassi is a self-hosted dog diary (walks with GPS tracks, training, food and stock, weight) being rebuilt as a web
 app, an Android app, a Garmin app and a self-hostable server. Step 1 (foundation: monorepo, API, sign-in by links,
-dogs, tracks) is built; the web app, the Android app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay 0.x until there is real data.
+dogs, tracks) and step 2 (the app: one Expo app, shipped for the web first, ADR 0006) are built; the Android build of
+the same app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay 0.x until there is real data.
 `docs/BUILD.md` holds the implementation decisions, `docs/adr/` the architecture decisions.
 
 ## Commands (from the repo root)
@@ -15,6 +16,9 @@ dogs, tracks) is built; the web app, the Android app and the Garmin app follow (
 - `npm run test:e2e` (builds the server, then Playwright: the API through the typed client, the link page in Chromium)
 - `npm run typecheck`, `npm run lint`
 - `npm run dev -w @gassi/server` (needs `apps/server/.env.local`, see `apps/server/.env.example`)
+- The app in dev: `npm run web -w @gassi/mobile` (port 8081) against that server, with `CORS_ORIGIN=http://localhost:8081`
+  in the server's `.env.local` and `EXPO_PUBLIC_API_URL=http://localhost:3000` in `apps/mobile/.env.local` (see
+  `apps/mobile/.env.example`). The server's build exports the app into `apps/server/public` (`scripts/web.mjs`).
 - `scripts/quiet.sh <command>` prints only failures and the summary of a long run
 - Installs run without scripts (`.npmrc`): better-sqlite3 loads its prebuilt binary.
 
@@ -29,6 +33,12 @@ dogs, tracks) is built; the web app, the Android app and the Garmin app follow (
   `backend/index.ts`. `backend/http/router.ts` serves the contract from one catch-all route (`app/api/[...path]`);
   `backend/http/api.ts` maps each endpoint to a use case (`diary.ts`, `sessions.ts`, `tracks.ts`, `catalog.ts`,
   `dogs.ts`, `auth/*`). Devices sign in with Bearer tokens from one-time links (ADR 0004).
+- `apps/mobile` (`@gassi/mobile`): the Expo Router app for the web now and Android in step 3 (ADR 0006). Screens in
+  `app/` stay thin and render from `src/` (start, walk, food, training, history, week, more). `src/data` holds the
+  device, the command queue and the household snapshot behind modules with a `.web.ts` file (localStorage); other
+  platform parts the same way (`.web.tsx`: maps, pickers, sheet). No domain rules here; writes other than taps need the
+  server and say `OFFLINE`. `public/` holds the web page template, manifest and service worker. Its e2e tests run
+  against the server's build in `apps/server/e2e` (`app-*.spec.ts`).
 - Tests sit next to the code. Outside calls are injected (`fetch`, `now`, the database), not mocked:
   `backend/db/testing.ts` is a fresh database per test (seeded with Toffee, Hirsch, Herzii unless `{ empty: true }`),
   `backend/http/testing.ts` calls the API with device tokens, `backend/oidc/testing.ts` is a stub issuer.
