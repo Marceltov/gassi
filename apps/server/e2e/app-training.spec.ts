@@ -81,7 +81,7 @@ test("with several dogs ✓ asks for the dog; Fertig on a walk's training leads 
     await page.goto("/");
     await page.getByRole("button", { name: "Gassi gehen" }).click();
     await expect(page).toHaveURL(`${BASE_URL}/runde`);
-    await page.getByRole("button", { name: "🎯 Training", exact: true }).click();
+    await page.getByRole("button", { name: "Training", exact: true }).click();
     await expect(page).toHaveURL(`${BASE_URL}/training`);
     await page.getByRole("button", { name: "Übung hinzufügen" }).click();
     await page.getByRole("button", { name: "Sitz", exact: true }).click();
@@ -153,7 +153,7 @@ test("at 360×640 Fertig stays visible with four exercises and three treat kinds
       await page.getByRole("button", { name: "Übung hinzufügen" }).click();
       await page.getByRole("button", { name: n, exact: true }).click();
     }
-    await expect(page.getByRole("button", { name: "✓ Fertig" })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("button", { name: "Fertig" })).toBeInViewport({ ratio: 1 });
     await page.screenshot({ path: "../../.superpowers/sdd/2026-10-21-gassi-step2b-app/task-7-training-360x640.png" });
   } finally {
     await restore();

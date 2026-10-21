@@ -1,14 +1,16 @@
-// One fact on the Start screen: what, when, and who.
+// One fact on the Start screen: what, when, and who; read out as one ("Draußen: vor 2 Std., Hirsch").
 import { StyleSheet, Text, View } from "react-native";
 import { radius, useTheme } from "../theme";
 
 export function Tile({ label, value, by }: { label: string; value: string; by?: string }) {
   const theme = useTheme();
   return (
-    <View testID={`tile-${label}`} style={[styles.tile, { backgroundColor: theme.surface }]}>
-      <Text style={[styles.small, { color: theme.muted }]}>{label}</Text>
-      <Text style={[styles.value, { color: theme.ink }]}>{value}</Text>
-      {by ? <Text style={[styles.small, { color: theme.muted }]}>{by}</Text> : null}
+    <View testID={`tile-${label}`} accessible accessibilityLabel={`${label}: ${value}${by ? `, ${by}` : ""}`} style={[styles.tile, { backgroundColor: theme.surface }]}>
+      <View importantForAccessibility="no-hide-descendants">
+        <Text style={[styles.small, { color: theme.muted }]}>{label}</Text>
+        <Text style={[styles.value, { color: theme.ink }]}>{value}</Text>
+        {by ? <Text style={[styles.small, { color: theme.muted }]}>{by}</Text> : null}
+      </View>
     </View>
   );
 }

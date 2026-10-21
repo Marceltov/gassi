@@ -1,6 +1,7 @@
 // A big colored button for the thumb: the label, optionally a small line under it.
 import { Pressable, StyleSheet, Text } from "react-native";
 import { type ButtonKind, radius, useTheme } from "../theme";
+import { spoken } from "./spoken";
 
 const sizes = { xl: { height: 100, font: 21 }, l: { height: 72, font: 17 }, m: { height: 52, font: 15 } };
 
@@ -12,7 +13,8 @@ type Props = {
   size?: keyof typeof sizes;
   /** Held down: for the "undo" of a counting tap. */
   onLongPress?: () => void;
-  /** What a screen reader says, when the label alone is not enough (a "✓" per exercise). */
+  /** What a screen reader says, when the label alone is not enough (a "✓" per exercise); else the label without its
+   * signs (spoken.ts). */
   a11y?: string;
   /** Greyed out and not tappable. */
   disabled?: boolean;
@@ -24,7 +26,7 @@ export function BigButton({ kind, label, sub, onPress, onLongPress, a11y, disabl
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={a11y ?? (sub ? `${label}, ${sub}` : label)}
+      accessibilityLabel={a11y ?? spoken(sub ? `${label}, ${sub}` : label)}
       accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
       onPress={onPress}

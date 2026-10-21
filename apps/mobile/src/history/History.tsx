@@ -12,6 +12,7 @@ import { BigButton } from "../ui/BigButton";
 import { TYPE_ICON } from "../ui/icons";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
+import { spoken } from "../ui/spoken";
 import { useLeaving } from "../ui/useLeaving";
 import { EntryRow } from "./EntryRow";
 import type { Entry, Filter } from "./form";
@@ -101,6 +102,7 @@ export function History() {
                     <Pressable
                       key={o.label}
                       accessibilityRole="button"
+                      accessibilityLabel={spoken(o.label)}
                       accessibilityState={{ selected: o.on }}
                       onPress={o.pick}
                       style={({ pressed }) => [styles.option, { backgroundColor: o.on ? theme.walk : theme.surface, opacity: pressed ? 0.7 : 1 }]}

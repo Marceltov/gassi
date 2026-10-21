@@ -1,5 +1,6 @@
-// The web's bottom sheet: a fixed backdrop and a panel at the bottom, closed by a tap outside or Escape.
-// Rendered into document.body so it sits above the tab bar, whatever screen opens it.
+// The web's bottom sheet: a fixed backdrop and a panel at the bottom, closed by a tap outside or Escape; a modal
+// dialog for screen readers, and clear of the home indicator (the page runs with viewport-fit=cover). Rendered into
+// document.body so it sits above the tab bar, whatever screen opens it.
 import { type ReactNode, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -17,7 +18,7 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
   return createPortal(
     <View style={styles.overlay}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Schließen" />
-      <View accessibilityViewIsModal style={[styles.sheet, { backgroundColor: theme.background }]}>
+      <View role="dialog" aria-modal style={[styles.sheet, { backgroundColor: theme.background }]}>
         {children}
       </View>
     </View>,
@@ -35,6 +36,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.sheet,
     borderTopRightRadius: radius.sheet,
     padding: space.gutter,
+    // CSS, which React Native's types don't know: the gutter plus the home indicator's height
+    paddingBottom: `calc(${space.gutter}px + env(safe-area-inset-bottom))` as unknown as number,
     gap: space.gap,
   },
 });
