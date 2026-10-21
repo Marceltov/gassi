@@ -85,7 +85,7 @@ export function Devices() {
           ) : null}
           {invites.shown ? <InviteCard invite={invites.shown} onRevoke={() => invites.shown && invites.revoke(invites.shown.id)} /> : null}
           <OpenInvites invites={invites.open} onRevoke={invites.revoke} />
-          <Sheet open={asking !== null} onClose={() => setAsking(null)}>
+          <Sheet open={asking !== null} onClose={() => setAsking(null)} label={asking === "here" ? "Auf diesem Gerät abmelden?" : `${asking?.name ?? ""} abmelden?`}>
             <View testID="signout-sheet" style={styles.sheet}>
               <Text style={[styles.sheetTitle, { color: theme.ink }]}>{asking === "here" ? "Auf diesem Gerät abmelden?" : `${asking?.name ?? ""} abmelden?`}</Text>
               <Text style={[styles.small, { color: theme.muted }]}>

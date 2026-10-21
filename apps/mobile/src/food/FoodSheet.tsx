@@ -19,7 +19,7 @@ const STEP_G = 10;
 
 export function FoodSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Sheet open={open} onClose={onClose}>
+    <Sheet open={open} onClose={onClose} label="Futter geben">
       {open ? <FoodForm onClose={onClose} /> : null}
     </Sheet>
   );

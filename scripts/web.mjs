@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { exportStamp, needsExport } from "./web-stamp.mjs";
+import { exportStamp, needsExport, stampToStore } from "./web-stamp.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const dist = `${root}apps/mobile/dist/`;
@@ -49,7 +49,10 @@ if (needsExport({ stamp, stored, exported, force: process.argv.includes("--force
   // expo export empties dist first, so a failed export leaves no stamp behind.
   const run = spawnSync("npm", ["run", "export", "-w", "@gassi/mobile"], { cwd: root, stdio: "inherit" });
   if (run.status !== 0) process.exit(run.status ?? 1);
-  writeFileSync(stampFile, `${stamp}\n`);
+  // only an export of sources that stayed put is stamped: an edit during the export would otherwise look exported
+  const keep = stampToStore({ before: stamp, after: exportStamp(sources(), process.env) });
+  if (keep) writeFileSync(stampFile, `${keep}\n`);
+  else console.warn("App hat sich während des Exports geändert – beim nächsten Mal wird neu exportiert.");
   console.log("App exportiert");
 } else {
   console.log("App unverändert, Export übersprungen");

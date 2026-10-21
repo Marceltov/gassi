@@ -1,13 +1,25 @@
 // The web's bottom sheet: a fixed backdrop and a panel at the bottom, closed by a tap outside or Escape; a modal
 // dialog for screen readers, and clear of the home indicator (the page runs with viewport-fit=cover). Rendered into
-// document.body so it sits above the tab bar, whatever screen opens it.
-import { type ReactNode, useEffect } from "react";
+// document.body so it sits above the tab bar, whatever screen opens it. Named by `label` (its title); opening moves the
+// focus to its first button, closing gives it back to what had it (the button that opened it).
+import { type ReactNode, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Pressable, StyleSheet, View } from "react-native";
 import { radius, space, useTheme } from "../theme";
 
-export function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void; children?: ReactNode }) {
+export function Sheet({ open, onClose, label, children }: { open: boolean; onClose: () => void; label?: string; children?: ReactNode }) {
   const theme = useTheme();
+  const panel = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // after the portal is in the page: the first button inside (the backdrop is outside the panel)
+    const frame = requestAnimationFrame(() => panel.current?.querySelector<HTMLElement>('[role="button"], button, input, textarea')?.focus());
+    return () => {
+      cancelAnimationFrame(frame);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
@@ -18,7 +30,7 @@ export function Sheet({ open, onClose, children }: { open: boolean; onClose: () 
   return createPortal(
     <View style={styles.overlay}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Schließen" />
-      <View role="dialog" aria-modal style={[styles.sheet, { backgroundColor: theme.background }]}>
+      <View ref={panel as never} role="dialog" aria-modal aria-label={label} style={[styles.sheet, { backgroundColor: theme.background }]}>
         {children}
       </View>
     </View>,

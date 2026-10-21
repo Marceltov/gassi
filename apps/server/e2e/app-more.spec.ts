@@ -160,8 +160,14 @@ test("Vorrat: × removes a size at once, in either mode; with cans left it asks 
   // with cans left: asks, then removes; the unsaved edit in that row stayed until then
   await expect(page.getByTestId("count-9999-value")).toHaveText("1 Dose");
   const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
-  await page.getByTestId("count-9999").getByRole("button", { name: "Dosengröße entfernen" }).click();
-  await expect(asked).toContainText("9999 g entfernen? 1 Dose wird ausgebucht.");
+  const remove9999 = page.getByTestId("count-9999").getByRole("button", { name: "Dosengröße entfernen" });
+  await remove9999.click();
+  await expect(page.getByRole("dialog", { name: "Dosengröße entfernen" })).toContainText("9999 g entfernen? 1 Dose wird ausgebucht.");
+  await expect(asked.getByRole("button", { name: "Entfernen" })).toBeFocused(); // the sheet takes the focus
+  await asked.getByRole("button", { name: "Abbrechen" }).click();
+  await expect(asked).toHaveCount(0);
+  await expect(remove9999).toBeFocused(); // and gives it back
+  await remove9999.click();
   await asked.getByRole("button", { name: "Entfernen" }).click();
   made.push(...((await (await counted).json()) as { entries: { id: number }[] }).entries.map((e) => e.id));
   await expect(page.getByTestId("stock-message")).toHaveText("9999 g entfernt.");

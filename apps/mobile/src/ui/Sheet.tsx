@@ -3,12 +3,14 @@ import type { ReactNode } from "react";
 import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { radius, space, useTheme } from "../theme";
 
-export function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void; children?: ReactNode }) {
+export function Sheet({ open, onClose, label, children }: { open: boolean; onClose: () => void; label?: string; children?: ReactNode }) {
   const theme = useTheme();
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Schließen" />
-      <View style={[styles.sheet, { backgroundColor: theme.background }]}>{children}</View>
+      <View accessibilityLabel={label} accessibilityViewIsModal style={[styles.sheet, { backgroundColor: theme.background }]}>
+        {children}
+      </View>
     </Modal>
   );
 }

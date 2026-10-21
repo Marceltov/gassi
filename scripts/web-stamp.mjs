@@ -18,3 +18,9 @@ export function exportStamp(files, env) {
 export function needsExport({ stamp, stored, exported, force }) {
   return force || !exported || stored !== stamp;
 }
+
+/** The stamp to keep after an export: the one computed before it, if the sources still give it afterwards; else
+ * null (they changed while it ran, so the export may be older than they are, and the next build exports again). */
+export function stampToStore({ before, after }) {
+  return before === after ? before : null;
+}

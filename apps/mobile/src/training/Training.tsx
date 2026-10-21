@@ -179,7 +179,7 @@ export function Training() {
             onPick={(id) => choosing && (choosing.undoDogs ? rep(choosing.exerciseId, id, choosing.ok, -1) : pick(choosing.exerciseId, choosing.ok, id))}
             onClose={() => setChoosing(null)}
           />
-          <Sheet open={picking} onClose={() => setPicking(false)}>
+          <Sheet open={picking} onClose={() => setPicking(false)} label={naming === null ? "Welche Übung?" : "Neue Übung"}>
             {naming === null ? (
               <View testID="exercise-picker" style={styles.gap}>
                 <Text style={[styles.title, { color: theme.ink }]}>Welche Übung?</Text>

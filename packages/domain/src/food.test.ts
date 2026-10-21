@@ -113,4 +113,6 @@ test("removing a can size is a count of the stock as it is, with that size at 0,
   expect(removeSize(stock, 395)).toEqual({ sizes: [{ unitG: 400, cans: 2.75 }, { unitG: 800, cans: 0 }, { unitG: 395, cans: 0 }], ask: "395 g entfernen? 1½ Dosen werden ausgebucht." });
   expect(removeSize(stock, 800).ask).toBeNull();
   expect(removeSize({ ...stock, wet: wetStock([can(400, 1)]) }, 400).ask).toBe("400 g entfernen? 1 Dose wird ausgebucht.");
+  // less than ¼ can left is still something to book out
+  expect(removeSize({ ...stock, wet: wetStock([{ unitG: 400, grams: 60, cans: 0, belowZero: false }]) }, 400).ask).toBe("400 g entfernen? Ein Rest wird ausgebucht.");
 });

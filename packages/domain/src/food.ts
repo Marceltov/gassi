@@ -134,10 +134,13 @@ export function formSizes<C extends string | number>(known: readonly number[], r
 
 /** × on a can size (Ruling Y): a wet count of the stock as it is (each size's exact grams in cans), that size at 0, so
  * the retire rule takes it away at once; and the question to ask first while it still has cans ("400 g entfernen? 3
- * Dosen werden ausgebucht."), null when it has none. */
+ * Dosen werden ausgebucht.", "… Ein Rest wird ausgebucht." for less than ¼ can), null when it has no grams left. */
 export function removeSize(stock: Stock, unitG: number): { sizes: { unitG: number; cans: number }[]; ask: string | null } {
   const sizes = stock.wet.sizes.map((s) => ({ unitG: s.unitG, cans: s.unitG === unitG ? 0 : s.grams / s.unitG }));
-  const cans = stock.wet.sizes.find((s) => s.unitG === unitG)?.cans ?? 0;
-  const ask = cans > 0 ? `${unitG} g entfernen? ${formatCans(cans)} ${cans > 0 && cans <= 1 ? "wird" : "werden"} ausgebucht.` : null;
+  const size = stock.wet.sizes.find((s) => s.unitG === unitG);
+  const cans = size?.cans ?? 0;
+  // anything left is asked about, a rest of less than ¼ can too
+  const what = cans > 0 ? `${formatCans(cans)} ${cans <= 1 ? "wird" : "werden"}` : "Ein Rest wird";
+  const ask = (size?.grams ?? 0) > 0 ? `${unitG} g entfernen? ${what} ausgebucht.` : null;
   return { sizes: sizes.some((s) => s.unitG === unitG) ? sizes : [...sizes, { unitG, cans: 0 }], ask };
 }

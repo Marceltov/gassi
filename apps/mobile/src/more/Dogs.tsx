@@ -58,7 +58,7 @@ export function Dogs() {
           {error && !data ? <Text style={[styles.small, { color: theme.muted }]}>{error}</Text> : null}
           {active.length ? <Group>{rows(active)}</Group> : null}
           {archived.length ? <Group title="Archiviert">{rows(archived)}</Group> : null}
-          <Sheet open={!!editing} onClose={() => setEditing(null)}>
+          <Sheet open={!!editing} onClose={() => setEditing(null)} label={editing ? (editing.dog ? editing.dog.name : "Neuer Hund") : undefined}>
             {editing ? (
               <View testID="dog-sheet" style={styles.sheet}>
                 <Text style={[styles.sheetTitle, { color: theme.ink }]}>{editing.dog ? editing.dog.name : "Neuer Hund"}</Text>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { exportStamp, needsExport } from "../scripts/web-stamp.mjs";
+import { exportStamp, needsExport, stampToStore } from "../scripts/web-stamp.mjs";
 
 const files = [
   { path: "apps/mobile/src/a.ts", hash: "1" },
@@ -40,4 +40,9 @@ describe("needsExport", () => {
     expect(needsExport({ ...base, exported: false })).toBe(true);
   });
   it("exports when forced", () => expect(needsExport({ ...base, force: true })).toBe(true));
+});
+
+describe("stampToStore", () => {
+  it("keeps the stamp when the sources stayed as they were during the export", () => expect(stampToStore({ before: "s", after: "s" })).toBe("s"));
+  it("keeps nothing when they changed underneath: the next build exports again", () => expect(stampToStore({ before: "s", after: "t" })).toBeNull());
 });

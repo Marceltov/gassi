@@ -93,7 +93,7 @@ export function History() {
             <FilterButton label={`Was: ${chosen.type}`} on={!!filter.type} onPress={() => setChoosing("type")} />
             {active.length > 1 ? <FilterButton label={`Hund: ${chosen.dog}`} on={!!filter.dog} onPress={() => setChoosing("dog")} /> : null}
           </View>
-          <Sheet open={choosing !== null} onClose={() => setChoosing(null)}>
+          <Sheet open={choosing !== null} onClose={() => setChoosing(null)} label={choosing ? titles[choosing] : undefined}>
             {choosing ? (
               <View testID="filter-sheet" style={styles.sheet}>
                 <Text style={[styles.sheetTitle, { color: theme.ink }]}>{titles[choosing]}</Text>

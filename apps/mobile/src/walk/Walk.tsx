@@ -153,7 +153,7 @@ export function Walk() {
             onPick={(id) => choosing && log(choosing, id)}
             onClose={() => setChoosing(null)}
           />
-          <Sheet open={adding} onClose={() => setAdding(false)}>
+          <Sheet open={adding} onClose={() => setAdding(false)} label="Wer kommt mit?">
             <View style={styles.sheet}>
               <Text style={[styles.title, { color: theme.ink }]}>Wer kommt mit?</Text>
               {otherPeople.length || otherDogs.length ? (

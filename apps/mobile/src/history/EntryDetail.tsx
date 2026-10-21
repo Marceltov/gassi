@@ -147,7 +147,7 @@ export function EntryDetail({ id }: { id: number }) {
             style={[styles.note, { color: theme.ink, backgroundColor: theme.surface }]}
           />
           {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-          <Sheet open={asking} onClose={() => setAsking(false)}>
+          <Sheet open={asking} onClose={() => setAsking(false)} label="Eintrag löschen?">
             <View testID="delete-sheet" style={styles.sheet}>
               <Text style={[styles.sheetTitle, { color: theme.ink }]}>Eintrag löschen?</Text>
               <Text style={[styles.small, { color: theme.muted }]}>{`${entry.count ? `Die ganze Zählung (${countLine(entry.count)})` : TYPE_LABEL[entry.type]} – das lässt sich nicht rückgängig machen.`}</Text>

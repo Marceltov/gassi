@@ -83,7 +83,7 @@ export function Catalog() {
               </Group>
             </>
           ) : null}
-          <Sheet open={!!editing} onClose={() => setEditing(null)}>
+          <Sheet open={!!editing} onClose={() => setEditing(null)} label={editing ? (editing.item?.name ?? (editing.what === "exercise" ? "Neue Übung" : "Neues Leckerli")) : undefined}>
             {editing ? (
               <View testID="catalog-sheet" style={styles.sheet}>
                 <Text style={[styles.sheetTitle, { color: theme.ink }]}>{editing.item?.name ?? (editing.what === "exercise" ? "Neue Übung" : "Neues Leckerli")}</Text>

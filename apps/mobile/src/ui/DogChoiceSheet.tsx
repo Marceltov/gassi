@@ -10,7 +10,7 @@ type Props = { open: boolean; title: string; dogs: { id: number; name: string; c
 export function DogChoiceSheet({ open, title, dogs, onPick, onClose }: Props) {
   const theme = useTheme();
   return (
-    <Sheet open={open} onClose={onClose}>
+    <Sheet open={open} onClose={onClose} label={title}>
       <View testID="dog-choice" style={styles.sheet}>
         <Text style={[styles.title, { color: theme.ink }]}>{title}</Text>
         <ChoiceList choices={dogs.map((d) => ({ key: d.id, label: d.name, color: d.color, onPress: () => onPick(d.id) }))} />

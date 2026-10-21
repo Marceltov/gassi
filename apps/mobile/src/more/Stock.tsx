@@ -54,6 +54,7 @@ export function Stock() {
   const [extras, setExtras] = useState(0); // how many rows were added
   const [edits, setEdits] = useState<Record<string, { size?: string; cans?: string }>>({});
   const [removed, setRemoved] = useState<string[]>([]); // added rows taken away with × (never saved)
+  const [gone, setGone] = useState<{ unitG: number; of: typeof stock }[]>([]); // sizes removed with ×, for the stock read then
   const [asking, setAsking] = useState<{ unitG: number; text: string } | null>(null); // × on a size that has cans
 
   // × on a known size removes it at once (Ruling Y): a count of the stock as it is with that size at 0; it needs the
@@ -65,13 +66,14 @@ export function Stock() {
     setAsking(null);
     void run(async (api) => {
       await api.correctStock({ foodKind: "wet", sizes: count });
-      setRemoved((r) => [...r, `k${unitG}`]); // gone already; the stock read anew agrees
+      // gone at once, until the stock is read anew (it agrees; bought again later, the size shows again)
+      setGone((g) => [...g, { unitG, of: stock }]);
       reload();
     }, `${unitG} g entfernt.`);
   };
   const removeRow = (key: string) => (key.startsWith("k") ? removeKnown(Number(key.slice(1))) : setRemoved([...removed, key]));
   const rows = [
-    ...known.map((u) => ({ key: `k${u}`, size: String(u), cans: decimalText(mode === "count" ? (stock?.wet.sizes.find((s) => s.unitG === u)?.cans ?? 0) : 0) })),
+    ...known.filter((u) => !gone.some((g) => g.unitG === u && g.of === stock)).map((u) => ({ key: `k${u}`, size: String(u), cans: decimalText(mode === "count" ? (stock?.wet.sizes.find((s) => s.unitG === u)?.cans ?? 0) : 0) })),
     ...Array.from({ length: extras }, (_, i) => ({ key: `x${i}`, size: "", cans: "0" })),
   ]
     .filter((r) => !removed.includes(r.key))
@@ -223,7 +225,7 @@ export function Stock() {
           )}
           <BigButton kind="food" size="l" label="Eintragen" disabled={!ready} onPress={save} />
           <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />
-          <Sheet open={asking !== null} onClose={() => setAsking(null)}>
+          <Sheet open={asking !== null} onClose={() => setAsking(null)} label="Dosengröße entfernen">
             {asking ? (
               <View testID="remove-size" style={styles.sheet}>
                 <Text style={[styles.sheetText, { color: theme.ink }]}>{asking.text}</Text>
