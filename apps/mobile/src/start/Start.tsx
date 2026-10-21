@@ -1,15 +1,17 @@
-// Start: the day at a glance on top, three big buttons at the bottom. A running walk or training is led back into.
+// Start: the day at a glance on top, three big tiles at the bottom: Gassi gehen across, Futter and Training side by side
+// below it, each with when it was last. A running walk or training shows its clock on its tile and is led back into.
 import { formatAgo, newId } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { FoodSheet } from "../food/FoodSheet";
 import { useGassi } from "../data/GassiProvider";
-import { BigButton } from "../ui/BigButton";
 import { Screen } from "../ui/Screen";
 import { Tile } from "../ui/Tile";
 import { useLeaving } from "../ui/useLeaving";
-import { walkClock } from "./elapsed";
+import { trainingClock, walkClock } from "./elapsed";
+import { lastFeeding, lastTraining, lastWalk } from "./lines";
+import { StartTile } from "./StartTile";
 import { useNow } from "./useNow";
 import { type Today, useToday } from "./useToday";
 
@@ -24,7 +26,7 @@ export function Start() {
   const router = useRouter();
   const { view, send } = useGassi();
   const today = useToday();
-  const now = useNow(view.walk ? 1000 : 30_000);
+  const now = useNow(view.walk || view.training ? 1000 : 30_000);
   const [foodOpen, setFoodOpen] = useState(false);
 
   // A second tap before the screen has caught up must not start a second walk or training.
@@ -58,16 +60,22 @@ export function Start() {
       bottom={
         <>
           {view.walk ? (
-            <BigButton kind="walk" label={`Runde läuft · ${walkClock(view.walk, now)}`} onPress={() => open("/runde")} />
+            <StartTile big kind="walk" icon="walk" title="Gassi gehen" line={`Runde läuft · ${walkClock(view.walk, now)}`} a11y={`Runde läuft · ${walkClock(view.walk, now)}`} onPress={() => open("/runde")} />
           ) : (
-            <BigButton kind="walk" label="🐕 Gassi gehen" onPress={startWalk} />
+            <StartTile big kind="walk" icon="walk" title="Gassi gehen" line={lastWalk(today.walk, now)} a11y={`Gassi gehen, ${lastWalk(today.walk, now)}`} onPress={startWalk} />
           )}
-          <BigButton kind="food" size="l" label="🥣 Futter geben" onPress={() => setFoodOpen(true)} />
-          {view.training ? (
-            <BigButton kind="training" size="l" label="Training läuft" onPress={() => open("/training")} />
-          ) : (
-            <BigButton kind="training" size="l" label="🎯 Training starten" onPress={startTraining} />
-          )}
+          <View style={styles.row}>
+            <View style={styles.cell}>
+              <StartTile kind="food" icon="food" title="Futter" line={lastFeeding(today.food, now)} a11y={`Futter geben, ${lastFeeding(today.food, now)}`} onPress={() => setFoodOpen(true)} />
+            </View>
+            <View style={styles.cell}>
+              {view.training ? (
+                <StartTile kind="training" icon="training" title="Training" line={`läuft · ${trainingClock(view.training, now)}`} a11y={`Training läuft · ${trainingClock(view.training, now)}`} onPress={() => open("/training")} />
+              ) : (
+                <StartTile kind="training" icon="training" title="Training" line={lastTraining(today.training, now)} a11y={`Training starten, ${lastTraining(today.training, now)}`} onPress={startTraining} />
+              )}
+            </View>
+          </View>
           <FoodSheet open={foodOpen} onClose={() => setFoodOpen(false)} />
         </>
       }
@@ -77,4 +85,5 @@ export function Start() {
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 8 },
+  cell: { flex: 1 },
 });

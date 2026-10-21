@@ -14,6 +14,7 @@ import { useTheme } from "../theme";
 import { hhmm } from "../time";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
+import { Icon } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
 import { LAST_WALKER } from "./lastOne";
 import { trainingLine } from "./lines";
@@ -87,12 +88,13 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
             ))}
           </View>
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
-            {marks("💧 Pipi", shown.taps.filter((t) => t.type === "pee"), "summary-pees")}
-            {marks("💩 Poopoo", shown.taps.filter((t) => t.type === "poop"), "summary-poops")}
+            {marks("pee", "Pipi", shown.taps.filter((t) => t.type === "pee"), "summary-pees")}
+            {marks("poop", "Poopoo", shown.taps.filter((t) => t.type === "poop"), "summary-poops")}
             {shown.trainings.map((t, i) => (
-              <Text key={i} style={[styles.line, { color: theme.ink }]}>
-                {trainingLine(t)}
-              </Text>
+              <View key={i} style={styles.label}>
+                <Icon name="training" size={17} color={theme.training} />
+                <Text style={[styles.line, styles.right, { color: theme.ink }]}>{trainingLine(t)}</Text>
+              </View>
             ))}
           </View>
           <TextInput
@@ -108,7 +110,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
           {shown.id !== null && !local ? <BigButton kind="neutral" size="m" label="Zeit, Hunde, Löschen …" onPress={() => router.push(`/eintrag/${shown.id}`)} /> : null}
         </>
       }
-      bottom={<BigButton kind="walk" size="l" label="Fertig" onPress={done} />}
+      bottom={<BigButton kind="walk" size="l" icon="check" label="Fertig" onPress={done} />}
     />
   );
 
@@ -121,11 +123,14 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
     );
   }
   // how many, then each with its time (and dog): one the server has opens its detail (time, dog, delete)
-  function marks(label: string, taps: Tap[], testID: string) {
+  function marks(kind: "pee" | "poop", label: string, taps: Tap[], testID: string) {
     return (
       <View testID={testID} style={styles.marks}>
         <View style={styles.row}>
-          <Text style={[styles.line, { color: theme.ink }]}>{label}</Text>
+          <View style={styles.label}>
+            <Icon name={kind} size={17} color={theme[kind]} />
+            <Text style={[styles.line, { color: theme.ink }]}>{label}</Text>
+          </View>
           <Text style={[styles.line, styles.right, { color: theme.ink }]}>{taps.length ? `${taps.length}×` : "keins"}</Text>
         </View>
         {taps.map((t) =>
@@ -134,12 +139,12 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
               key={`${t.id}`}
               testID={`summary-mark-${t.id}`}
               accessibilityRole="button"
-              accessibilityLabel={`${label.slice(label.indexOf(" ") + 1)} ${markText(t)} ändern`}
+              accessibilityLabel={`${label} ${markText(t)} ändern`}
               onPress={() => router.push(`/eintrag/${t.id}`)}
               style={({ pressed }) => [styles.mark, { backgroundColor: theme.neutral, opacity: pressed ? 0.7 : 1 }]}
             >
               <Text style={[styles.line, { color: theme.ink }]}>{markText(t)}</Text>
-              <Text style={[styles.line, { color: theme.muted }]}>›</Text>
+              <Icon name="next" size={18} color={theme.muted} />
             </Pressable>
           ) : (
             <View key={`${t.at}/${t.dogId}`} style={styles.mark}>
@@ -162,6 +167,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: 12, padding: 12, gap: 6 },
   row: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
   marks: { gap: 4 },
+  label: { flexDirection: "row", alignItems: "center", gap: 8 },
   mark: { flexDirection: "row", justifyContent: "space-between", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, minHeight: 40, alignItems: "center" },
   line: { fontSize: 15 },
   right: { flexShrink: 1, textAlign: "right" },

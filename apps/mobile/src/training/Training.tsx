@@ -1,5 +1,5 @@
-// The running training: on top the clock and the summary line, at the bottom each shown exercise with ✓ klappt /
-// ✗ klappt nicht per repetition, "+ Übung" (one of the household's exercises not shown yet, or a new one: "Neue Übung
+// The running training: on top the clock and the summary line, at the bottom each shown exercise with "klappt" /
+// "klappt nicht" per repetition, "+ Übung" (one of the household's exercises not shown yet, or a new one: "Neue Übung
 // …"), the treats with +1, and Fertig. A long press on a button undoes its last tap. With several dogs a tap asks for
 // the dog (like Pipi on the walk). Every tap goes through the queue; only a new exercise needs the server.
 import { newId, trainingSummaryLine } from "@gassi/domain";
@@ -33,7 +33,7 @@ export function Training() {
   const { message, setMessage, run } = useWrite();
   // the dog question for a tap, or for an undo when the last tap's dog is not known (`undoDogs`: those with a count)
   const [choosing, setChoosing] = useState<{ exerciseId: number; ok: boolean; undoDogs?: number[] } | null>(null);
-  // the dog of the last tap on each ✓/✗ button of an exercise, so that a long press undoes that very tap; after a
+  // the dog of the last tap on each "klappt" / "klappt nicht" button of an exercise, so that a long press undoes that very tap; after a
   // reload it is not known, and the undo asks when several dogs have a count
   const lastDog = useRef(new Map<string, number>());
 
@@ -148,10 +148,10 @@ export function Training() {
                   <Text style={[styles.name, { color: theme.ink }]}>{`${e.name} · ${t.ok}/${t.ok + t.fail}`}</Text>
                   <View style={styles.row}>
                     <View style={styles.cell}>
-                      <BigButton kind="walk" size="m" label="✓ klappt" a11y={`${e.name} klappt`} onPress={() => tap(e.id, true)} onLongPress={() => undo(e.id, true)} />
+                      <BigButton kind="walk" size="m" icon="check" label="klappt" a11y={`${e.name} klappt`} onPress={() => tap(e.id, true)} onLongPress={() => undo(e.id, true)} />
                     </View>
                     <View style={styles.cell}>
-                      <BigButton kind="neutral" size="m" label="✗ klappt nicht" a11y={`${e.name} klappt nicht`} onPress={() => tap(e.id, false)} onLongPress={() => undo(e.id, false)} />
+                      <BigButton kind="neutral" size="m" icon="cross" label="klappt nicht" a11y={`${e.name} klappt nicht`} onPress={() => tap(e.id, false)} onLongPress={() => undo(e.id, false)} />
                     </View>
                   </View>
                 </View>
@@ -165,12 +165,12 @@ export function Training() {
             <View style={[styles.row, styles.wrap]}>
               {treatKinds.map((k) => (
                 <View key={k.id} style={[styles.cell, styles.treat]}>
-                  <BigButton kind="food" size="m" label={`${k.name} · ${training.treats[k.id] ?? 0}`} sub="+1" a11y={`${k.name} +1`} onPress={() => treat(k.id, 1)} onLongPress={() => treat(k.id, -1)} />
+                  <BigButton kind="food" size="m" icon="treat" label={`${k.name} · ${training.treats[k.id] ?? 0}`} sub="+1" a11y={`${k.name} +1`} onPress={() => treat(k.id, 1)} onLongPress={() => treat(k.id, -1)} />
                 </View>
               ))}
             </View>
           ) : null}
-          <BigButton kind="training" size="l" label="✓ Fertig" onPress={done} />
+          <BigButton kind="training" size="l" icon="check" label="Fertig" onPress={done} />
 
           <DogChoiceSheet
             open={choosing !== null}
@@ -194,7 +194,7 @@ export function Training() {
                     {message}
                   </Text>
                 ) : null}
-                <BigButton kind="training" size="l" label="Anlegen" disabled={!naming.trim()} onPress={create} />
+                <BigButton kind="training" size="l" icon="add" label="Anlegen" disabled={!naming.trim()} onPress={create} />
               </View>
             )}
           </Sheet>

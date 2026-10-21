@@ -5,13 +5,11 @@ import { useGassi } from "../data/GassiProvider";
 import { useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Screen } from "../ui/Screen";
-import { useBack } from "./back";
 import { InviteCard, OpenInvites, useInvites } from "./Invite";
 import { Group, Row } from "./List";
 
 export function Household() {
   const theme = useTheme();
-  const back = useBack();
   const { people, me, household } = useGassi();
   const { shown, open, create, revoke, message } = useInvites("person");
   const oidc = !!household?.oidc;
@@ -36,8 +34,7 @@ export function Household() {
       bottom={
         <>
           {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-          {!oidc ? <BigButton kind="walk" size="l" label="Person einladen" onPress={create} /> : null}
-          <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />
+          {!oidc ? <BigButton kind="walk" size="l" icon="invite" label="Person einladen" onPress={create} /> : null}
         </>
       }
     />

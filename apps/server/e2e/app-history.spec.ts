@@ -109,7 +109,7 @@ test("filtered by Herzii, the walk she went on stays and Hirsch's feeding goes; 
   await expect(page.getByTestId(`entry-${food.id}`)).toHaveCount(0);
   const walkRow = page.getByTestId(`entry-${walk.id}`);
   await expect(walkRow).toContainText("Gassi · 28 Min.");
-  await expect(page.getByTestId(`entry-${walk.id}-more`)).toHaveText("💧 1");
+  await expect(page.getByTestId(`entry-${walk.id}-more`)).toHaveText("1× Pipi");
   await expect(walkRow).toContainText("Hirsch + Herzii");
 
   await walkRow.click();
@@ -130,7 +130,8 @@ test("a filter's choices are one list: Alle first, every option as wide, the cho
   const options = sheet.getByRole("button");
   await expect(options.first()).toHaveAccessibleName("Alles");
   await expect(options.first()).toHaveAttribute("aria-pressed", "true");
-  await expect(options.first()).toContainText("✓");
+  await expect(options.first().getByTestId("choice-mark")).toBeVisible();
+  await expect(options.nth(1).getByTestId("choice-mark")).toHaveCount(0);
   const boxes = await Promise.all((await options.all()).map((o) => o.boundingBox()));
   expect(new Set(boxes.map((b) => Math.round(b!.width))).size).toBe(1); // as wide as each other
   expect(new Set(boxes.map((b) => Math.round(b!.x))).size).toBe(1); // one below the other

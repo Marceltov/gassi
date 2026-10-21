@@ -1,4 +1,4 @@
-// "Which dog?" for a tap that is for one dog (Pipi, Poopoo, ✓/✗) when several are on the walk or training: the dogs
+// "Which dog?" for a tap that is for one dog (Pipi, Poopoo, klappt / klappt nicht) when several are on the walk or training: the dogs
 // as one list, like every choice sheet.
 import { StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme";

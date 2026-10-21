@@ -48,7 +48,7 @@ test("Gewicht: 12,4 kg logged shows in the list, on the curve and on Mehr", asyn
   await expect(page.getByLabel("Gewicht in kg")).toHaveValue("");
   await expect(page.getByTestId("weight-curve")).toBeVisible();
 
-  await page.getByRole("button", { name: "Zurück" }).click();
+  await page.getByRole("tab", { name: "Mehr" }).click();
   await expect(page.getByTestId("more-Gewicht")).toContainText("12,4 kg · gerade eben");
 });
 

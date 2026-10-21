@@ -100,7 +100,7 @@ export function SignIn({ token, extra, hint }: { token?: string; extra?: ReactNo
             <TextInput accessibilityLabel="Name deines Hundes" placeholder="Name deines Hundes" placeholderTextColor={theme.muted} value={dogName} onChangeText={setDogName} onSubmitEditing={() => void submit()} style={input} />
           ) : null}
           {!token || asking ? (
-            <BigButton kind="walk" size="l" label={busy ? "Einen Moment …" : "Anmelden"} onPress={() => void submit()} />
+            <BigButton kind="walk" size="l" icon="signIn" label={busy ? "Einen Moment …" : "Anmelden"} onPress={() => void submit()} />
           ) : error ? (
             <BigButton kind="neutral" size="l" label="Zur Anmeldung" onPress={() => router.replace("/anmelden")} />
           ) : null}

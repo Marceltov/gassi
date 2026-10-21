@@ -101,16 +101,34 @@ describe("today, people and routes over the API", () => {
 
   test("today is the newest entry of each type, null where there is none; people lists the household", async () => {
     const token = await tokenFor(HIRSCH.id);
-    expect((await json("/api/today", { token })).body).toEqual({ walk: null, food: null, pee: null, poop: null });
+    expect((await json("/api/today", { token })).body).toEqual({ walk: null, food: null, pee: null, poop: null, training: null });
     const log = (body: object) => json("/api/entries", { method: "POST", token, body });
     await log({ type: "pee", at: "2026-10-20T07:00:00Z" });
     const { body: pee } = await log({ type: "pee", at: "2026-10-20T08:00:00Z" });
     const { body: food } = await log({ type: "food", foodKind: "dry", amountG: 100, at: "2026-10-20T07:30:00Z" });
     const { body: walk } = await log({ type: "walk", at: "2026-10-20T06:00:00Z", endedAt: "2026-10-20T06:30:00Z" });
     const { body } = await json("/api/today", { token });
-    expect(body).toEqual({ walk, food, pee, poop: null });
+    expect(body).toEqual({ walk, food, pee, poop: null, training: null });
     expect(body.walk).toMatchObject({ distanceM: null, route: null });
     expect((await json("/api/people", { token })).body.people).toEqual([HERZII, HIRSCH]);
+  });
+
+  test("today has the newest training with its exercises, for Start's \"Sitz 4/5 zuletzt\"", async () => {
+    const token = await tokenFor(HIRSCH.id);
+    const { body: sitz } = await json("/api/exercises", { method: "POST", token, body: { name: "Sitz" } });
+    const rep = (id: string, ok: boolean) => ({ id, at: "2026-10-20T09:05:00.000Z", kind: "training.rep", trainingKey: "t2", exerciseId: sitz.id, dogId: 1, ok, delta: 1 });
+    const commands = [
+      { id: "a", at: "2026-10-20T08:00:00.000Z", kind: "training.start", trainingKey: "t1" },
+      { id: "b", at: "2026-10-20T08:10:00.000Z", kind: "training.stop", trainingKey: "t1" },
+      { id: "c", at: "2026-10-20T09:00:00.000Z", kind: "training.start", trainingKey: "t2" },
+      rep("d", true),
+      rep("e", true),
+      rep("f", false),
+      { id: "g", at: "2026-10-20T09:10:00.000Z", kind: "training.stop", trainingKey: "t2" },
+    ];
+    await json("/api/commands", { method: "POST", token, body: { commands } });
+    const { body } = await json("/api/today", { token });
+    expect(body.training).toMatchObject({ type: "training", at: "2026-10-20T09:00:00.000Z", exercises: [{ name: "Sitz", ok: 2, fail: 1 }] });
   });
 
   test("a walk with a track has its distance and a route in entries, today and the week", async () => {

@@ -265,7 +265,7 @@ export const contract = {
   lastFood: endpoint({ method: "GET", path: "/api/food/last", input: none, output: z.object({ wet: z.number().nullable(), dry: z.number().nullable(), wetUnitG: z.number().nullable() }) }),
   weights: endpoint({ method: "GET", path: "/api/weight", input: none, output: z.object({ weights: z.array(entryViewSchema) }) }),
   logWeight: endpoint({ method: "POST", path: "/api/weight", input: weightInput, output: entryViewSchema, messages: WEIGHT_MESSAGES }),
-  today: endpoint({ method: "GET", path: "/api/today", input: none, output: z.object({ walk: entryViewSchema.nullable(), food: entryViewSchema.nullable(), pee: entryViewSchema.nullable(), poop: entryViewSchema.nullable() }) }),
+  today: endpoint({ method: "GET", path: "/api/today", input: none, output: z.object({ walk: entryViewSchema.nullable(), food: entryViewSchema.nullable(), pee: entryViewSchema.nullable(), poop: entryViewSchema.nullable(), training: entryViewSchema.nullable() }) }),
   people: endpoint({ method: "GET", path: "/api/people", input: none, output: z.object({ people: z.array(personSchema) }) }),
   week: endpoint({ method: "GET", path: "/api/week", input: z.object({ w: z.string().optional() }), output: weekSchema }),
   updateMe: endpoint({

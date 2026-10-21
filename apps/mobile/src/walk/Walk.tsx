@@ -14,6 +14,7 @@ import { hhmm } from "../time";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
 import { DogChoiceSheet } from "../ui/DogChoiceSheet";
+import { Icon } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
 import { useLeaving } from "../ui/useLeaving";
@@ -23,7 +24,7 @@ import { trainingLine } from "./lines";
 import { useWalkTaps } from "./useWalkTaps";
 
 type Kind = "pee" | "poop";
-const LABEL: Record<Kind, string> = { pee: "💧 Pipi", poop: "💩 Poopoo" };
+const LABEL: Record<Kind, string> = { pee: "Pipi", poop: "Poopoo" };
 
 export function Walk() {
   const router = useRouter();
@@ -113,16 +114,24 @@ export function Walk() {
           <View testID="walk-taps" style={[styles.log, { backgroundColor: theme.surface }]}>
             {taps.length === 0 && trainings.length === 0 && !runningTraining ? <Text style={[styles.line, { color: theme.muted }]}>Noch nichts</Text> : null}
             {taps.map((t) => (
-              <Text key={`${t.type}${t.at}${t.dogId}`} style={[styles.line, { color: theme.ink }]}>
-                {`${hhmm(t.at)}  ${LABEL[t.type]}${several ? ` · ${dogName(t.dogId)}` : ""}`}
-              </Text>
+              <View key={`${t.type}${t.at}${t.dogId}`} style={styles.item}>
+                <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(t.at)}</Text>
+                <Icon name={t.type} size={17} color={theme[t.type]} />
+                <Text style={[styles.line, { color: theme.ink }]}>{`${LABEL[t.type]}${several ? ` · ${dogName(t.dogId)}` : ""}`}</Text>
+              </View>
             ))}
             {trainings.map((t, i) => (
-              <Text key={`t${i}`} style={[styles.line, { color: theme.ink }]}>
-                {trainingLine(t)}
-              </Text>
+              <View key={`t${i}`} style={styles.item}>
+                <Icon name="training" size={17} color={theme.training} />
+                <Text style={[styles.line, styles.shrink, { color: theme.ink }]}>{trainingLine(t)}</Text>
+              </View>
             ))}
-            {runningTraining && trainings.length === 0 ? <Text style={[styles.line, { color: theme.ink }]}>🎯 Training läuft</Text> : null}
+            {runningTraining && trainings.length === 0 ? (
+              <View style={styles.item}>
+                <Icon name="training" size={17} color={theme.training} />
+                <Text style={[styles.line, { color: theme.ink }]}>Training läuft</Text>
+              </View>
+            ) : null}
           </View>
         </>
       }
@@ -130,21 +139,21 @@ export function Walk() {
         <>
           <View style={styles.row}>
             <View style={styles.cell}>
-              <BigButton kind="pee" label={LABEL.pee} disabled={walkDogs.length === 0} onPress={() => tap("pee")} />
+              <BigButton kind="pee" icon="pee" label={LABEL.pee} disabled={walkDogs.length === 0} onPress={() => tap("pee")} />
             </View>
             <View style={styles.cell}>
-              <BigButton kind="poop" label={LABEL.poop} disabled={walkDogs.length === 0} onPress={() => tap("poop")} />
+              <BigButton kind="poop" icon="poop" label={LABEL.poop} disabled={walkDogs.length === 0} onPress={() => tap("poop")} />
             </View>
           </View>
           <View style={styles.row}>
             <View style={styles.cell}>
-              <BigButton kind="neutral" size="m" label={walk.paused ? "▶ Weiter" : "⏸ Pause"} onPress={pause} />
+              <BigButton kind="neutral" size="m" icon={walk.paused ? "resume" : "pause"} label={walk.paused ? "Weiter" : "Pause"} onPress={pause} />
             </View>
             <View style={styles.cell}>
-              <BigButton kind="training" size="m" label={runningTraining ? "🎯 Training läuft" : "🎯 Training"} onPress={training} />
+              <BigButton kind="training" size="m" icon="training" label={runningTraining ? "Training läuft" : "Training"} onPress={training} />
             </View>
           </View>
-          <BigButton kind="walk" size="l" label="🏠 Zuhause" onPress={home} />
+          <BigButton kind="walk" size="l" icon="home" label="Zuhause" onPress={home} />
 
           <DogChoiceSheet
             open={choosing !== null}
@@ -183,6 +192,9 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center", marginVertical: 4 },
   log: { borderRadius: 12, padding: 12, gap: 4 },
   line: { fontSize: 15 },
+  item: { flexDirection: "row", alignItems: "center", gap: 8 },
+  time: { fontVariant: ["tabular-nums"], minWidth: 40 },
+  shrink: { flexShrink: 1 },
   row: { flexDirection: "row", gap: 8 },
   cell: { flex: 1 },
   sheet: { gap: 8 },

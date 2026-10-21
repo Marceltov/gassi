@@ -31,8 +31,8 @@ test("a walk: duration with pause, distance and who walked", () => {
 
 test("what happened during a walk: pee, poop and the exercises with their success", () => {
   const during = (d: DescribableEntry["during"]) => describeEntry(entry({ endedAt: "x", durationMin: 40, during: d })).during;
-  expect(during({ pees: 2, poops: 1, exercises: [{ name: "Sitz", ok: 4, fail: 1 }] })).toBe("💧 2 · 💩 1 · 🎯 Sitz 4/5");
-  expect(during({ pees: 0, poops: 1, exercises: [] })).toBe("💩 1");
+  expect(during({ pees: 2, poops: 1, exercises: [{ name: "Sitz", ok: 4, fail: 1 }] })).toBe("2× Pipi · 1× Poopoo · Sitz 4/5");
+  expect(during({ pees: 0, poops: 1, exercises: [] })).toBe("1× Poopoo");
   expect(during({ pees: 0, poops: 0, exercises: [] })).toBe("");
   expect(during(null)).toBe("");
 });

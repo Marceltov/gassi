@@ -13,7 +13,6 @@ import { useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
-import { useBack } from "./back";
 import { InviteCard, OpenInvites, useInvites } from "./Invite";
 import { Group, Row, Small } from "./List";
 import { useServer } from "./useServer";
@@ -29,7 +28,6 @@ const KIND: Record<Device["kind"], string> = { phone: "Handy", watch: "Uhr", web
 export function Devices() {
   const theme = useTheme();
   const router = useRouter();
-  const back = useBack();
   const now = useNow(60_000);
   const { writeApi } = useGassi();
   const { data, error, reload } = useServer((a) => a.devices());
@@ -100,15 +98,8 @@ export function Devices() {
       bottom={
         <>
           {message ?? invites.message ? <Text style={[styles.message, { color: theme.ink }]}>{message ?? invites.message}</Text> : null}
-          <BigButton kind="walk" size="l" label="Gerät hinzufügen" onPress={invites.create} />
-          <View style={styles.pair}>
-            <View style={styles.half}>
-              <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />
-            </View>
-            <View style={styles.half}>
-              <BigButton kind="neutral" size="m" label="Hier abmelden" a11y="Auf diesem Gerät abmelden" onPress={() => setAsking("here")} />
-            </View>
-          </View>
+          <BigButton kind="walk" size="l" icon="add" label="Gerät hinzufügen" onPress={invites.create} />
+          <BigButton kind="neutral" size="m" label="Hier abmelden" a11y="Auf diesem Gerät abmelden" onPress={() => setAsking("here")} />
         </>
       }
     />
@@ -121,6 +112,4 @@ const styles = StyleSheet.create({
   sheet: { gap: 10 },
   sheetTitle: { fontSize: 17, fontWeight: "700" },
   message: { fontSize: 15, fontWeight: "600" },
-  pair: { flexDirection: "row", gap: 8 },
-  half: { flex: 1 },
 });
