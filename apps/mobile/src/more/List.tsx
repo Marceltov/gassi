@@ -1,6 +1,7 @@
 // Mehr's lists: rows in rounded groups, each a name with a short value on the right; tappable ones open something.
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { onColor } from "../colors";
 import { type ListTone, radius, useTheme } from "../theme";
 import { Icon, type IconName } from "../ui/Icon";
 
@@ -23,7 +24,7 @@ export function Row({ label, value, icon, tone, square, dot, onPress, testID, mu
       {dot ? <View style={[styles.dot, { backgroundColor: dot }]} /> : null}
       {icon ? (
         <View style={[styles.square, { backgroundColor: square ?? (tone ? theme[tone] : theme.neutral), opacity: muted ? 0.6 : 1 }]}>
-          <Icon name={icon} size={17} color={tone || square ? "#fff" : theme.muted} />
+          <Icon name={icon} size={17} color={square ? onColor(square) : tone ? "#fff" : theme.muted} />
         </View>
       ) : null}
       <Text style={[styles.label, { color: muted ? theme.muted : theme.ink }]} numberOfLines={1}>
