@@ -8,18 +8,21 @@ Gassi is a self-hosted dog diary (walks with GPS tracks, training, food and stoc
 app, an Android app, a Garmin app and a self-hostable server. Step 1 (foundation: monorepo, API, sign-in by links,
 dogs, tracks) and step 2 (the app: one Expo app, shipped for the web first, ADR 0006) are built; the Android build of
 the same app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay 0.x until there is real data.
-`docs/BUILD.md` holds the implementation decisions, `docs/adr/` the architecture decisions.
+`docs/adr/` holds the decisions (ADR 0007 the offline web app, 0008 the web app in the server's image);
+`docs/BUILD.md` is the history of steps 1 and 2a.
 
 ## Commands (from the repo root)
 
 - `npm test` (Vitest over all workspaces); one test: `npx vitest run <path> -t <name>`
-- `npm run test:e2e` (builds the app and the server, then Playwright: the API through the typed client, the link page
-  and the app's screens (`apps/server/e2e/app-*.spec.ts`) in Chromium)
+- `npm run build` (the app export, then the server's build); `npm run build:app` alone exports the Expo app into
+  `apps/server/public` and skips the export when nothing it depends on changed (`--force` exports anyway)
+- `npm run test:e2e` (the app step, the server's build, then Playwright: the API through the typed client, the link
+  page and the app's screens (`apps/server/e2e/app-*.spec.ts`) in Chromium)
 - `npm run typecheck`, `npm run lint`
 - `npm run dev -w @gassi/server` (needs `apps/server/.env.local`, see `apps/server/.env.example`)
 - The app in dev: `npm run web -w @gassi/mobile` (port 8081) against that server, with `CORS_ORIGIN=http://localhost:8081`
   in the server's `.env.local` and `EXPO_PUBLIC_API_URL=http://localhost:3000` in `apps/mobile/.env.local` (see
-  `apps/mobile/.env.example`). The server's build exports the app into `apps/server/public` (`scripts/web.mjs`).
+  `apps/mobile/.env.example`). Development needs no export.
 - `scripts/quiet.sh <command>` prints only failures and the summary of a long run
 - Installs run without scripts (`.npmrc`): better-sqlite3 loads its prebuilt binary.
 
