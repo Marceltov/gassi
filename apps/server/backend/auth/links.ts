@@ -60,13 +60,16 @@ export class Links {
     return { kind: row.kind, valid: !row.used_at && !row.revoked_at && row.expires_at > this.now().toISOString() };
   }
 
+  /** What an open link is for, by its token or code, without using it (the app asks for a name only when it needs one). */
+  async info(key: LinkKey): Promise<{ kind: LinkKind }> {
+    return { kind: (await this.usable(this.db, key)).kind };
+  }
+
   /** Uses the link: adds the person (and, for setup, the first dog) or the device, in one transaction. */
   async redeem(key: LinkKey, d: { deviceKind: DeviceKind; deviceName: string; personName?: string; dogName?: string }): Promise<Redeemed> {
     return this.db.transaction().execute(async (tx) => {
       const now = this.now().toISOString();
-      const [column, hash] = "code" in key ? (["code_hash", hashCode(this.codeKey, key.code)] as const) : (["token_hash", hashToken(key.token)] as const);
-      const link = await tx.selectFrom("link").selectAll().where(column, "=", hash).executeTakeFirst();
-      if (!link || link.used_at || link.revoked_at || link.expires_at <= now || !isKind(link.kind)) throw new InputError(USED);
+      const link = await this.usable(tx, key);
       const people = new PeopleRepository(tx, this.now);
       let personId = link.person_id;
       if (link.kind === "setup" || link.kind === "person") {
@@ -85,6 +88,14 @@ export class Links {
       await tx.updateTable("link").set({ used_at: now }).where("id", "=", link.id).execute();
       return { deviceToken, person, device };
     });
+  }
+
+  // The link `key` names if it can still be used, else the same InputError for unknown, used, revoked and expired.
+  private async usable(db: DB, key: LinkKey) {
+    const [column, hash] = "code" in key ? (["code_hash", hashCode(this.codeKey, key.code)] as const) : (["token_hash", hashToken(key.token)] as const);
+    const link = await db.selectFrom("link").selectAll().where(column, "=", hash).executeTakeFirst();
+    if (!link || link.used_at || link.revoked_at || link.expires_at <= this.now().toISOString() || !isKind(link.kind)) throw new InputError(USED);
+    return { ...link, kind: link.kind };
   }
 
   /** The links `personId` made that can still be used. */

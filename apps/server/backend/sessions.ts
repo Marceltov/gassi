@@ -31,9 +31,11 @@ export type WalkSummary = {
   pauseCount: number;
   walkers: Person[];
   trainings: TrainingSummary[];
-  pee: number;
-  poop: number;
+  pees: Mark[]; // oldest first
+  poops: Mark[];
 };
+/** A pee or poop during a walk: when, and which dog. */
+export type Mark = { at: string; dogId: number };
 
 export type SessionsDeps = { db: DB; names: Names; now: () => Date };
 
@@ -76,7 +78,7 @@ export class Sessions {
     };
   }
 
-  /** What a walk was: its times, walkers, trainings and the pee/poop during it. A running walk is counted up to now. */
+  /** What a walk was: its times, walkers, trainings and each pee/poop during it. A running walk is counted up to now. */
   async summary(walkEntryId: number): Promise<WalkSummary> {
     const repo = new EntryRepository(this.deps.db);
     const walk = await repo.get(walkEntryId);
@@ -96,8 +98,8 @@ export class Sessions {
       pauseCount: pauses.length,
       walkers: await this.walkers(walk.id),
       trainings: await Promise.all(trainings.map((t) => this.trainingSummary(t, end))),
-      pee: during.filter((e) => e.type === "pee").length,
-      poop: during.filter((e) => e.type === "poop").length,
+      pees: marks(during, "pee"),
+      poops: marks(during, "poop"),
     };
   }
 
@@ -143,6 +145,10 @@ export class Sessions {
     return { min: minutesBetween(t.at, t.endedAt ?? walkEnd)!, exercises: exerciseTotals(exercises.map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count }))), treats };
   }
 }
+
+// `during` is newest first; pee and poop are for exactly one dog
+const marks = (during: readonly Entry[], type: "pee" | "poop"): Mark[] =>
+  during.filter((e) => e.type === type).reverse().map((e) => ({ at: e.at, dogId: e.dogIds[0] }));
 
 /** The walk or training started with `key`, or the running one that a second start with `key` joined. */
 export async function findByKey(db: Tx, key: string, type: "walk" | "training"): Promise<Entry | undefined> {

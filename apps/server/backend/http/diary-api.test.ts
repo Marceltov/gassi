@@ -142,11 +142,11 @@ describe("editing afterwards over the API", () => {
     const walk = list.entries.find((e: { type: string }) => e.type === "walk");
     const training = list.entries.find((e: { type: string }) => e.type === "training");
     const fixed = await json(`/api/entries/${walk.id}`, { method: "PATCH", token, body: { at: walk.at, endedAt: walk.endedAt, walkers: [HERZII.id] } });
-    expect(fixed.body.walkers).toEqual([HERZII.name]);
+    expect(fixed.body).toMatchObject({ walkers: [HERZII.name], walkerIds: [HERZII.id] });
     const bad = await json(`/api/entries/${training.id}`, { method: "PATCH", token, body: { at: training.at, endedAt: training.endedAt, walkers: [HERZII.id] } });
     expect(bad).toMatchObject({ status: 400, body: { error: "Mitgeher gibt es nur bei Runden." } });
     const edited = await json(`/api/trainings/${training.id}`, { method: "PATCH", token, body: { reps: [{ exerciseId: sitz.id, dogId: 1, ok: 2, fail: 1 }], treats: [] } });
-    expect(edited.body.exercises).toEqual([{ name: "Sitz", ok: 2, fail: 1 }]);
+    expect(edited.body).toMatchObject({ exercises: [{ name: "Sitz", ok: 2, fail: 1 }], reps: [{ exerciseId: sitz.id, dogId: 1, ok: 2, fail: 1 }], treatCounts: [] });
     expect((await json(`/api/trainings/${training.id}`, { method: "PATCH", token, body: { reps: [{ exerciseId: sitz.id, dogId: 1, ok: -1, fail: 0 }], treats: [] } })).status).toBe(400);
     expect((await json("/api/trainings/999", { method: "PATCH", token, body: { reps: [], treats: [] } })).status).toBe(404);
   });

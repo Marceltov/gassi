@@ -36,7 +36,7 @@ test("a fresh server: set up, invite, walk together with two dogs, record a trac
   await asHirsch.commands({ commands: [{ id: "e", at: t(25), kind: "walk.stop", walkKey: "w1" }] });
   const walkEntry = (await asHirsch.entries({ type: "walk" })).entries[0];
   const walk = await asHirsch.walk({ id: walkEntry.id });
-  expect(walk.summary).toMatchObject({ totalMin: 25, pee: 1 });
+  expect(walk.summary).toMatchObject({ totalMin: 25, pees: [{ dogId: bruno.id }] });
   expect(Math.round(walk.track!.metrics.distanceM)).toBe(1200);
 
   // Herzii signs her phone out: its token stops working at once

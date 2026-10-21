@@ -46,6 +46,7 @@ export const deviceSchema = z.object({ id: z.number(), kind: z.enum(deviceKinds)
 export const dogSchema = z.object({ id: z.number(), name: z.string(), color: z.string(), archived: z.boolean() });
 
 const exerciseTotalSchema = z.object({ name: z.string(), ok: z.number(), fail: z.number() });
+const repSchema = z.object({ exerciseId: z.number(), dogId: z.number(), ok: z.number(), fail: z.number() });
 const routeSchema = z.array(z.tuple([z.number(), z.number()]));
 
 export const entryViewSchema = z.object({
@@ -63,9 +64,13 @@ export const entryViewSchema = z.object({
   loggedBy: z.string(),
   byName: z.string(),
   walkers: z.array(z.string()),
+  walkerIds: z.array(z.string()),
   pauseMin: z.number().nullable(),
   exercises: z.array(exerciseTotalSchema),
   treats: z.number().nullable(),
+  // a training's repetitions per exercise and dog and its treats per kind, as editTraining takes them (else empty)
+  reps: z.array(repSchema),
+  treatCounts: z.array(z.object({ treatKindId: z.number(), count: z.number() })),
   distanceM: z.number().nullable(),
   route: routeSchema.nullable(),
   createdAt: z.string(),
@@ -85,7 +90,7 @@ const trainingView = z.object({
   startedAt: z.string(),
   dogIds: z.array(z.number()),
   walkKey: z.string().nullable(),
-  reps: z.array(z.object({ exerciseId: z.number(), dogId: z.number(), ok: z.number(), fail: z.number() })),
+  reps: z.array(repSchema),
   treats: z.record(z.string(), z.number()),
 });
 export const sessionsViewSchema = z.object({ walk: walkView.nullable(), training: trainingView.nullable() });
@@ -106,6 +111,7 @@ const metricsSchema = z.object({
   descentM: z.number(),
   bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).nullable(),
 });
+const markSchema = z.object({ at: z.string(), dogId: z.number() });
 export const walkSummarySchema = z.object({
   id: z.number(),
   note: z.string().nullable(),
@@ -116,8 +122,9 @@ export const walkSummarySchema = z.object({
   pauseCount: z.number(),
   walkers: z.array(personSchema),
   trainings: z.array(z.object({ min: z.number(), exercises: z.array(exerciseTotalSchema), treats: z.array(z.object({ name: z.string(), count: z.number() })) })),
-  pee: z.number(),
-  poop: z.number(),
+  // the walk's pee and poop entries, oldest first
+  pees: z.array(markSchema),
+  poops: z.array(markSchema),
 });
 
 const exerciseSchema = z.object({ id: z.number(), name: z.string() });
@@ -145,6 +152,9 @@ const weekSchema = z.object({
 });
 const LINK_OR_CODE = "Link oder Code fehlt.";
 export const linkKinds = ["setup", "person", "device", "watch", "magic"] as const;
+// the link's token, or its code as typed into the app (XXXX-XXXX, loosely); exactly one of them
+const linkKey = { token: z.string().min(1).max(100).optional(), code: z.string().min(1).max(20).optional() };
+const oneKey = (i: { token?: string; code?: string }) => (i.token === undefined) !== (i.code === undefined);
 const openLink = z.object({ id: z.number(), kind: z.enum(linkKinds), createdAt: z.string(), expiresAt: z.string() });
 
 export const contract = {
@@ -152,18 +162,26 @@ export const contract = {
     method: "POST",
     path: "/api/auth/redeem",
     auth: false,
-    // the link's token, or its code as typed into the app (XXXX-XXXX, loosely)
     input: z
       .object({
-        token: z.string().min(1).max(100).optional(),
-        code: z.string().min(1).max(20).optional(),
+        ...linkKey,
         deviceKind: z.enum(deviceKinds),
         deviceName: z.string().trim().min(1).max(60),
         personName: z.string().optional(),
         dogName: z.string().optional(),
       })
-      .refine((i) => (i.token === undefined) !== (i.code === undefined), { message: LINK_OR_CODE, path: ["token"] }),
+      .refine(oneKey, { message: LINK_OR_CODE, path: ["token"] }),
     output: z.object({ deviceToken: z.string(), person: personSchema, device: deviceSchema }),
+    messages: { token: LINK_OR_CODE, code: LINK_OR_CODE },
+  }),
+  // what an open link is for (so the sign-in asks for a name, and a dog for setup), without using it; a used, expired
+  // or unknown one answers like redeem
+  linkInfo: endpoint({
+    method: "GET",
+    path: "/api/auth/link",
+    auth: false,
+    input: z.object(linkKey).refine(oneKey, { message: LINK_OR_CODE, path: ["token"] }),
+    output: z.object({ kind: z.enum(linkKinds) }),
     messages: { token: LINK_OR_CODE, code: LINK_OR_CODE },
   }),
   magicLink: endpoint({
@@ -177,7 +195,8 @@ export const contract = {
     method: "POST",
     path: "/api/invites",
     input: z.object({ kind: z.enum(["person", "device", "watch"]) }),
-    output: z.object({ id: z.number(), url: z.string(), appLink: z.string(), expiresAt: z.string() }),
+    // the code is shown only now: the server keeps just its hash
+    output: z.object({ id: z.number(), url: z.string(), appLink: z.string(), code: z.string(), expiresAt: z.string() }),
   }),
   invites: endpoint({ method: "GET", path: "/api/invites", input: none, output: z.object({ invites: z.array(openLink) }) }),
   revokeInvite: endpoint({ method: "DELETE", path: "/api/invites/:id", input: z.object({ id }), output: z.object({ revoked: z.literal(true) }) }),
@@ -203,6 +222,7 @@ export const contract = {
     output: z.object({ entries: z.array(entryViewSchema), more: z.boolean() }),
   }),
   logEntry: endpoint({ method: "POST", path: "/api/entries", input: entryCreateInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),
+  // all fields are sent (a left-out note or amount becomes null), except walkers: left out, they stay as they are
   editEntry: endpoint({ method: "PATCH", path: "/api/entries/:id", input: entryEditInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),
   editTraining: endpoint({ method: "PATCH", path: "/api/trainings/:id", input: trainingEditInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),
   deleteEntry: endpoint({ method: "DELETE", path: "/api/entries/:id", input: z.object({ id }), output: z.object({ deleted: z.literal(true) }) }),

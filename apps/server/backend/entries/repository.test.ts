@@ -48,7 +48,7 @@ describe("EntryRepository", () => {
     const ats = (es: Entry[]) => es.map((e) => e.at.slice(11, 13));
     expect(ats(await r.list({}))).toEqual(["09", "08", "07"]);
     expect(ats(await r.list({ type: "walk" }))).toEqual(["09", "07"]);
-    expect(ats(await r.list({ loggedBy: "bille" }))).toEqual(["09", "08"]);
+    expect(ats(await r.list({ by: "bille" }))).toEqual(["09", "08"]);
     expect(ats(await r.list({ limit: 2, offset: 1 }))).toEqual(["08", "07"]);
   });
 

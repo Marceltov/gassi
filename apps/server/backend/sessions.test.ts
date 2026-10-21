@@ -63,7 +63,7 @@ describe("walks", () => {
     await s.apply(HERZII, [cmd(1, { kind: "walk.start", walkKey: "w2" }), cmd(5, { kind: "log", type: "pee", dogId: 1 })]); // queued without reception
     expect((await entries()).filter((e) => e.type === "walk")).toHaveLength(1);
     expect(await s.current()).toEqual({ walk: null, training: null });
-    expect(await s.summaryFor("w2")).toMatchObject({ totalMin: 40, walkers: [HIRSCH, HERZII], pee: 1 });
+    expect(await s.summaryFor("w2")).toMatchObject({ totalMin: 40, walkers: [HIRSCH, HERZII], pees: [{ at: at(5), dogId: 1 }] });
   });
 
   test("a start does not join a walk whose end was edited into the future", async () => {
@@ -164,7 +164,7 @@ describe("walks", () => {
     expect(await s.apply(HERZII, [pipi])).toEqual({ applied: [pipi.id], dropped: [] });
     const all = await entries();
     expect(all[0]).toMatchObject({ type: "pee", at: at(40), loggedBy: "bille" });
-    expect(await s.summary(all[1].id)).toMatchObject({ pee: 0 });
+    expect(await s.summary(all[1].id)).toMatchObject({ pees: [] });
   });
 
   test("applying a command id twice changes nothing", async () => {
@@ -190,7 +190,7 @@ describe("walks", () => {
     expect(await sessions().apply(HIRSCH, [stop])).toEqual({ applied: [], dropped: [stop.id] });
   });
 
-  test("summary counts pee/poop inside the walk's time only", async () => {
+  test("summary lists pee/poop inside the walk's time only, with times and dogs, oldest first", async () => {
     const s = sessions();
     await s.apply(HIRSCH, [
       cmd(0, { kind: "log", type: "pee", dogId: 1 }),
@@ -202,7 +202,7 @@ describe("walks", () => {
       cmd(31, { kind: "log", type: "poop", dogId: 1 }),
     ]);
     const walk = (await entries()).find((e) => e.type === "walk")!;
-    expect(await s.summary(walk.id)).toMatchObject({ pee: 2, poop: 1 });
+    expect(await s.summary(walk.id)).toMatchObject({ pees: [{ at: at(5), dogId: 1 }, { at: at(7), dogId: 1 }], poops: [{ at: at(6), dogId: 1 }] });
   });
 });
 

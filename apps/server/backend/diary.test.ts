@@ -54,6 +54,17 @@ test("history pages by 50 and says when there is more", async () => {
   expect((await d.history({ type: "food" })).entries[0].byName).toBe("Herzii");
 });
 
+test("the person filter also finds walks the person went on but didn't log", async () => {
+  const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), now: () => clock });
+  await s.apply(HIRSCH, [{ id: "1", at: "2026-10-20T09:00:00.000Z", kind: "walk.start", walkKey: "w" }]);
+  await s.apply(HERZII, [{ id: "2", at: "2026-10-20T09:01:00.000Z", kind: "walk.join", walkKey: "w" }]);
+  await diary().log(HIRSCH, { type: "food", foodKind: "dry", at: "2026-10-20T08:00:00Z" });
+  const walk = (await diary().history({ type: "walk" })).entries[0];
+  expect((await diary().history({ by: "bille" })).entries.map((e) => e.id)).toEqual([walk.id]);
+  expect((await diary().history({ by: "marcel" })).entries).toHaveLength(2);
+  expect((await diary().history({ by: "bille", type: "walk" })).entries).toHaveLength(1);
+});
+
 test("filter keeps only known types and people", () => {
   const d = diary();
   expect(d.filter({ type: "walk", by: "marcel" })).toEqual({ type: "walk", by: "marcel" });
@@ -172,10 +183,13 @@ describe("entries carry their walk and training details", () => {
       { id: "11", at: "2026-10-20T09:12:00.000Z", kind: "training.stop", trainingKey: "t" },
     ]);
     const [training, walk] = (await diary().history({})).entries;
-    expect(walk).toMatchObject({ type: "walk", durationMin: 52, pauseMin: 8, walkers: ["Hirsch", "Herzii"], exercises: [], treats: null });
+    expect(walk).toMatchObject({ type: "walk", durationMin: 52, pauseMin: 8, walkers: ["Hirsch", "Herzii"], walkerIds: ["marcel", "bille"], exercises: [], treats: null, reps: [], treatCounts: [] });
     expect(training).toMatchObject({ type: "training", durationMin: 12, pauseMin: null, walkers: [], exercises: [{ name: "Sitz", ok: 1, fail: 1 }], treats: 3 });
+    // in the shape editTraining takes, per dog and treat kind
+    expect(training.reps).toEqual([{ exerciseId: sitz.id, dogId: 1, ok: 1, fail: 1 }]);
+    expect(training.treatCounts).toEqual([{ treatKindId: kaese.id, count: 3 }]);
     const pee = await diary().log(HIRSCH, { type: "pee", at: "2026-10-20T10:00:00Z" });
-    expect(pee).toMatchObject({ walkers: [], pauseMin: null, exercises: [], treats: null });
+    expect(pee).toMatchObject({ walkers: [], walkerIds: [], pauseMin: null, exercises: [], treats: null, reps: [], treatCounts: [] });
   });
 });
 
@@ -316,6 +330,23 @@ describe("editing walkers and a training's repetitions afterwards", () => {
         { treat_kind_id: kaese.id, count: 3, grams_per_piece: 1, from_dry: 0 },
         { treat_kind_id: wurst.id, count: 2, grams_per_piece: 4, from_dry: 1 },
       ]);
+    });
+
+    test("bumps the entry's change time and answers with the fresh entry", async () => {
+      const { entry, platz } = await training();
+      clock = new Date("2026-10-20T15:00:00Z");
+      const view = await diary().editTraining(entry.id, { reps: [{ exerciseId: platz.id, dogId: 1, ok: 2, fail: 0 }], treats: [] });
+      expect(view).toMatchObject({ updatedAt: "2026-10-20T15:00:00.000Z", reps: [{ exerciseId: platz.id, dogId: 1, ok: 2, fail: 0 }], treatCounts: [] });
+      expect((await diary().history({})).entries[0].updatedAt).toBe("2026-10-20T15:00:00.000Z");
+    });
+
+    test("a dog taken out of the training takes its repetitions along", async () => {
+      const bruno = (await db().insertInto("dog").values({ name: "Bruno", color: "#3a6fc0", created_at: "2026-01-01T00:00:00.000Z" }).returning("id").executeTakeFirstOrThrow()).id;
+      const { entry, sitz } = await training();
+      await diary().edit(entry.id, { at: entry.at, endedAt: entry.endedAt, dogIds: [1, bruno] });
+      await diary().editTraining(entry.id, { reps: [{ exerciseId: sitz.id, dogId: 1, ok: 1, fail: 0 }, { exerciseId: sitz.id, dogId: bruno, ok: 2, fail: 1 }], treats: [] });
+      const view = await diary().edit(entry.id, { at: entry.at, endedAt: entry.endedAt, dogIds: [1] });
+      expect(view).toMatchObject({ dogIds: [1], reps: [{ exerciseId: sitz.id, dogId: 1, ok: 1, fail: 0 }], exercises: [{ name: "Sitz", ok: 1, fail: 0 }] });
     });
 
     test("refuses dogs outside the training, unknown ids, negative counts and other entries", async () => {

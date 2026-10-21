@@ -1,6 +1,6 @@
 // The implementations of the API contract, each a thin call into a use case.
 import { Devices } from "../auth/devices";
-import { appLink, INVITE_TTL, Links } from "../auth/links";
+import { appLink, INVITE_TTL, type LinkKey, Links } from "../auth/links";
 import { type Mailer, sendMagicLink } from "../auth/mail";
 import { InputError } from "../errors";
 import { Catalog } from "../catalog";
@@ -31,10 +31,12 @@ const missing = (what: string) => {
   throw new NotFound(what);
 };
 
+const linkKey = (i: { token?: string; code?: string }): LinkKey => (i.code !== undefined ? { code: i.code } : { token: i.token! });
 const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl, deps.codeKey, deps.defaultDogName ?? null);
 
 const implementations: Implementations<ApiDeps> = {
-  redeem: async ({ input, deps }) => links(deps).redeem(input.code !== undefined ? { code: input.code } : { token: input.token! }, input),
+  redeem: async ({ input, deps }) => links(deps).redeem(linkKey(input), input),
+  linkInfo: async ({ input, deps }) => links(deps).info(linkKey(input)),
   magicLink: async ({ input, deps }) => {
     if (!deps.mailer) throw new InputError("E-Mail ist auf diesem Server nicht eingerichtet.");
     await sendMagicLink(deps.db, deps.now, deps.publicUrl, deps.codeKey, deps.mailer, input.email);
@@ -44,7 +46,7 @@ const implementations: Implementations<ApiDeps> = {
     // with an OIDC provider, the provider decides who is in: invites only add devices of existing members
     if (input.kind === "person" && deps.oidc) throw new InputError("Neue Personen kommen über die Anmeldung herein.");
     const link = await links(deps).create({ kind: input.kind, personId: input.kind === "person" ? null : auth.person.id, createdBy: auth.person.id, ttlMs: INVITE_TTL });
-    return { id: link.id, url: link.url, appLink: appLink(deps.publicUrl, link.token), expiresAt: link.expiresAt };
+    return { id: link.id, url: link.url, appLink: appLink(deps.publicUrl, link.token), code: link.code, expiresAt: link.expiresAt };
   },
   invites: async ({ auth, deps }) => ({ invites: await links(deps).open(auth.person.id) }),
   revokeInvite: async ({ input, auth, deps }) => {
