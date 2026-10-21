@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { freshDatabase, HIRSCH } from "../db/testing";
 import { InputError } from "../errors";
+import { TEST_CODE_KEY } from "../http/testing";
 import { appLink, ensureSetupLink, Links, normalizeCode, webLink } from "./links";
 import { Devices } from "./devices";
+import { hashCode, hashToken } from "./tokens";
 
 const URL_ = "https://gassi.example";
 const DAY = 86_400_000;
@@ -10,17 +12,17 @@ const DAY = 86_400_000;
 describe("setup", () => {
   const { db } = freshDatabase({ empty: true });
   const clock = new Date("2026-10-20T10:00:00Z");
-  const links = () => new Links(db(), () => clock, URL_);
+  const links = () => new Links(db(), () => clock, URL_, TEST_CODE_KEY);
 
   test("a fresh server prints its setup link, and a new one on each start until someone set it up", async () => {
     const lines: string[] = [];
-    const first = await ensureSetupLink(db(), URL_, (l) => lines.push(l), () => clock);
+    const first = await ensureSetupLink(db(), URL_, TEST_CODE_KEY, (l) => lines.push(l), () => clock);
     expect(lines).toEqual([`Gassi einrichten: ${first}`]);
-    const second = await ensureSetupLink(db(), URL_, (l) => lines.push(l), () => clock);
+    const second = await ensureSetupLink(db(), URL_, TEST_CODE_KEY, (l) => lines.push(l), () => clock);
     expect(second).not.toBe(first);
     await expect(links().redeem({ token: first!.split("/l/")[1] }, { deviceKind: "phone", deviceName: "iPhone", personName: "Hirsch", dogName: "Toffee" })).rejects.toThrow(InputError);
     await links().redeem({ token: second!.split("/l/")[1] }, { deviceKind: "phone", deviceName: "iPhone", personName: "Hirsch", dogName: "Toffee" });
-    expect(await ensureSetupLink(db(), URL_, (l) => lines.push(l), () => clock)).toBeNull();
+    expect(await ensureSetupLink(db(), URL_, TEST_CODE_KEY, (l) => lines.push(l), () => clock)).toBeNull();
     expect(lines).toHaveLength(2);
   });
 
@@ -33,8 +35,8 @@ describe("setup", () => {
   });
 
   test("setup takes DOG_NAME when the dog's name isn't given", async () => {
-    const { token } = await new Links(db(), () => clock, URL_, "Bello").create({ kind: "setup", ttlMs: DAY });
-    await new Links(db(), () => clock, URL_, "Bello").redeem({ token }, { deviceKind: "phone", deviceName: "iPhone", personName: "Hirsch" });
+    const { token } = await new Links(db(), () => clock, URL_, TEST_CODE_KEY, "Bello").create({ kind: "setup", ttlMs: DAY });
+    await new Links(db(), () => clock, URL_, TEST_CODE_KEY, "Bello").redeem({ token }, { deviceKind: "phone", deviceName: "iPhone", personName: "Hirsch" });
     expect(await db().selectFrom("dog").select("name").execute()).toEqual([{ name: "Bello" }]);
   });
 
@@ -47,7 +49,7 @@ describe("setup", () => {
 
   test("with OIDC there is no setup link: the provider lets the first person in", async () => {
     const lines: string[] = [];
-    expect(await ensureSetupLink(db(), URL_, (l) => lines.push(l), () => clock, { oidc: true })).toBeNull();
+    expect(await ensureSetupLink(db(), URL_, TEST_CODE_KEY, (l) => lines.push(l), () => clock, { oidc: true })).toBeNull();
     expect(lines).toEqual(["Gassi wird über OIDC eingerichtet: die erste Anmeldung über den Anbieter legt den Haushalt an."]);
   });
 
@@ -61,7 +63,7 @@ describe("setup", () => {
 describe("invites", () => {
   const { db } = freshDatabase();
   let clock = new Date("2026-10-20T10:00:00Z");
-  const links = () => new Links(db(), () => clock, URL_);
+  const links = () => new Links(db(), () => clock, URL_, TEST_CODE_KEY);
 
   test("a link works once", async () => {
     const { token, url } = await links().create({ kind: "person", createdBy: HIRSCH.id, ttlMs: 7 * DAY });
@@ -119,11 +121,20 @@ describe("invites", () => {
     await expect(links().redeem({ code: "" }, { deviceKind: "phone", deviceName: "iPad" })).rejects.toThrow(InputError);
   });
 
-  test("only the code's hash is kept, as with the token", async () => {
+  test("only the code's hash is kept, keyed with the server's code key: a copy of the database doesn't give it away", async () => {
     const { code } = await links().create({ kind: "device", personId: HIRSCH.id, ttlMs: DAY });
     const row = await db().selectFrom("link").selectAll().orderBy("id", "desc").executeTakeFirstOrThrow();
     expect(JSON.stringify(row)).not.toContain(code.replace("-", ""));
-    expect(row.code_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(row.code_hash).toBe(hashCode(TEST_CODE_KEY, normalizeCode(code)));
+    expect(row.code_hash).not.toBe(hashToken(normalizeCode(code))); // not the plain SHA-256, which 40 bits can't protect
+    expect(row.code_hash).not.toBe(hashCode("another-key", code));
+  });
+
+  test("under another key (a new SECRET) open codes no longer work; their links still do", async () => {
+    const { token, code } = await links().create({ kind: "device", personId: HIRSCH.id, ttlMs: DAY });
+    const rekeyed = new Links(db(), () => clock, URL_, "another-key");
+    await expect(rekeyed.redeem({ code }, { deviceKind: "phone", deviceName: "iPad" })).rejects.toThrow(new InputError("Dieser Link ist abgelaufen oder schon benutzt."));
+    expect((await rekeyed.redeem({ token }, { deviceKind: "phone", deviceName: "iPad" })).person).toEqual(HIRSCH);
   });
 
   test("peek says what a link is for without using it", async () => {

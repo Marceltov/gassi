@@ -15,8 +15,8 @@ const TEXT: Record<LinkKind, { title: string; hint: string }> = {
   magic: { title: "Bei Gassi anmelden", hint: "Öffne den Link in der Gassi-App, um dich anzumelden." },
 };
 
-export async function landing(db: DB, now: () => Date, publicUrl: string, token: string): Promise<Landing> {
-  const { kind, valid } = await new Links(db, now, publicUrl).peek(token);
+export async function landing(db: DB, now: () => Date, publicUrl: string, codeKey: string, token: string): Promise<Landing> {
+  const { kind, valid } = await new Links(db, now, publicUrl, codeKey).peek(token);
   if (!kind || !valid) return { valid: false, title: "Dieser Link ist abgelaufen oder schon benutzt.", hint: "Bitte um einen neuen Link." };
   const link = appLink(publicUrl, token);
   return { valid: true, ...TEXT[kind], appLink: link, qr: await qrSvg(link), code: codeFor(token), webLink: webLink(publicUrl, token) };

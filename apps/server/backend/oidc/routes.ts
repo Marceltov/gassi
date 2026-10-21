@@ -1,9 +1,10 @@
 // GET /api/oidc/start?app=1 (or ?web=1) and GET /api/oidc/callback, only while OIDC is configured: the app or the web
 // app signs in through the household's provider. What a sign-in in flight needs (state, nonce, PKCE verifier, and
-// which of the two started it) rides in a short-lived signed cookie that only /api/oidc receives. The provider decides
-// who may sign in; whoever it signs in becomes a person of the household (found by `sub`), and the sign-in ends where
-// it started with a one-time device link: gassi://join?… in the app, <PUBLIC_URL>/join?token=… in the web app — or, on
-// any failure, with ?error=signin there. Only these two fixed targets exist; nothing in the request names a URL.
+// which of the two started it) rides in a short-lived signed cookie that only /api/oidc receives. The provider
+// decides who may sign in; whoever it signs in becomes a person of the household (found by `sub`), and the sign-in
+// ends where it started with a one-time device link: gassi://join?… in the app, <PUBLIC_URL>/join?token=… in the web
+// app — or, on any failure, with ?error=signin there. Only these two fixed targets exist; nothing in the request
+// names a URL.
 import { createHash, randomBytes } from "node:crypto";
 import { clearCookie, readCookie, setCookie } from "../auth/cookies";
 import { appLink, Links, MAGIC_TTL, webLink } from "../auth/links";
@@ -13,7 +14,7 @@ import { database } from "../db/open";
 import { ensureFirstDog } from "../dogs";
 import { seeOther } from "../http/responses";
 import { PeopleRepository } from "../people";
-import { secret } from "../secret";
+import { linkCodeKey, secret } from "../secret";
 import { authorizeUrl, type Client, discover, exchange } from "./flow";
 import { AuthError, errorCode, fail, log } from "./log";
 
@@ -34,7 +35,7 @@ const defaultDeps: OidcDeps = {
     await ensureFirstDog(db, config().defaultDogName, () => new Date()); // the first sign-in sets the household up
     return person;
   },
-  deviceLink: async (personId) => (await new Links(await database(), () => new Date(), config().publicUrl).create({ kind: "device", personId, ttlMs: MAGIC_TTL })).token,
+  deviceLink: async (personId) => (await new Links(await database(), () => new Date(), config().publicUrl, linkCodeKey(config().secret, config().dataDir)).create({ kind: "device", personId, ttlMs: MAGIC_TTL })).token,
 };
 
 /** Where the sign-in started, and so where it ends. */

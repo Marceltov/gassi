@@ -3,10 +3,11 @@ import { Devices } from "../auth/devices";
 import { Links, MAGIC_TTL } from "../auth/links";
 import { freshDatabase, HIRSCH } from "../db/testing";
 import { apiRouter, type ApiDeps } from "./api";
+import { TEST_CODE_KEY } from "./testing";
 
 const { db } = freshDatabase();
 const NOW = new Date("2026-10-20T10:00:00Z");
-const deps = (more: Partial<ApiDeps> = {}): ApiDeps => ({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", oidc: false, mailer: null, ...more });
+const deps = (more: Partial<ApiDeps> = {}): ApiDeps => ({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", codeKey: TEST_CODE_KEY, oidc: false, mailer: null, ...more });
 const call = (path: string, init: { method?: string; token?: string; body?: unknown } = {}, more: Partial<ApiDeps> = {}) =>
   apiRouter(deps(more))(
     new Request(`https://gassi.example${path}`, {
@@ -41,7 +42,7 @@ describe("invites over the API", () => {
   });
 
   test("a link's code, typed loosely, redeems it like its token", async () => {
-    const { code } = await new Links(db(), () => NOW, "https://gassi.example").create({ kind: "magic", personId: HIRSCH.id, ttlMs: MAGIC_TTL });
+    const { code } = await new Links(db(), () => NOW, "https://gassi.example", TEST_CODE_KEY).create({ kind: "magic", personId: HIRSCH.id, ttlMs: MAGIC_TTL });
     const res = await call("/api/auth/redeem", { method: "POST", body: { code: code.toLowerCase().replace("-", " "), deviceKind: "phone", deviceName: "iPhone" } });
     expect(res.status).toBe(200);
     expect((await res.json()).person.name).toBe("Hirsch");

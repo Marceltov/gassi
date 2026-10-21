@@ -8,7 +8,7 @@ import { DogRepository, FIRST_DOG_COLOR } from "../dogs";
 import { InputError } from "../errors";
 import { PeopleRepository } from "../people";
 import { type DeviceInfo, type DeviceKind, Devices } from "./devices";
-import { codeFor, hashToken, newToken, normalizeCode } from "./tokens";
+import { codeFor, hashCode, hashToken, newToken, normalizeCode } from "./tokens";
 
 export { codeFor, normalizeCode };
 
@@ -36,6 +36,7 @@ export class Links {
     private readonly db: DB,
     private readonly now: () => Date,
     private readonly publicUrl: string,
+    private readonly codeKey: string, // keys the codes' hashes (secret.ts linkCodeKey)
     private readonly defaultDogName: string | null = null, // DOG_NAME: the first dog's name when setup doesn't say
   ) {}
 
@@ -46,7 +47,7 @@ export class Links {
     const expiresAt = new Date(now.getTime() + l.ttlMs).toISOString();
     const row = await this.db
       .insertInto("link")
-      .values({ token_hash: hashToken(token), code_hash: hashToken(normalizeCode(code)), kind: l.kind, person_id: l.personId ?? null, created_by: l.createdBy ?? null, created_at: now.toISOString(), expires_at: expiresAt })
+      .values({ token_hash: hashToken(token), code_hash: hashCode(this.codeKey, code), kind: l.kind, person_id: l.personId ?? null, created_by: l.createdBy ?? null, created_at: now.toISOString(), expires_at: expiresAt })
       .returning("id")
       .executeTakeFirstOrThrow();
     return { id: row.id, token, code, url: `${this.publicUrl}/l/${token}`, expiresAt };
@@ -63,7 +64,7 @@ export class Links {
   async redeem(key: LinkKey, d: { deviceKind: DeviceKind; deviceName: string; personName?: string; dogName?: string }): Promise<Redeemed> {
     return this.db.transaction().execute(async (tx) => {
       const now = this.now().toISOString();
-      const [column, hash] = "code" in key ? (["code_hash", hashToken(normalizeCode(key.code))] as const) : (["token_hash", hashToken(key.token)] as const);
+      const [column, hash] = "code" in key ? (["code_hash", hashCode(this.codeKey, key.code)] as const) : (["token_hash", hashToken(key.token)] as const);
       const link = await tx.selectFrom("link").selectAll().where(column, "=", hash).executeTakeFirst();
       if (!link || link.used_at || link.revoked_at || link.expires_at <= now || !isKind(link.kind)) throw new InputError(USED);
       const people = new PeopleRepository(tx, this.now);
@@ -108,7 +109,7 @@ export class Links {
 
 /** While nobody has set the server up (and no OIDC provider does it): a fresh setup link on each start (only its hash is kept, so an old one can't be
  * shown again; earlier unused ones are revoked). Returns the URL, or null once someone is in. */
-export async function ensureSetupLink(db: DB, publicUrl: string, print: (line: string) => void, now: () => Date = () => new Date(), { oidc = false } = {}): Promise<string | null> {
+export async function ensureSetupLink(db: DB, publicUrl: string, codeKey: string, print: (line: string) => void, now: () => Date = () => new Date(), { oidc = false } = {}): Promise<string | null> {
   if ((await new PeopleRepository(db).count()) > 0) return null;
   // with a provider, the provider decides who is in: its first sign-in sets the household up
   if (oidc) {
@@ -116,7 +117,7 @@ export async function ensureSetupLink(db: DB, publicUrl: string, print: (line: s
     return null;
   }
   await db.updateTable("link").set({ revoked_at: now().toISOString() }).where("kind", "=", "setup").where("used_at", "is", null).where("revoked_at", "is", null).execute();
-  const { url } = await new Links(db, now, publicUrl).create({ kind: "setup", ttlMs: SETUP_TTL });
+  const { url } = await new Links(db, now, publicUrl, codeKey).create({ kind: "setup", ttlMs: SETUP_TTL });
   print(`Gassi einrichten: ${url}`);
   return url;
 }

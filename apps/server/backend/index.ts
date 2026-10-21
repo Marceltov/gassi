@@ -8,6 +8,7 @@ import { healthRoute } from "./http/health";
 import { type Landing, landing } from "./http/landing";
 import { logged } from "./http/requestlog";
 import { oidcCallbackRoute, oidcStartRoute } from "./oidc/routes";
+import { linkCodeKey } from "./secret";
 
 export { startup } from "./startup";
 
@@ -17,8 +18,8 @@ const mailer = (smtp: { url: string; from: string }): Mailer => (cachedMailer?.u
 
 /** Every endpoint of the API contract (packages/api-client). */
 export const api = logged(async (req) => {
-  const { publicUrl, oidc, smtp, timeZone, defaultDogName } = config();
-  return apiRouter({ db: await database(), now: () => new Date(), publicUrl, oidc: oidc !== null, mailer: smtp && mailer(smtp), timeZone, defaultDogName })(req);
+  const { publicUrl, oidc, smtp, timeZone, defaultDogName, secret, dataDir } = config();
+  return apiRouter({ db: await database(), now: () => new Date(), publicUrl, codeKey: linkCodeKey(secret, dataDir), oidc: oidc !== null, mailer: smtp && mailer(smtp), timeZone, defaultDogName })(req);
 });
 export const health = logged(() => healthRoute());
 export const oidcStart = logged((req) => oidcStartRoute(req));
@@ -26,5 +27,6 @@ export const oidcCallback = logged((req) => oidcCallbackRoute(req));
 
 /** The page behind a setup, invite or magic link (/l/<token>). */
 export async function linkLanding(token: string): Promise<Landing> {
-  return landing(await database(), () => new Date(), config().publicUrl, token);
+  const { publicUrl, secret, dataDir } = config();
+  return landing(await database(), () => new Date(), publicUrl, linkCodeKey(secret, dataDir), token);
 }

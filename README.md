@@ -56,7 +56,7 @@ machine if your backup doesn't cover it. The image has a health check on `GET /h
 Everything the apps do goes through a JSON API with device tokens (`Authorization: Bearer …`), described as one table
 in [packages/api-client/src/contract.ts](packages/api-client/src/contract.ts), which also provides a typed client
 for TypeScript. A script gets its token like any device: through an invite link (kind `device`), redeemed with
-`POST /api/auth/redeem`. `GET /export.csv` with a token downloads everything as CSV.
+`POST /api/auth/redeem`.
 
 ## Develop
 

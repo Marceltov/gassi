@@ -20,7 +20,8 @@ beforeEach(() => {
   deviceLink = vi.fn<OidcDeps["deviceLink"]>(async (personId) => `for-${personId}`);
 });
 
-// Starts the app's (or the web app's) sign-in and returns what the callback needs: the flight cookie and the state/nonce sent.
+// Starts the app's (or the web app's) sign-in and returns what the callback needs: the flight cookie and the
+// state/nonce sent.
 async function start(o: StubOptions = {}, target = "app=1") {
   const res = await oidcStartRoute(new Request(`${BASE}/api/oidc/start?${target}`), { fetch: stubIssuer("", o), now: () => NOW, remember, deviceLink });
   const to = new URL(res.headers.get("location")!);

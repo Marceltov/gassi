@@ -16,6 +16,7 @@ export type ApiDeps = {
   db: DB;
   now: () => Date;
   publicUrl: string;
+  codeKey: string; // keys the link codes' hashes (secret.ts linkCodeKey)
   oidc: boolean;
   mailer: Mailer | null;
   timeZone?: string; // default Europe/Berlin
@@ -30,13 +31,13 @@ const missing = (what: string) => {
   throw new NotFound(what);
 };
 
-const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl, deps.defaultDogName ?? null);
+const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl, deps.codeKey, deps.defaultDogName ?? null);
 
 const implementations: Implementations<ApiDeps> = {
   redeem: async ({ input, deps }) => links(deps).redeem(input.code !== undefined ? { code: input.code } : { token: input.token! }, input),
   magicLink: async ({ input, deps }) => {
     if (!deps.mailer) throw new InputError("E-Mail ist auf diesem Server nicht eingerichtet.");
-    await sendMagicLink(deps.db, deps.now, deps.publicUrl, deps.mailer, input.email);
+    await sendMagicLink(deps.db, deps.now, deps.publicUrl, deps.codeKey, deps.mailer, input.email);
     return { sent: true as const };
   },
   createInvite: async ({ input, auth, deps }) => {

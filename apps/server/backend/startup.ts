@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { ensureSetupLink } from "./auth/links";
 import { startBackups } from "./backup";
 import { config } from "./config";
+import { linkCodeKey } from "./secret";
 import { database } from "./db/open";
 import { logger } from "./log";
 import { processState } from "./state";
@@ -13,11 +14,11 @@ import { processState } from "./state";
 const state = processState("backups", () => ({ started: false }));
 
 export async function startup(): Promise<void> {
-  const { timeZone, dataDir, oidc, smtp, publicUrl, setupLinkFile } = config();
+  const { timeZone, dataDir, oidc, smtp, publicUrl, setupLinkFile, secret } = config();
   const db = await database();
   logger("startup").info({ timeZone, oidc: oidc ? "on" : "off", mail: smtp ? "on" : "off" }, "gassi started");
   // The link holds a token, so it is a plain line for whoever runs the server, not a log event that might be shipped.
-  await ensureSetupLink(db, publicUrl, (line) => {
+  await ensureSetupLink(db, publicUrl, linkCodeKey(secret, dataDir), (line) => {
     process.stdout.write(`${line}\n`);
     if (setupLinkFile) appendFileSync(setupLinkFile, `${line}\n`);
   }, undefined, { oidc: oidc !== null });
