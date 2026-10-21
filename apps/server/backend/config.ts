@@ -32,6 +32,7 @@ const schema = z
     TZ: optional(z.string().refine(validTimeZone, "is not a time zone")).default("Europe/Berlin"),
     LOG_LEVEL: optional(z.enum(LOG_LEVELS)).default("info"),
     SETUP_LINK_FILE: optional(z.string()),
+    CORS_ORIGIN: optional(z.url({ protocol: /^https?$/ })).transform((u) => u?.replace(/\/+$/, "")),
   })
   .refine((c) => new Set([!!c.OIDC_ISSUER, !!c.OIDC_CLIENT_ID, !!c.OIDC_CLIENT_SECRET]).size === 1, { path: ["OIDC_ISSUER"], message: "OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET go together" });
 
@@ -46,6 +47,7 @@ export type Config = {
   timeZone: string;
   logLevel: (typeof LOG_LEVELS)[number];
   setupLinkFile: string | null; // where the setup link is also written (the e2e tests read it there)
+  corsOrigin: string | null; // dev only: the Expo dev server (http://localhost:8081) calling the API from another origin
 };
 
 export function parseConfig(env: Record<string, string | undefined>): Config {
@@ -65,6 +67,7 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
     timeZone: c.TZ,
     logLevel: c.LOG_LEVEL,
     setupLinkFile: c.SETUP_LINK_FILE ?? null,
+    corsOrigin: c.CORS_ORIGIN ?? null,
   };
 }
 

@@ -23,3 +23,13 @@ describe("packages/api-client", () => {
     expect(await errors("packages/api-client/src/x.ts", `import x from "@gassi/server";\nexport default x;\n`)).toHaveLength(1);
   });
 });
+
+describe("apps/mobile", () => {
+  test.each(["@gassi/server", "@gassi/server/backend", "../../server/backend", "../../../apps/server/app/layout", "next/link"])("may not import %s", async (mod) => {
+    expect(await errors("apps/mobile/app/x.tsx", `import x from "${mod}";\nexport default x;\n`)).toHaveLength(1);
+  });
+
+  test("may import the API client, the domain and Expo", async () => {
+    expect(await errors("apps/mobile/app/x.tsx", `import { createClient } from "@gassi/api-client";\nimport { TYPE_LABEL } from "@gassi/domain";\nimport { Tabs } from "expo-router";\nexport default [createClient, TYPE_LABEL, Tabs];\n`)).toHaveLength(0);
+  });
+});

@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "*": ["node_modules/sharp/**", "node_modules/@img/**"],
   },
+  // The Expo web app (apps/mobile, copied into public/ by scripts/web.mjs) is a single page: every path nothing else
+  // answers gets its index.html. The fallback phase comes after public files, app routes and dynamic routes, so /api,
+  // /l/<token>, /health and the OIDC routes win.
+  rewrites: async () => ({ beforeFiles: [], afterFiles: [], fallback: [{ source: "/:path*", destination: "/index.html" }] }),
 };
 
 export default nextConfig;

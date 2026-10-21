@@ -16,6 +16,7 @@ describe("parseConfig", () => {
       timeZone: "Europe/Berlin",
       logLevel: "info",
       setupLinkFile: null,
+      corsOrigin: null,
     });
   });
 
@@ -30,6 +31,12 @@ describe("parseConfig", () => {
   test("SMTP_URL alone is enough for mail; MAIL_FROM defaults to gassi@ the server's host", () => {
     expect(parseConfig({ ...ENV, SMTP_URL: "smtp://user:pw@mail.example:587" }).smtp).toEqual({ url: "smtp://user:pw@mail.example:587", from: "gassi@gassi.example" });
     expect(parseConfig({ ...ENV, SMTP_URL: "smtps://mail.example", MAIL_FROM: "Gassi <hund@example.org>" }).smtp).toEqual({ url: "smtps://mail.example", from: "Gassi <hund@example.org>" });
+  });
+
+  test("CORS_ORIGIN is an http(s) origin, without a trailing slash", () => {
+    expect(parseConfig({ ...ENV, CORS_ORIGIN: "http://localhost:8081/" }).corsOrigin).toBe("http://localhost:8081");
+    expect(parseConfig({ ...ENV, CORS_ORIGIN: "" }).corsOrigin).toBeNull();
+    expect(() => parseConfig({ ...ENV, CORS_ORIGIN: "localhost:8081" })).toThrow("CORS_ORIGIN");
   });
 
   test("an empty optional variable means its default", () => {

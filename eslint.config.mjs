@@ -6,7 +6,8 @@ import nextTs from "eslint-config-next/typescript";
 // - packages/domain is pure: no Node, no React or Next, no database, nothing from the apps;
 // - packages/api-client builds on the domain and zod only;
 // - in apps/server the frontend (app/) reaches the backend only through @/backend (backend/index.ts), and backend/ is
-//   framework-free.
+//   framework-free;
+// - apps/mobile (the Expo app) talks to the server only over the API: nothing from apps/server, no Next.
 const APPS = ["@gassi/server", "@gassi/server/*", "**/apps/*"];
 const DOMAIN_IMPORTS = {
   paths: ["react", "react-dom", "next", "kysely", "better-sqlite3", "pino", "@gassi/api-client"].map((name) => ({ name, message: "packages/domain is pure and shared: no frameworks, no database." })),
@@ -22,6 +23,10 @@ const API_CLIENT_IMPORTS = {
     { group: ["node:*"], message: "packages/api-client runs on phones too: no Node APIs." },
     { group: APPS, message: "packages/api-client never imports an app." },
   ],
+};
+const MOBILE_IMPORTS = {
+  paths: ["next", "@gassi/server"].map((name) => ({ name, message: "apps/mobile reaches the server only through the API (@gassi/api-client)." })),
+  patterns: [{ group: ["next/*", "@gassi/server/*", "**/apps/server", "**/apps/server/*", "**/server/backend", "**/server/backend/*", "**/server/app/*"], message: "apps/mobile reaches the server only through the API (@gassi/api-client)." }],
 };
 const FRONTEND_IMPORTS = {
   patterns: [{ group: ["@/backend/*", "**/backend/*"], message: "The frontend imports the backend only through @/backend (backend/index.ts)." }],
@@ -41,7 +46,8 @@ export default defineConfig([
   { settings: { next: { rootDir: "apps/server" } } },
   { files: ["packages/domain/**"], rules: { "no-restricted-imports": ["error", DOMAIN_IMPORTS] } },
   { files: ["packages/api-client/**"], rules: { "no-restricted-imports": ["error", API_CLIENT_IMPORTS] } },
+  { files: ["apps/mobile/**"], rules: { "no-restricted-imports": ["error", MOBILE_IMPORTS] } },
   { files: ["apps/server/app/**"], ignores: ["**/*.test.ts"], rules: { "no-restricted-imports": ["error", FRONTEND_IMPORTS] } },
   { files: ["apps/server/backend/**"], rules: { "no-restricted-imports": ["error", BACKEND_IMPORTS] } },
-  globalIgnores(["**/.next/**", "**/node_modules/**", "**/next-env.d.ts", "**/test-results/**", "**/playwright-report/**", "**/data/**"]),
+  globalIgnores(["**/.next/**", "**/node_modules/**", "**/next-env.d.ts", "**/test-results/**", "**/playwright-report/**", "**/data/**", "apps/mobile/dist/**", "apps/mobile/.expo/**", "apps/server/public/**"]),
 ]);

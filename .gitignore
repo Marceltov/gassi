@@ -13,3 +13,10 @@ next-env.d.ts
 # Superpowers specs/plans are local working notes; decisions are recorded as ADRs (/ccp:ship-pr).
 /docs/superpowers/
 /.superpowers/
+# The Expo web export, copied into the server's public/ at build time (scripts/web.mjs); the icons there stay tracked.
+/apps/server/public/.web-export
+/apps/server/public/_expo/
+/apps/server/public/assets/
+/apps/server/public/favicon.ico
+/apps/server/public/index.html
+/apps/server/public/metadata.json

@@ -14,3 +14,13 @@ scripts
 tooling
 **/playwright.config.ts
 .superpowers
+!scripts/web.mjs
+# Local builds of the Expo web app; the image exports its own.
+apps/mobile/dist
+apps/mobile/.expo
+apps/server/public/.web-export
+apps/server/public/_expo
+apps/server/public/assets
+apps/server/public/favicon.ico
+apps/server/public/index.html
+apps/server/public/metadata.json
