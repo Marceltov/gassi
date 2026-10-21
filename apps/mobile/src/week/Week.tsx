@@ -78,8 +78,8 @@ export function Week() {
       <Text testID="week-heading" style={[styles.heading, { color: theme.ink }]}>
         {weekLabel(monday)}
       </Text>
-      <View style={[styles.arrow, { opacity: thisWeek ? 0.35 : 1 }]} pointerEvents={thisWeek ? "none" : "auto"}>
-        <BigButton kind="neutral" size="l" label="›" a11y="Nächste Woche" onPress={() => setMonday(addDays(monday, 7))} />
+      <View style={styles.arrow}>
+        <BigButton kind="neutral" size="l" label="›" a11y="Nächste Woche" disabled={thisWeek} onPress={() => !thisWeek && setMonday(addDays(monday, 7))} />
       </View>
     </View>
   );

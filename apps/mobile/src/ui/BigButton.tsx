@@ -14,18 +14,22 @@ type Props = {
   onLongPress?: () => void;
   /** What a screen reader says, when the label alone is not enough (a "✓" per exercise). */
   a11y?: string;
+  /** Greyed out and not tappable. */
+  disabled?: boolean;
 };
 
-export function BigButton({ kind, label, sub, onPress, onLongPress, a11y, size = "xl" }: Props) {
+export function BigButton({ kind, label, sub, onPress, onLongPress, a11y, disabled, size = "xl" }: Props) {
   const theme = useTheme();
   const { height, font } = sizes[size];
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={a11y ?? (sub ? `${label}, ${sub}` : label)}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
       onPress={onPress}
       onLongPress={onLongPress}
-      style={({ pressed }) => [styles.button, { height, backgroundColor: theme[kind], opacity: pressed ? 0.8 : 1 }]}
+      style={({ pressed }) => [styles.button, { height, backgroundColor: theme[kind], opacity: disabled ? 0.35 : pressed ? 0.8 : 1 }]}
     >
       <Text style={[styles.label, { fontSize: font, color: kind === "neutral" ? theme.ink : "#fff" }]}>{label}</Text>
       {sub ? <Text style={[styles.sub, { color: kind === "neutral" ? theme.muted : "#fff" }]}>{sub}</Text> : null}
