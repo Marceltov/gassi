@@ -3,17 +3,16 @@
 // screens and a weight's entry. An entry and a walk's summary are shared routes (the same URL in several tabs): opened
 // in the app they stay in the tab they were opened from; a deep link or a reload has no tab to stay in and opens them
 // in the group that sorts first, which is why Verlauf's is "(chronik)" (before "(mehr)" and "(start)").
-// The bar keeps clear of the home indicator and the rounded corners: its labels sit above the safe area, with a little
-// room to spare.
+// The bar keeps clear of the home indicator and the rounded corners: its labels sit right above the safe area, as in
+// the iPhone's own apps (49 pt plus the safe area).
 import { Tabs } from "expo-router";
 import type { ColorValue } from "react-native";
 import { SymbolView, type SymbolViewProps } from "expo-symbols";
 import { useTheme } from "@/src/theme";
 import { useEdges } from "@/src/ui/edges";
 
-/** The bar's own height (icon and label) and the room below its labels, on top of the safe area. */
+/** The bar's own height (icon and label), on top of the safe area. */
 const BAR = 49;
-const BELOW = 6;
 
 const icon = (name: SymbolViewProps["name"]) =>
   function TabIcon({ color }: { color: ColorValue }) {
@@ -32,8 +31,8 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: theme.surface,
           borderTopColor: theme.line,
-          height: edges.bottom(BAR + BELOW),
-          paddingBottom: edges.bottom(BELOW),
+          height: edges.bottom(BAR),
+          paddingBottom: edges.bottom(),
           paddingLeft: edges.left(),
           paddingRight: edges.right(),
         },
