@@ -306,6 +306,18 @@ describe("editing walkers and a training's repetitions afterwards", () => {
       expect(await diary().editTraining(entry.id, { reps: [], treats: [] })).toMatchObject({ exercises: [], treats: 0 });
     });
 
+    test("treats already given keep their logged grams and dry flag; new kinds use the current ones", async () => {
+      const { entry, kaese } = await training();
+      await db().updateTable("treat_kind").set({ grams_per_piece: 9, from_dry: 1 }).where("id", "=", kaese.id).execute();
+      const wurst = await new Catalog(db()).addTreatKind({ name: "Wurst", gramsPerPiece: 4, fromDry: true });
+      await diary().editTraining(entry.id, { reps: [], treats: [{ treatKindId: kaese.id, count: 3 }, { treatKindId: wurst.id, count: 2 }] });
+      const rows = await db().selectFrom("training_treat").select(["treat_kind_id", "count", "grams_per_piece", "from_dry"]).where("entry_id", "=", entry.id).orderBy("treat_kind_id").execute();
+      expect(rows).toEqual([
+        { treat_kind_id: kaese.id, count: 3, grams_per_piece: 1, from_dry: 0 },
+        { treat_kind_id: wurst.id, count: 2, grams_per_piece: 4, from_dry: 1 },
+      ]);
+    });
+
     test("refuses dogs outside the training, unknown ids, negative counts and other entries", async () => {
       const { entry, sitz, kaese } = await training();
       const food = await diary().log(HIRSCH, { type: "food", foodKind: "wet", at: "2026-10-20T09:00:00Z", amountG: 200 });

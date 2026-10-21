@@ -91,8 +91,12 @@ export class Diary {
     }
     // without an end it would run again (it was started on the walk screen); a walk logged afterwards may lose its end
     if (before?.clientKey && before.endedAt && !fields.endedAt) throw new InputError(before.type === "walk" ? "Eine beendete Runde braucht ein Ende." : "Ein beendetes Training braucht ein Ende.");
-    const entry = await this.entries.update(id, fields);
-    if (entry && walkers) await this.replaceWalkers(id, [...new Set(walkers)]);
+    // the entry and its walkers change together or not at all
+    const entry = await this.deps.db.transaction().execute(async (tx) => {
+      const updated = await new EntryRepository(tx, this.deps.now).update(id, fields);
+      if (updated && walkers) await replaceWalkers(tx, id, [...new Set(walkers)]);
+      return updated;
+    });
     return entry ? this.view1(entry) : null;
   }
 
@@ -107,6 +111,8 @@ export class Diary {
       db.selectFrom("exercise").select("id").execute(),
       db.selectFrom("treat_kind").select(["id", "grams_per_piece", "from_dry"]).execute(),
     ]);
+    // treats already given keep the grams and dry flag they were logged with
+    const given = await db.selectFrom("training_treat").selectAll().where("entry_id", "=", id).execute();
     // the same exercise and dog (or treat kind) twice add up
     const repRows = new Map<string, { exercise_id: number; dog_id: number; ok_count: number; fail_count: number }>();
     for (const r of reps) {
@@ -126,19 +132,12 @@ export class Diary {
       const exerciseRows = [...repRows.values()].filter((r) => r.ok_count > 0 || r.fail_count > 0).map((r) => ({ entry_id: id, ...r }));
       if (exerciseRows.length) await tx.insertInto("training_exercise").values(exerciseRows).execute();
       const treatRows = [...treatCounts].filter(([, count]) => count > 0).map(([kindId, count]) => {
-        const kind = kinds.find((k) => k.id === kindId)!;
+        const kind = given.find((g) => g.treat_kind_id === kindId) ?? kinds.find((k) => k.id === kindId)!;
         return { entry_id: id, treat_kind_id: kindId, count, grams_per_piece: kind.grams_per_piece, from_dry: kind.from_dry };
       });
       if (treatRows.length) await tx.insertInto("training_treat").values(treatRows).execute();
     });
     return this.view1(training);
-  }
-
-  private async replaceWalkers(id: number, personIds: string[]): Promise<void> {
-    await this.deps.db.transaction().execute(async (tx) => {
-      await tx.deleteFrom("walk_walker").where("entry_id", "=", id).execute();
-      await tx.insertInto("walk_walker").values(personIds.map((person_id) => ({ entry_id: id, person_id }))).execute();
-    });
   }
 
   remove(id: number): Promise<boolean> {
@@ -290,6 +289,11 @@ export class Diary {
       };
     });
   }
+}
+
+async function replaceWalkers(tx: DB, id: number, personIds: string[]): Promise<void> {
+  await tx.deleteFrom("walk_walker").where("entry_id", "=", id).execute();
+  await tx.insertInto("walk_walker").values(personIds.map((person_id) => ({ entry_id: id, person_id }))).execute();
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();
