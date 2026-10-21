@@ -42,7 +42,7 @@ export function Training() {
   const { leave, isLeaving } = useLeaving();
   useFocusEffect(
     useCallback(() => {
-      if (!training && !isLeaving()) router.replace("/");
+      if (!training && !isLeaving()) router.dismissTo("/");
     }, [training, router, isLeaving]),
   );
   if (!training) return null;

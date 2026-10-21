@@ -69,9 +69,13 @@ test("Pipi with one dog logs at once; without reception Poopoo and Zuhause show 
     await expect(page.getByTestId("track-map")).toContainText("OpenStreetMap");
     await expect(page.getByText("1,2 km")).toBeVisible();
 
+    // after the reload the summary is a cold link, which resolves to Verlauf's copy and goes on to Start's: Start stays
+    // highlighted and Fertig goes back to Start
+    await expect(page).toHaveURL(new RegExp(`/runde/${key}$`));
+    await expect(page.getByRole("tab", { name: "Start" })).toHaveAttribute("aria-selected", "true");
     await page.getByRole("button", { name: "Fertig" }).click();
     await expect(page).toHaveURL(`${BASE_URL}/`);
-    await expect(page.getByRole("button", { name: "Gassi gehen" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Start" })).toHaveAttribute("aria-selected", "true");
   } finally {
     await restore();
   }

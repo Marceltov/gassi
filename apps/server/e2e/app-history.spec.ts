@@ -115,6 +115,11 @@ test("filtered by Herzii, the walk she went on stays and Hirsch's feeding goes; 
   await walkRow.click();
   await expect(page).toHaveURL(`${BASE_URL}/runde/${walk.id}`);
   await expect(page.getByTestId("summary-pees")).toContainText("1×");
+  // opened from Verlauf, the summary stays on Verlauf's tab, and Fertig goes back to the filtered list
+  await expect(page.getByRole("tab", { name: "Verlauf" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("button", { name: "Fertig" }).click();
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
+  await expect(page.getByRole("button", { name: "Wer: Herzii" })).toBeVisible();
 });
 
 test("a filter's choices are one list: Alle first, every option as wide, the chosen one marked", async ({ page }) => {

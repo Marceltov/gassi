@@ -37,11 +37,11 @@ export function Walk() {
   const [hint, setHint] = useState<string | null>(null); // why the last person or dog can't be tapped off
 
   // Leaving (Zuhause, Training) happens once, also on a double tap. Without a walk (ended on another phone, or none
-  // after a reload) the focused screen goes back to Start.
+  // after a reload) the focused screen goes back to Start, down its tab's stack.
   const { leave, isLeaving } = useLeaving();
   useFocusEffect(
     useCallback(() => {
-      if (!walk && !isLeaving()) router.replace("/");
+      if (!walk && !isLeaving()) router.dismissTo("/");
     }, [walk, router, isLeaving]),
   );
   if (!walk) return null;
