@@ -1,16 +1,15 @@
 import { Link, Stack } from "expo-router";
-import { StyleSheet } from "react-native";
-import { Text, View } from "@/components/Themed";
-import Colors from "@/constants/Colors";
-import { useColorScheme } from "@/components/useColorScheme";
+import { StyleSheet, Text, View } from "react-native";
+import { useTheme } from "@/src/theme";
 
 export default function NotFoundScreen() {
+  const theme = useTheme();
   return (
     <>
       <Stack.Screen options={{ title: "Nicht gefunden" }} />
-      <View style={styles.container}>
-        <Text style={styles.title}>Diese Seite gibt es nicht.</Text>
-        <Link href="/" style={[styles.link, { color: Colors[useColorScheme()].tint }]}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <Text style={[styles.title, { color: theme.ink }]}>Diese Seite gibt es nicht.</Text>
+        <Link href="/" style={[styles.link, { color: theme.walk }]}>
           Zum Start
         </Link>
       </View>
