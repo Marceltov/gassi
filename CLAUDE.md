@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Gassi is a self-hosted dog diary (walks with GPS tracks, training, food and stock, weight) being rebuilt as phone
-apps, a Garmin app and a self-hostable server. Step 1 (foundation: monorepo, API, sign-in by links, dogs, tracks) is
-built; the app, the Garmin app and the dashboard follow (`docs/PLAN.md`). Versions stay 0.x until there is real data.
+Gassi is a self-hosted dog diary (walks with GPS tracks, training, food and stock, weight) being rebuilt as a web
+app, an Android app, a Garmin app and a self-hostable server. Step 1 (foundation: monorepo, API, sign-in by links,
+dogs, tracks) is built; the web app, the Android app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay 0.x until there is real data.
 `docs/BUILD.md` holds the implementation decisions, `docs/adr/` the architecture decisions.
 
 ## Commands (from the repo root)
@@ -20,9 +20,9 @@ built; the app, the Garmin app and the dashboard follow (`docs/PLAN.md`). Versio
 
 ## Code layout
 
-- `packages/domain` (`@gassi/domain`): pure TypeScript shared by server, app and dashboard — entry types and schemas,
-  dog rules, commands and the offline projection and queue, stock, week, track metrics, time helpers. No Node, React,
-  Next or database (lint-enforced, `tooling/boundaries.test.ts`).
+- `packages/domain` (`@gassi/domain`): pure TypeScript shared by server, web app and Android app — entry types and
+  schemas, dog rules, commands and the offline projection and queue, stock, week, track metrics, time helpers. No
+  Node, React, Next or database (lint-enforced, `tooling/boundaries.test.ts`).
 - `packages/api-client` (`@gassi/api-client`): the API contract (one table of endpoints with zod in/out) and the typed
   client built from it. The server's router validates against the same table (ADR 0003).
 - `apps/server` (`@gassi/server`): Next.js. `backend/` is framework-free and reached from `app/` only through
@@ -42,15 +42,16 @@ labels, ports); they apply to that deployment folder, not to the app code here.
 
 ## Decisions to respect
 
-- **Rebuild plan:** `docs/PLAN.md` (apps, Garmin, dashboard, self-hosting) in five steps; each step gets its own design
-  and plan. Nobody depends on 0.2; no compatibility layers.
+- **Rebuild plan:** `docs/PLAN.md` in five steps (foundation, web app, Android app, Garmin app, release); each step
+  gets its own design and plan. No iOS app from us (ADR 0005). Nobody depends on 0.2; no compatibility layers.
 - **One model:** an `Entry` for one or more dogs (`dogIds`; pee/poop/weight exactly one, restock/stockcheck/note none),
   with optional `endedAt`/`amountG`/`foodKind`/`note`. Walkers, pauses, exercises, treats and GPS tracks are child rows.
   "During a walk" is decided by time (ADR 0002). Taps are idempotent commands with client ids (ADR 0001).
 - **No redundancy:** domain rules exist once in `packages/domain`; the API exists once in the contract.
 - **Sign-in:** setup link (printed at first start), invite links, magic links (SMTP), optional OIDC; devices hold
   tokens stored only as hashes (ADR 0004). Only `PUBLIC_URL` is required.
-- **UI (apps, dashboard):** German, phone-first, native look and feel in the apps, dark mode.
+- **UI (web app, Android app):** German, phone-first, dark mode; the web app is an installable PWA, the Android app
+  has native look and feel.
 - **Deployment:** one container (`Dockerfile`, standalone server at `apps/server/server.js`); GitHub Actions pushes
   `ghcr.io/marceltov/gassi`; Watchtower pulls `:main` in the homelab.
 

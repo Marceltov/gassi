@@ -1,25 +1,28 @@
 # Plan
 
-## From 0.3: phone apps, a Garmin app and a server anyone can run
+## From 0.3: a web app, an Android app, a Garmin app and a server anyone can run
 
 Gassi becomes something a household uses on the phone for everything around its dogs, so easily that it really logs
-everything, and something other households can run themselves (agreed with Marcel on 2026-10-20).
+everything, and something other households can run themselves (agreed with Marcel on 2026-10-20, platforms revised
+on 2026-10-21, ADR 0005).
 
-- **Phone app** (React Native with Expo) for iOS and Android with native look and feel: walks with start/stop,
-  pauses, several walkers and the GPS track recorded in the background; pee/poop per dog; training; food and stock;
-  weight; history; statistics and maps.
+- **Web app** (installable PWA, phone-first): logging, including walks without a track (start/stop, pauses, several
+  walkers, pee/poop during the walk), food and stock, training, weight; today, history, week, statistics and maps;
+  also the dashboard on a big screen. Taps queue on the device without reception.
+- **Android app** (React Native with Expo) with native look and feel: everything for daily use, plus the walk's GPS
+  track recorded in the background. Built with EAS during development. An iOS app is left to the community.
 - **Garmin app** (Connect IQ, Forerunner 165 first): start/stop, pee, poop, training and treats from the wrist; the
-  watch records the track and saves the walk as a Garmin activity (from there Komoot and Apple Health).
-- **Web dashboard** for looking at the data on a big screen (week, statistics, maps, weight, stock).
+  watch records the track and saves the walk as a Garmin activity (from there Komoot and Apple Health). It gets its
+  access through the web app.
 - **Self-hostable:** one container per household, only `PUBLIC_URL` required; sign-in by setup link, invite links,
   magic links by e-mail (with SMTP) or the household's OIDC provider; open source (AGPL-3.0) when released.
 - **Several dogs** per household; walks, trainings and feedings for one or more, pee/poop and weight for one.
 - **Monorepo, no redundancy:** `packages/domain` holds the rules once, `packages/api-client` the API once.
 
 Order, each with its own design and plan: 1 foundation (done: monorepo, API with device tokens and links, dogs,
-tracks) · 2 the app (Android first, then iOS) · 3 the Garmin app · 4 the dashboard · 5 release (stores, open source,
-self-hosting guide). Non-goals for now: a hosted service, several households per server, reminders, training plans,
-vet records. Versions stay 0.x until real data of others exists; nobody depends on 0.2, so no compatibility layers.
+tracks) · 2 the web app · 3 the Android app · 4 the Garmin app · 5 release (open source, APK on GitHub, self-hosting
+guide, the update path for other households, optional Play Store). Non-goals for now: a hosted service, several
+households per server, reminders, training plans, vet records, an iOS app built by us. Versions stay 0.x until real data of others exists; nobody depends on 0.2, so no compatibility layers.
 
 ## Before the rebuild (0.1 and 0.2, replaced)
 
