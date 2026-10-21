@@ -87,3 +87,57 @@ test("with several dogs ✓ asks for the dog; Fertig on a walk's training leads 
     await client.updateDog({ id: luna.id, archived: true });
   }
 });
+
+test("with several dogs a long press after a reload asks which dog to undo, among the dogs with a count", async ({ page }) => {
+  const { client } = await household();
+  const luna = await client.addDog({ name: "Luna", color: "#7a4fc0" });
+  try {
+    await signIn(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Training starten" }).click();
+    await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+    await page.getByRole("button", { name: "Sitz", exact: true }).click();
+    const choice = page.getByTestId("dog-choice");
+    for (const dog of ["Luna", "Toffee", "Toffee"]) {
+      await page.getByRole("button", { name: "Sitz klappt", exact: true }).click();
+      await choice.getByRole("button", { name: dog }).click();
+    }
+    await expect(page.getByTestId("training-summary")).toHaveText("Sitz 3/3");
+    await expect.poll(async () => (await asHirsch().sessions()).training?.reps.length).toBe(2);
+
+    await page.reload(); // the last tap is forgotten: asks, offering the dogs that have a count
+    await expect(page.getByTestId("training-summary")).toHaveText("Sitz 3/3");
+    await page.getByRole("button", { name: "Sitz klappt", exact: true }).click({ delay: 700 });
+    await expect(choice.getByRole("button", { name: "Luna" })).toBeVisible();
+    await expect(choice.getByRole("button", { name: "Toffee" })).toBeVisible();
+    await choice.getByRole("button", { name: "Luna" }).click();
+    await expect(page.getByTestId("training-summary")).toHaveText("Sitz 2/2");
+    await expect.poll(async () => (await asHirsch().sessions()).training?.reps.map((r) => [r.dogId === luna.id ? "Luna" : "other", r.ok]).sort()).toEqual([["Luna", 0], ["other", 2]]);
+  } finally {
+    await client.updateDog({ id: luna.id, archived: true });
+  }
+});
+
+test("at 360×640 Fertig stays visible with four exercises and three treat kinds", async ({ page }) => {
+  const { client } = await household();
+  const names = ["Sitz", "Platz", "Bleib", "Hier"];
+  const have = (await client.exercises()).exercises.map((e) => e.name);
+  for (const n of names) if (!have.includes(n)) await client.addExercise({ name: n });
+  const haveKinds = (await client.treatKinds()).treatKinds.map((k) => k.name);
+  for (const n of ["Käse", "Wurst", "Trocken"]) if (haveKinds.length < 3 && !haveKinds.includes(n)) await client.addTreatKind({ name: n, gramsPerPiece: 2, fromDry: false });
+  const restore = await onlyOneDog();
+  try {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await signIn(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Training starten" }).click();
+    for (const n of names) {
+      await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+      await page.getByRole("button", { name: n, exact: true }).click();
+    }
+    await expect(page.getByRole("button", { name: "✓ Fertig" })).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: "../../.superpowers/sdd/2026-10-21-gassi-step2b-app/task-7-training-360x640.png" });
+  } finally {
+    await restore();
+  }
+});
