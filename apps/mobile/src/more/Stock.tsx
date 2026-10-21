@@ -59,12 +59,16 @@ export function Stock() {
   // Eingekauft: sizes hidden from the purchase rows on this phone (Ruling Z); the stock doesn't change. Counting, × sets
   // the size to 0 for this count (it is in no row), and Eintragen retires it.
   const personId = me?.id ?? "";
-  const [hidden, setHidden] = useState<HiddenSize[]>(() => loadHidden(personId));
+  // read anew for another person (the state belongs to the person it was read for)
+  const [kept, setKept] = useState<{ personId: string; hidden: HiddenSize[] }>(() => ({ personId, hidden: loadHidden(personId) }));
+  const hidden = kept.personId === personId ? kept.hidden : loadHidden(personId);
   const offered = mode === "restock" && stock ? buyingSizes(stock, hidden) : known;
   const removeRow = (key: string) => {
     if (mode === "restock" && key.startsWith("k")) {
-      const next = [...hidden.filter((h) => `k${h.unitG}` !== key), { unitG: Number(key.slice(1)), at: new Date().toISOString() }];
-      setHidden(next);
+      const unitG = Number(key.slice(1));
+      // remembered with the size's last purchase or count as the server told it, not the phone's clock
+      const next = [...hidden.filter((h) => h.unitG !== unitG), { unitG, seenLastAt: stock?.wet.sizes.find((x) => x.unitG === unitG)?.lastAt ?? null }];
+      setKept({ personId, hidden: next });
       saveHidden(personId, next);
     } else setRemoved([...removed, key]);
   };

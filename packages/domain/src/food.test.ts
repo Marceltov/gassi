@@ -108,14 +108,17 @@ test("the stock screen's rows by their (maybe edited) sizes: counting, a known s
 });
 
 test("a size hidden from the purchase rows stays hidden until it is bought or counted with cans again", () => {
-  const at = "2026-10-20T10:00:00.000Z";
+  const seen = "2026-10-19T08:00:00.000Z";
   const sized = (lastAt: string | null) => ({ ...can(800, 2), lastAt });
-  const stock: Stock = { wet: wetStock([can(400, 1), sized("2026-10-19T08:00:00.000Z")]), dry: { grams: null, daysLeft: null, belowZero: false } };
-  const hidden = [{ unitG: 800, at }];
+  const stock: Stock = { wet: wetStock([can(400, 1), sized(seen)]), dry: { grams: null, daysLeft: null, belowZero: false } };
+  const hidden = [{ unitG: 800, seenLastAt: seen }];
   expect(buyingSizes(stock, hidden)).toEqual([400]); // the stock keeps its cans; only the row goes
   expect(stock.wet.sizes.find((x) => x.unitG === 800)?.cans).toBe(2);
+  // bought again since: its time (the server's) is another one, so it is back
   const later: Stock = { ...stock, wet: wetStock([can(400, 1), sized("2026-10-20T11:00:00.000Z")]) };
   expect(buyingSizes(later, hidden)).toEqual([400, 800]);
   expect(stillHidden(later, hidden)).toEqual([]);
-  expect(buyingSizes({ ...stock, wet: wetStock([can(400, 1), sized(null)]) }, hidden)).toEqual([400]);
+  // never bought or counted with cans: hidden as seen (null), and stays so
+  const never: Stock = { ...stock, wet: wetStock([can(400, 1), sized(null)]) };
+  expect(buyingSizes(never, [{ unitG: 800, seenLastAt: null }])).toEqual([400]);
 });

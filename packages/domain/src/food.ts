@@ -132,15 +132,14 @@ export function formSizes<C extends string | number>(known: readonly number[], r
   return { sizes: [...sized, ...gone], unsized: rows.length - sized.length };
 }
 
-/** A can size hidden from the purchase rows on this phone, and when (Ruling Z). */
-export type HiddenSize = { unitG: number; at: string };
+/** A can size hidden from the purchase rows on this phone (Ruling Z), with its `lastAt` from the stock at the tap: the
+ * server's time, so the phone's clock doesn't matter. */
+export type HiddenSize = { unitG: number; seenLastAt: string | null };
 
-/** The hidden sizes that stay hidden: one comes back once it is bought or counted with cans after it was hidden. */
+/** The hidden sizes that stay hidden: one comes back once it has been bought or counted with cans since it was hidden
+ * (its `lastAt` is no longer the one seen then). */
 export function stillHidden(stock: Stock, hidden: readonly HiddenSize[]): HiddenSize[] {
-  return hidden.filter((h) => {
-    const last = stock.wet.sizes.find((s) => s.unitG === h.unitG)?.lastAt;
-    return !last || last <= h.at;
-  });
+  return hidden.filter((h) => (stock.wet.sizes.find((s) => s.unitG === h.unitG)?.lastAt ?? null) === h.seenLastAt);
 }
 
 /** The can sizes the purchase rows offer: the known ones without those hidden on this phone. */

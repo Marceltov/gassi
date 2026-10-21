@@ -7,7 +7,7 @@ const key = (personId: string) => `stock-hidden.${personId}`;
 
 export function loadHidden(personId: string): HiddenSize[] {
   const kept = loadKept(key(personId));
-  return Array.isArray(kept) ? kept.filter((h): h is HiddenSize => typeof h?.unitG === "number" && typeof h?.at === "string") : [];
+  return Array.isArray(kept) ? kept.filter((h): h is HiddenSize => typeof h?.unitG === "number" && (typeof h?.seenLastAt === "string" || h?.seenLastAt === null)) : [];
 }
 
 export const saveHidden = (personId: string, hidden: readonly HiddenSize[]): void => saveKept(key(personId), hidden);
