@@ -1,6 +1,7 @@
 // Verlauf: what happened, newest first, grouped by day; an entry opens to be changed or deleted, a walk opens its
 // summary; filters by person, type and dog. Each test makes its own entries and looks only at those (the server is
 // shared), and deletes what it made.
+import { utcToLocal } from "@gassi/domain";
 import { expect, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
 import { asHirsch, stopEverything } from "./sessions";
@@ -14,7 +15,8 @@ test.afterEach(async () => {
   for (const id of made.splice(0)) await asHirsch().deleteEntry({ id }).catch(() => undefined);
 });
 
-const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000).toISOString();
+// whole minutes, so a time typed into a minute field lands on the same instant
+const minutesAgo = (n: number) => new Date(Math.floor(Date.now() / 60_000) * 60_000 - n * 60_000).toISOString();
 const firstDog = async () => (await asHirsch().dogs()).dogs.filter((d) => !d.archived)[0];
 
 test("a feeding's grams are changed in its detail (not without reception), and the list shows the new amount", async ({ page, context }) => {
@@ -55,12 +57,12 @@ test("a pee is deleted after asking, and is gone from the list", async ({ page }
   await row.click();
   await expect(page).toHaveURL(`${BASE_URL}/eintrag/${pee.id}`);
 
-  await page.getByRole("button", { name: "Löschen" }).click();
+  await page.getByRole("button", { name: "Löschen", exact: true }).click();
   const ask = page.getByTestId("delete-sheet");
   await expect(ask).toContainText("Eintrag löschen?");
   await ask.getByRole("button", { name: "Abbrechen" }).click();
   await expect(ask).toBeHidden();
-  await page.getByRole("button", { name: "Löschen" }).click();
+  await page.getByRole("button", { name: "Löschen", exact: true }).click();
   await ask.getByRole("button", { name: "Ja, löschen" }).click();
 
   await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
@@ -68,44 +70,84 @@ test("a pee is deleted after asking, and is gone from the list", async ({ page }
   await expect(asHirsch().entry({ id: pee.id })).rejects.toMatchObject({ status: 404 });
 });
 
-test("filtered by Herzii, the walk she went on stays and Hirsch's feeding goes; the walk shows what happened and opens its summary", async ({ page }) => {
+/** A walk with one pee, `hoursAgo` back (a start while another walk ran would join that one; other specs walk now). */
+async function pastWalk(hoursAgo: number) {
   const client = asHirsch();
-  const herzii = (await client.people()).people.find((p) => p.name === "Herzii")!;
-  const key = `history-walk-${Date.now()}`;
+  const key = `history-walk-${hoursAgo}-${Date.now()}`;
   const dog = await firstDog();
-  // hours ago: a start while another walk ran would join that one (other specs walk now)
+  const from = hoursAgo * 60;
   await client.commands({
     commands: [
-      { id: `${key}-start`, at: minutesAgo(360), kind: "walk.start", walkKey: key },
-      { id: `${key}-pee`, at: minutesAgo(350), kind: "log", type: "pee", dogId: dog.id },
-      { id: `${key}-stop`, at: minutesAgo(332), kind: "walk.stop", walkKey: key },
+      { id: `${key}-start`, at: minutesAgo(from), kind: "walk.start", walkKey: key },
+      { id: `${key}-pee`, at: minutesAgo(from - 10), kind: "log", type: "pee", dogId: dog.id },
+      { id: `${key}-stop`, at: minutesAgo(from - 28), kind: "walk.stop", walkKey: key },
     ],
   });
   const walk = (await client.walkByKey({ key })).summary;
   expect((await client.entry({ id: walk.id })).clientKey).toBe(key);
+  made.push(walk.id, walk.pees[0].id);
+  return walk;
+}
+
+test("filtered by Herzii, the walk she went on stays and Hirsch's feeding goes; the walk shows what happened and opens its summary", async ({ page }) => {
+  const client = asHirsch();
+  const herzii = (await client.people()).people.find((p) => p.name === "Herzii")!;
+  const walk = await pastWalk(6);
   const me = (await client.me()).person;
   await client.editEntry({ id: walk.id, at: walk.startedAt, endedAt: walk.endedAt, walkers: [me.id, herzii.id] });
-  const pee = (await client.entries({ type: "pee" })).entries.find((e) => e.at === walk.pees[0]?.at)!;
   const food = await client.logEntry({ type: "food", foodKind: "dry", amountG: 47 });
-  made.push(walk.id, pee.id, food.id);
+  made.push(food.id);
 
   await signIn(page);
   await page.goto("/verlauf");
-  const walkRow = page.getByTestId(`entry-${walk.id}`);
-  await expect(walkRow).toContainText("28 Min.");
-  await expect(walkRow).toContainText("💧 1");
-  await expect(walkRow).toContainText("Hirsch + Herzii");
   await expect(page.getByTestId(`entry-${food.id}`)).toBeVisible();
 
+  // only Herzii's entries: few, so her walk is on the first page whatever other specs logged
   await page.getByRole("button", { name: "Wer: Alle" }).click();
   await page.getByTestId("filter-sheet").getByRole("button", { name: "Herzii" }).click();
   await expect(page.getByRole("button", { name: "Wer: Herzii" })).toBeVisible();
   await expect(page.getByTestId(`entry-${food.id}`)).toHaveCount(0);
-  await expect(walkRow).toBeVisible();
+  const walkRow = page.getByTestId(`entry-${walk.id}`);
+  await expect(walkRow).toContainText("Gassi · 28 Min.");
+  await expect(page.getByTestId(`entry-${walk.id}-more`)).toHaveText("💧 1");
+  await expect(walkRow).toContainText("Hirsch + Herzii");
 
   await walkRow.click();
   await expect(page).toHaveURL(`${BASE_URL}/runde/${walk.id}`);
   await expect(page.getByTestId("summary-pees")).toContainText("1×");
+});
+
+test("from a walk's summary: its pee is deleted, its start moved, then the walk deleted, which leads to Verlauf", async ({ page }) => {
+  const walk = await pastWalk(8);
+  const pee = walk.pees[0];
+  await signIn(page);
+  await page.goto(`/runde/${walk.id}`);
+  await expect(page.getByTestId("summary-pees")).toContainText("1×");
+
+  await page.getByTestId(`summary-mark-${pee.id}`).click();
+  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${pee.id}`);
+  await page.getByRole("button", { name: "Löschen", exact: true }).click();
+  await page.getByTestId("delete-sheet").getByRole("button", { name: "Ja, löschen" }).click();
+  await expect(page).toHaveURL(`${BASE_URL}/runde/${walk.id}`);
+  await expect(page.getByTestId("summary-pees")).toContainText("keins");
+
+  // ten minutes earlier, typed as this phone's local time (the page runs in Europe/Berlin)
+  const earlier = utcToLocal(Date.parse(walk.startedAt) - 10 * 60_000, "Europe/Berlin");
+  await page.getByRole("button", { name: "Zeit, Hunde, Löschen …" }).click();
+  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${walk.id}`);
+  await page.getByLabel("Beginn").fill(earlier);
+  await page.getByRole("button", { name: "Speichern" }).click();
+  await expect(page).toHaveURL(`${BASE_URL}/runde/${walk.id}`);
+  await expect(page.getByText(`Runde ${earlier.slice(11)}–`)).toBeVisible();
+  await expect(page.getByText("38 Min.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Zeit, Hunde, Löschen …" }).click();
+  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${walk.id}`);
+  await page.getByRole("button", { name: "Löschen", exact: true }).click();
+  await page.getByTestId("delete-sheet").getByRole("button", { name: "Ja, löschen" }).click();
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
+  await expect(page.getByTestId(`entry-${walk.id}`)).toHaveCount(0);
+  await expect(asHirsch().entry({ id: walk.id })).rejects.toMatchObject({ status: 404 });
 });
 
 test("a training reads Sitz 2/3 in the list; its repetitions are changed in its detail", async ({ page }) => {

@@ -49,12 +49,12 @@ export function EntryDetail({ id }: { id: number }) {
   }, [api, id]);
 
   const back = () => (router.canGoBack() ? router.back() : router.replace("/verlauf"));
-  const run = async (call: () => Promise<void>) => {
+  const run = async (call: () => Promise<void>, then: () => void = back) => {
     if (busy.current) return;
     busy.current = true;
     try {
       await call();
-      back();
+      then();
     } catch (e) {
       setMessage(errorMessage(e));
     } finally {
@@ -67,11 +67,15 @@ export function EntryDetail({ id }: { id: number }) {
       await api.editEntry(editInput(e, f));
       if (e.type === "training") await api.editTraining(trainingInput(e, f));
     });
-  const remove = () =>
-    run(async () => {
-      setAsking(false);
-      if (api) await api.deleteEntry({ id });
-    });
+  // a deleted walk has no summary to go back to: Verlauf (anything else goes back to where it was opened)
+  const remove = (e: Entry) =>
+    run(
+      async () => {
+        setAsking(false);
+        if (api) await api.deleteEntry({ id });
+      },
+      e.type === "walk" ? () => router.dismissTo("/verlauf") : back,
+    );
 
   if (!entry || !form) {
     const waitText = <Text style={[styles.small, { color: theme.muted }]}>{message ?? "Lädt …"}</Text>;
@@ -151,7 +155,7 @@ export function EntryDetail({ id }: { id: number }) {
             <View testID="delete-sheet" style={styles.sheet}>
               <Text style={[styles.sheetTitle, { color: theme.ink }]}>Eintrag löschen?</Text>
               <Text style={[styles.small, { color: theme.muted }]}>{`${TYPE_LABEL[entry.type]} – das lässt sich nicht rückgängig machen.`}</Text>
-              <BigButton kind="neutral" size="l" label="Ja, löschen" onPress={() => void remove()} />
+              <BigButton kind="neutral" size="l" label="Ja, löschen" onPress={() => void remove(entry)} />
               <BigButton kind="neutral" size="m" label="Abbrechen" onPress={() => setAsking(false)} />
             </View>
           </Sheet>

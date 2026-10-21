@@ -113,7 +113,7 @@ const metricsSchema = z.object({
   descentM: z.number(),
   bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).nullable(),
 });
-const markSchema = z.object({ at: z.string(), dogId: z.number() });
+const markSchema = z.object({ id: z.number(), at: z.string(), dogId: z.number() });
 export const walkSummarySchema = z.object({
   id: z.number(),
   note: z.string().nullable(),
@@ -124,7 +124,7 @@ export const walkSummarySchema = z.object({
   pauseCount: z.number(),
   walkers: z.array(personSchema),
   trainings: z.array(z.object({ min: z.number(), exercises: z.array(exerciseTotalSchema), treats: z.array(z.object({ name: z.string(), count: z.number() })) })),
-  // the walk's pee and poop entries, oldest first
+  // the walk's pee and poop entries (their ids, to open one), oldest first
   pees: z.array(markSchema),
   poops: z.array(markSchema),
 });

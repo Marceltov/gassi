@@ -6,7 +6,8 @@ import type { Output } from "@gassi/api-client";
 import { type Command, minutesBetween, type Person, pausedWithin, type WalkView } from "@gassi/domain";
 
 export type WalkSummary = Output<"walk">["summary"];
-export type Tap = { type: "pee" | "poop"; at: string; dogId: number };
+/** A pee or poop; `id` is its entry's once the server has it (a tap still in the queue has none). */
+export type Tap = { type: "pee" | "poop"; at: string; dogId: number; id?: number };
 
 const same = (a: Tap, b: Tap) => a.type === b.type && a.at === b.at && a.dogId === b.dogId;
 const byTime = (a: Tap, b: Tap) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);

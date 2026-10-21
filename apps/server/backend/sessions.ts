@@ -34,8 +34,8 @@ export type WalkSummary = {
   pees: Mark[]; // oldest first
   poops: Mark[];
 };
-/** A pee or poop during a walk: when, and which dog. */
-export type Mark = { at: string; dogId: number };
+/** A pee or poop during a walk: its entry, when, and which dog. */
+export type Mark = { id: number; at: string; dogId: number };
 
 export type SessionsDeps = { db: DB; names: Names; now: () => Date };
 
@@ -148,7 +148,7 @@ export class Sessions {
 
 // `during` is newest first; pee and poop are for exactly one dog
 const marks = (during: readonly Entry[], type: "pee" | "poop"): Mark[] =>
-  during.filter((e) => e.type === type).reverse().map((e) => ({ at: e.at, dogId: e.dogIds[0] }));
+  during.filter((e) => e.type === type).reverse().map((e) => ({ id: e.id, at: e.at, dogId: e.dogIds[0] }));
 
 /** The walk or training started with `key`, or the running one that a second start with `key` joined. */
 export async function findByKey(db: Tx, key: string, type: "walk" | "training"): Promise<Entry | undefined> {

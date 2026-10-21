@@ -5,7 +5,7 @@
 import { formatDistance, formatMinutes, keepsOne, simplify } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { errorMessage, OFFLINE } from "../data/api";
 import { useGassi } from "../data/GassiProvider";
 import { TrackMap } from "../map/TrackMap";
@@ -56,7 +56,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
 
   const several = new Set(shown.taps.map((t) => t.dogId)).size > 1 || dogs.filter((d) => !d.archived).length > 1;
   const dogName = (id: number) => dogs.find((d) => d.id === id)?.name ?? "Hund";
-  const marks = (taps: Tap[]) => (taps.length ? `${taps.length}× · ${taps.map((t) => `${hhmm(t.at)}${several ? ` ${dogName(t.dogId)}` : ""}`).join(", ")}` : "keins");
+  const markText = (t: Tap) => `${hhmm(t.at)}${several ? ` · ${dogName(t.dogId)}` : ""}`;
   const everyone = [...people, ...shown.walkers.filter((w) => !people.some((p) => p.id === w.id))];
   const walkerIds = shown.walkers.map((w) => w.id);
   const toggle = (id: string) => {
@@ -84,8 +84,8 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
             ))}
           </View>
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
-            {row("💧 Pipi", marks(shown.taps.filter((t) => t.type === "pee")), "summary-pees")}
-            {row("💩 Poopoo", marks(shown.taps.filter((t) => t.type === "poop")), "summary-poops")}
+            {marks("💧 Pipi", shown.taps.filter((t) => t.type === "pee"), "summary-pees")}
+            {marks("💩 Poopoo", shown.taps.filter((t) => t.type === "poop"), "summary-poops")}
             {shown.trainings.map((t, i) => (
               <Text key={i} style={[styles.line, { color: theme.ink }]}>
                 {trainingLine(t)}
@@ -117,11 +117,33 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
       </View>
     );
   }
-  function row(label: string, value: string, testID: string) {
+  // how many, then each with its time (and dog): one the server has opens its detail (time, dog, delete)
+  function marks(label: string, taps: Tap[], testID: string) {
     return (
-      <View testID={testID} style={styles.row}>
-        <Text style={[styles.line, { color: theme.ink }]}>{label}</Text>
-        <Text style={[styles.line, styles.right, { color: theme.ink }]}>{value}</Text>
+      <View testID={testID} style={styles.marks}>
+        <View style={styles.row}>
+          <Text style={[styles.line, { color: theme.ink }]}>{label}</Text>
+          <Text style={[styles.line, styles.right, { color: theme.ink }]}>{taps.length ? `${taps.length}×` : "keins"}</Text>
+        </View>
+        {taps.map((t) =>
+          t.id !== undefined && !local ? (
+            <Pressable
+              key={`${t.id}`}
+              testID={`summary-mark-${t.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${label.slice(label.indexOf(" ") + 1)} ${markText(t)} ändern`}
+              onPress={() => router.push(`/eintrag/${t.id}`)}
+              style={({ pressed }) => [styles.mark, { backgroundColor: theme.neutral, opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Text style={[styles.line, { color: theme.ink }]}>{markText(t)}</Text>
+              <Text style={[styles.line, { color: theme.muted }]}>›</Text>
+            </Pressable>
+          ) : (
+            <View key={`${t.at}/${t.dogId}`} style={styles.mark}>
+              <Text style={[styles.line, { color: theme.muted }]}>{`${markText(t)} · wartet auf Empfang`}</Text>
+            </View>
+          ),
+        )}
       </View>
     );
   }
@@ -136,6 +158,8 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   card: { borderRadius: 12, padding: 12, gap: 6 },
   row: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
+  marks: { gap: 4 },
+  mark: { flexDirection: "row", justifyContent: "space-between", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, minHeight: 40, alignItems: "center" },
   line: { fontSize: 15 },
   right: { flexShrink: 1, textAlign: "right" },
   note: { borderRadius: 12, padding: 12, minHeight: 60, fontSize: 15 },

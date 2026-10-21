@@ -49,7 +49,7 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
           {d.extra ? ` · ${d.extra}` : ""}
         </Text>
         {second ? (
-          <Text style={[styles.small, { color: theme.muted }]} numberOfLines={2}>
+          <Text testID={`entry-${entry.id}-more`} style={[styles.small, { color: theme.muted }]} numberOfLines={2}>
             {second}
           </Text>
         ) : null}

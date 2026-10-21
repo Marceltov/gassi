@@ -3,7 +3,7 @@
 import { byDay, ENTRY_TYPES, type EntryType, TYPE_LABEL } from "@gassi/domain";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { useNow } from "../start/useNow";
 import { radius, useTheme } from "../theme";
@@ -16,6 +16,7 @@ import type { Entry, Filter } from "./form";
 import { useHistory } from "./useHistory";
 
 type Choosing = "by" | "type" | "dog";
+const OSM_COPYRIGHT = "https://www.openstreetmap.org/copyright";
 type Option = { label: string; on: boolean; pick: () => void };
 
 export function History() {
@@ -83,6 +84,12 @@ export function History() {
             </View>
           ))}
           {more ? <BigButton kind="neutral" size="m" label={loadingMore ? "Lädt …" : "Ältere zeigen"} onPress={loadMore} /> : null}
+          {entries?.some((e) => e.route) ? (
+            // the small maps leave out their credit line: it is here instead
+            <Text accessibilityRole="link" onPress={() => void Linking.openURL(OSM_COPYRIGHT)} style={[styles.credit, { color: theme.muted }]}>
+              Karten © OpenStreetMap-Mitwirkende
+            </Text>
+          ) : null}
         </>
       }
       bottom={
@@ -138,6 +145,7 @@ const styles = StyleSheet.create({
   small: { fontSize: 13 },
   day: { gap: 6 },
   heading: { fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6, marginTop: 6 },
+  credit: { fontSize: 12, textAlign: "center", textDecorationLine: "underline" },
   filters: { flexDirection: "row", gap: 8 },
   filter: { flex: 1, minHeight: 48, borderRadius: radius.tile, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },
   filterText: { fontSize: 14, fontWeight: "600" },

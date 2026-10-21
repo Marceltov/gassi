@@ -203,6 +203,10 @@ describe("walks", () => {
     ]);
     const walk = (await entries()).find((e) => e.type === "walk")!;
     expect(await s.summary(walk.id)).toMatchObject({ pees: [{ at: at(5), dogId: 1 }, { at: at(7), dogId: 1 }], poops: [{ at: at(6), dogId: 1 }] });
+    // each with its entry's id, so the summary can open it
+    const idAt = async (type: string, t: string) => (await entries()).find((e) => e.type === type && e.at === t)!.id;
+    expect((await s.summary(walk.id)).pees.map((m) => m.id)).toEqual([await idAt("pee", at(5)), await idAt("pee", at(7))]);
+    expect((await s.summary(walk.id)).poops[0].id).toBe(await idAt("poop", at(6)));
   });
 });
 
