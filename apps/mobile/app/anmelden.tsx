@@ -3,7 +3,7 @@
 // code signs it in again there).
 import { useEffect, useState } from "react";
 import { Platform, StyleSheet, Text } from "react-native";
-import { OIDC_START, oidcAvailable } from "@/src/data/signin";
+import { OIDC_START, signInOptions } from "@/src/data/signin";
 import { SignIn } from "@/src/signin/SignIn";
 import { useTheme } from "@/src/theme";
 import { BigButton } from "@/src/ui/BigButton";
@@ -18,7 +18,7 @@ export default function SignInScreen() {
   const theme = useTheme();
   const [oidc, setOidc] = useState(false);
   useEffect(() => {
-    void oidcAvailable().then(setOidc);
+    void signInOptions().then((o) => setOidc(o.oidc));
   }, []);
   return (
     <SignIn

@@ -184,6 +184,8 @@ export const contract = {
     output: z.object({ kind: z.enum(linkKinds) }),
     messages: { token: LINK_OR_CODE, code: LINK_OR_CODE },
   }),
+  // what the sign-in can offer before there is a token: the household's OIDC provider, a link by e-mail
+  options: endpoint({ method: "GET", path: "/api/auth/options", auth: false, input: none, output: z.object({ oidc: z.boolean(), mail: z.boolean() }) }),
   magicLink: endpoint({
     method: "POST",
     path: "/api/auth/magic",

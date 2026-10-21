@@ -34,12 +34,12 @@ export function deviceName(userAgent: string): string {
   return `${kinds.find(([re]) => re.test(userAgent))?.[1] ?? "Browser"} (Web)`;
 }
 
-/** Whether the household signs in through OIDC: /api/oidc/start exists only then (404 otherwise; 400 without a target). */
-export async function oidcAvailable(fetchFn: typeof fetch = (...a) => fetch(...a)): Promise<boolean> {
+/** What else the sign-in can offer (OIDC, mail); nothing when the server isn't reachable. */
+export async function signInOptions(fetchFn?: typeof fetch): Promise<{ oidc: boolean; mail: boolean }> {
   try {
-    return (await fetchFn(`${API_URL}/api/oidc/start`, { redirect: "manual" })).status === 400;
+    return await publicApi(fetchFn).options();
   } catch {
-    return false;
+    return { oidc: false, mail: false };
   }
 }
 

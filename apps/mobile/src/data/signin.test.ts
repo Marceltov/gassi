@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { loadDevice } from "./device";
-import { deviceName, linkKind, needsName, signIn } from "./signin";
+import { deviceName, linkKind, needsName, signIn, signInOptions } from "./signin";
 import { fakeServer, status } from "./testing";
 
 test("the device is named after the phone, for the list of devices", () => {
@@ -28,4 +28,11 @@ test("signing in with a code keeps the device's token; a used code says why", as
   expect(server.calls[0].body).toEqual({ code: "abcd efgh", deviceKind: "web", deviceName: "iPhone (Web)", personName: "Herzii" });
   expect(loadDevice()).toEqual({ token: "dev-1", serverUrl: "" });
   await expect(signIn({ code: "used" }, {}, "", server.fetch)).rejects.toThrow("Dieser Link ist abgelaufen oder schon benutzt.");
+});
+
+test("the sign-in asks the server whether OIDC is set up; out of reach, it offers only the code", async () => {
+  const server = fakeServer({ "GET /api/auth/options": () => ({ oidc: true, mail: false }) });
+  expect(await signInOptions(server.fetch)).toEqual({ oidc: true, mail: false });
+  server.reachable = false;
+  expect(await signInOptions(server.fetch)).toEqual({ oidc: false, mail: false });
 });
