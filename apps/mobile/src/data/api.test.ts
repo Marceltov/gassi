@@ -4,15 +4,17 @@ import { apiFor, errorMessage, isOffline, NO_ANSWER, OFFLINE } from "./api";
 import { loadDevice, saveDevice } from "./device";
 import { fakeServer, HIRSCH, status } from "./testing";
 
-test("a 401 signs the device out and forgets what it showed", async () => {
+test("a 401 signs the device out and forgets what it showed: the household, the walk ended last, the food sheet's facts", async () => {
   const server = fakeServer({ "GET /api/me": () => status(401, { error: "Bitte anmelden." }) });
   saveDevice({ token: "removed", serverUrl: "", person: HIRSCH });
-  localStorage.setItem("gassi.snapshot", JSON.stringify({ personId: HIRSCH.id }));
-  localStorage.setItem("gassi.endedWalk", JSON.stringify({ key: "w" }));
+  localStorage.setItem("gassi.kept.snapshot", JSON.stringify({ personId: HIRSCH.id }));
+  localStorage.setItem("gassi.kept.endedWalk", JSON.stringify({ key: "w" }));
+  localStorage.setItem(`gassi.kept.food.${HIRSCH.id}`, JSON.stringify({ recent: [] }));
+  localStorage.setItem(`gassi.commands.${HIRSCH.id}`, "[]");
   await expect(apiFor(loadDevice()!, { fetch: server.fetch }).me()).rejects.toEqual(new ApiError(401, "Bitte anmelden."));
   expect(loadDevice()).toBeNull();
-  expect(localStorage.getItem("gassi.snapshot")).toBeNull();
-  expect(localStorage.getItem("gassi.endedWalk")).toBeNull();
+  const left = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i));
+  expect(left).toEqual([`gassi.commands.${HIRSCH.id}`]); // only the unsent taps: they go out at the same person's next sign-in
   expect(server.calls[0].headers.authorization).toBe("Bearer removed");
 });
 

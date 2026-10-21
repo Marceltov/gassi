@@ -3,8 +3,7 @@
 // removed or its token is gone) and forgets what it showed, which brings up the sign-in.
 import { ApiError, type Client, createClient } from "@gassi/api-client";
 import { clearDevice, type Device, loadDevice } from "./device";
-import { clearEnded } from "../walk/ended";
-import { clearSnapshot } from "./snapshot";
+import { clearKept } from "./kept";
 
 /** The server: empty on the web, where the server serves the app (same origin); set for development. */
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
@@ -60,11 +59,11 @@ export function apiFor(device: Device, { fetch: fetchFn = (...a) => fetch(...a),
   return createClient({ baseUrl: device.serverUrl, token: device.token, fetch: wrap(fetchFn, onReached, signOutOn401, timeoutMs) });
 }
 
-/** Signs this device out here: forgets the token and what it showed, which brings up the sign-in. The queue of unsent
- * taps stays (per person): it goes out when the same person signs in again. */
+/** Signs this device out here: forgets the token and everything kept of what it showed (kept.ts: the household, the
+ * walk ended last, the food sheet's facts), which brings up the sign-in. The queue of unsent taps stays (per person):
+ * it goes out when the same person signs in again. */
 export function forgetDevice(): void {
-  clearSnapshot();
-  clearEnded();
+  clearKept();
   clearDevice();
 }
 

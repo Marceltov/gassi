@@ -9,10 +9,9 @@ import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
 import { Sheet } from "../ui/Sheet";
-import { type FoodFacts, loadFacts, saveFacts } from "./memory";
+import { type FoodFacts, loadFacts, RECENT, saveFacts, withFeeding } from "./memory";
 
 const STEP_G = 10;
-const RECENT = 20; // the newest feedings the portions are taken from
 const KINDS: { kind: FoodKind; label: string }[] = [
   { kind: "wet", label: "Nass" },
   { kind: "dry", label: "Trocken" },
@@ -40,7 +39,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
   const kept = useRef(facts); // what was kept at the opening, for what the server doesn't answer
   const kindPicked = useRef(false); // the person chose the kind: the server's answer must not change it
   const edited = useRef(false); // the person set the grams by hand: the server's answer must not change them
-  const submitId = useRef(newId()); // one id per form: a double tap on Eintragen is one feeding
+  const [submitId] = useState(newId); // one id per form: a double tap on Eintragen is one feeding
 
   useEffect(() => {
     if (!api) return;
@@ -91,7 +90,9 @@ function FoodForm({ onClose }: { onClose: () => void }) {
   const quick = quickPortions(facts.recent, kind, facts.stock?.wet.canSizeG ?? null);
   const stock = facts.stock ? stockLine(facts.stock, kind) : null;
   const submit = () => {
-    send({ id: submitId.current, at: new Date().toISOString(), kind: "food", foodKind: kind, amountG, ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
+    send({ id: submitId, at: new Date().toISOString(), kind: "food", foodKind: kind, amountG, ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
+    // the next opening (maybe without reception) starts from this feeding, as it would from the server's answer
+    saveFacts(personId, withFeeding(facts, { foodKind: kind, amountG }));
     onClose();
   };
 

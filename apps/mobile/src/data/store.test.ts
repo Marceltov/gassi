@@ -1,7 +1,10 @@
 import type { Command } from "@gassi/domain";
 import { expect, test } from "vitest";
+import { forgetDevice } from "./api";
+import { saveDevice } from "./device";
+import { loadKept } from "./kept";
 import { createGassiStore } from "./store";
-import { HIRSCH, household } from "./testing";
+import { HIRSCH, household, status } from "./testing";
 
 const start = (id: string): Command => ({ id, at: new Date().toISOString(), kind: "walk.start", walkKey: "w1" });
 const settle = () => new Promise((r) => setTimeout(r, 0));
@@ -45,6 +48,7 @@ test("subscribers hear about each change", async () => {
 
 test("reopened without reception: the queued walk shows at once, with the household as last seen, and a new tap is kept", async () => {
   const device = { token: "t", serverUrl: "", person: HIRSCH };
+  saveDevice(device);
   const first = household();
   const before = createGassiStore(device, { fetch: first.fetch });
   await before.refresh(); // the last answer is kept: Toffee, Herzii
@@ -100,4 +104,44 @@ test("a sessions answer asked for before a tap's answer came back does not undo 
   release();
   await refreshing;
   expect(store.get().view.walk).toMatchObject({ key: "w1" });
+});
+
+test("the queue goes out even when one of the household's calls fails", async () => {
+  const server = household();
+  server.handlers["GET /api/people"] = () => status(500, { error: "Kaputt." });
+  const store = createGassiStore({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: server.fetch });
+  server.reachable = false;
+  store.send(start("s1"));
+  await settle();
+  server.reachable = true;
+  await store.refresh();
+  expect(server.calls.some((c) => c.route === "POST /api/commands")).toBe(true);
+  expect(store.get().unsent).toBe(0);
+});
+
+test("a household that came is kept, also when the sessions don't come", async () => {
+  const device = { token: "t", serverUrl: "", person: HIRSCH };
+  saveDevice(device);
+  const server = household();
+  server.handlers["GET /api/sessions"] = () => status(500, { error: "Kaputt." });
+  await createGassiStore(device, { fetch: server.fetch }).refresh();
+  expect(loadKept("snapshot")).toMatchObject({ dogs: [{ name: "Toffee" }], people: [{ name: "Hirsch" }, { name: "Herzii" }] });
+});
+
+test("an answer that comes after this device was signed out keeps nothing", async () => {
+  const device = { token: "t", serverUrl: "", person: HIRSCH };
+  saveDevice(device);
+  const server = household();
+  let release = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  const fetchFn: typeof fetch = async (input, init) => {
+    if (String(input).endsWith("/api/sessions")) await held;
+    return server.fetch(input, init);
+  };
+  const refreshing = createGassiStore(device, { fetch: fetchFn }).refresh();
+  await settle();
+  forgetDevice(); // a 401 elsewhere, or Abmelden
+  release();
+  await refreshing;
+  expect(loadKept("snapshot")).toBeNull();
 });

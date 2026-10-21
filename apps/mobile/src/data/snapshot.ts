@@ -1,18 +1,20 @@
 // The last household and sessions the server showed, so a reopened app shows them at once (also without
-// reception) until the server answers. The web keeps them in localStorage (snapshot.web.ts); the Android app (step 3)
-// brings its own file next to this one. Until then a native build keeps them only while it runs.
+// reception) until the server answers. One, of the person signed in, kept with the rest (kept.ts).
 import type { SessionsView } from "@gassi/domain";
+import { dropKept, loadKept, saveKept } from "./kept";
 import type { GassiState } from "./store";
 
 export type Snapshot = Pick<GassiState, "household" | "people" | "dogs" | "exercises" | "treatKinds"> & { me: NonNullable<GassiState["me"]>; view: SessionsView };
 
-let current: Snapshot | null = null;
+const KEY = "snapshot";
 
 /** The snapshot of `personId`'s household, if one was kept. */
-export const loadSnapshot = (personId: string): Snapshot | null => (current?.me.id === personId ? current : null);
-export function saveSnapshot(s: Snapshot): void {
-  current = s;
+export function loadSnapshot(personId: string): Snapshot | null {
+  const s = loadKept(KEY) as Snapshot | null;
+  // only the fields the store reads, each of the right shape; anything else counts as none
+  const ok = s?.me?.id === personId && Array.isArray(s.people) && Array.isArray(s.dogs) && Array.isArray(s.exercises) && Array.isArray(s.treatKinds) && typeof s.view === "object" && s.view !== null;
+  return ok ? s : null;
 }
-export function clearSnapshot(): void {
-  current = null;
-}
+
+export const saveSnapshot = (s: Snapshot): void => saveKept(KEY, s);
+export const clearSnapshot = (): void => dropKept(KEY);

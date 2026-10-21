@@ -6,7 +6,7 @@
 import { ApiError, type Client, type Output } from "@gassi/api-client";
 import { type Command, createCommandQueue, type Person, project, RejectedCommands, type SessionsView } from "@gassi/domain";
 import { apiFor, WRITE_TIMEOUT_MS } from "./api";
-import type { Device } from "./device";
+import { type Device, loadDevice } from "./device";
 import { onReconnect } from "./network";
 import { onQueueChanged, queueStorage } from "./queue";
 import { loadSnapshot, saveSnapshot } from "./snapshot";
@@ -40,7 +40,7 @@ export type GassiStore = {
   get(): GassiState;
   subscribe(fn: () => void): () => void;
   send(cmd: Command): void;
-  /** Sends what is queued, then reloads the household and the sessions. */
+  /** Reloads the household, and sends what is queued, then reloads the sessions. */
   refresh(): Promise<void>;
   /** Listens to other tabs' taps and to reception coming back; returns the stop. */
   start(): () => void;
@@ -79,7 +79,10 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
     state = { ...household, me, view: project(serverView, pending, me, people, activeDogs), pending, unsent: pending.length, online };
     listeners.forEach((fn) => fn());
   }
-  const keep = () => saveSnapshot({ ...household, view: serverView });
+  // only while this device is the signed-in one: an answer that comes after a 401 (or Abmelden) keeps nothing
+  const keep = () => {
+    if (loadDevice()?.token === device.token) saveSnapshot({ ...household, view: serverView });
+  };
 
   const sendCommands = async (commands: Command[]) => {
     try {
@@ -104,11 +107,21 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
   });
   update();
 
-  async function refresh() {
+  // The household's five calls and the queue go out side by side, each on its own: one call that fails holds up
+  // neither the taps nor what came. The sessions are asked for after the queue, so they show its taps.
+  async function loadHousehold() {
     try {
       const [me, people, dogs, exercises, treatKinds] = await Promise.all([api.me(), api.people(), api.dogs(), api.exercises(), api.treatKinds()]);
       household = { me: me.person, household: me.household, people: people.people, dogs: dogs.dogs, exercises: exercises.exercises, treatKinds: treatKinds.treatKinds };
-      await queue.flush();
+      keep();
+    } catch {
+      // no reception, signed out (the 401 already cleared the device), or an answer that didn't fit: keep showing
+      // what we have; the next refresh tries again
+    }
+  }
+  async function loadSessions() {
+    await queue.flush(); // never throws: what doesn't go out stays queued
+    try {
       const asked = answers;
       const sessions = await api.sessions();
       if (asked === answers) {
@@ -116,9 +129,11 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
         keep();
       }
     } catch {
-      // no reception, signed out (the 401 already cleared the device), or an answer that didn't fit: keep showing
-      // what we have; the next refresh tries again
+      // as above
     }
+  }
+  async function refresh() {
+    await Promise.all([loadHousehold(), loadSessions()]);
     update();
   }
 

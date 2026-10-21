@@ -35,7 +35,7 @@ test("a device link opened in the browser signs in at once; removing the device 
 
   await page.goto(`/join?token=${invite.url.split("/l/")[1]}`);
   await startShows(page);
-  await expect.poll(() => page.evaluate(() => localStorage.getItem("gassi.snapshot"))).not.toBeNull(); // kept for an offline start
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("gassi.kept.snapshot"))).not.toBeNull(); // kept for an offline start
   const token = JSON.parse((await page.evaluate(() => localStorage.getItem("gassi.device")))!).token as string;
   const asThisPhone = createClient({ baseUrl: BASE_URL, token });
   expect((await asThisPhone.me()).device).toMatchObject({ kind: "web", name: "Android (Web)" });
@@ -45,7 +45,7 @@ test("a device link opened in the browser signs in at once; removing the device 
   await page.reload();
   await expect(page).toHaveURL(`${BASE_URL}/anmelden`);
   await expect(page.getByLabel("Code")).toBeVisible();
-  expect(await page.evaluate(() => [localStorage.getItem("gassi.device"), localStorage.getItem("gassi.snapshot")])).toEqual([null, null]);
+  expect(await page.evaluate(() => [localStorage.getItem("gassi.device"), localStorage.getItem("gassi.kept.snapshot")])).toEqual([null, null]);
 });
 
 test("a used code says so; a failed sign-in from the provider says it didn't work", async ({ page }) => {

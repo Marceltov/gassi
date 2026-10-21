@@ -1,13 +1,14 @@
-// The walk this phone ended last, for its summary until the server knows it. The web keeps it in localStorage
-// (ended.web.ts), so a reload without reception still shows it; a native build keeps it while it runs (step 3).
+// The walk this phone ended last, for its summary until the server knows it; kept with the rest (data/kept.ts), so a
+// reload without reception still shows it.
+import { dropKept, loadKept, saveKept } from "../data/kept";
 import type { Ended } from "./taps";
 
-let current: Ended | null = null;
+const KEY = "endedWalk";
 
-export const loadEnded = (key: string): Ended | null => (current?.key === key ? current : null);
-export function saveEnded(e: Ended): void {
-  current = e;
+export function loadEnded(key: string): Ended | null {
+  const e = loadKept(KEY) as Ended | null;
+  return e?.key === key && Array.isArray(e.taps) && Array.isArray(e.walkers) && Array.isArray(e.pauses) ? e : null;
 }
-export function clearEnded(): void {
-  current = null;
-}
+
+export const saveEnded = (e: Ended): void => saveKept(KEY, e);
+export const clearEnded = (): void => dropKept(KEY);
