@@ -22,5 +22,13 @@ export function saveEnded(e: Ended): void {
   }
 }
 
-const sameAsNative: typeof Native = { loadEnded, saveEnded };
+export function clearEnded(): void {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // nothing kept then either
+  }
+}
+
+const sameAsNative: typeof Native = { loadEnded, saveEnded, clearEnded };
 void sameAsNative;

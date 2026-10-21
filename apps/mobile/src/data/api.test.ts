@@ -8,9 +8,11 @@ test("a 401 signs the device out and forgets what it showed", async () => {
   const server = fakeServer({ "GET /api/me": () => status(401, { error: "Bitte anmelden." }) });
   saveDevice({ token: "removed", serverUrl: "", person: HIRSCH });
   localStorage.setItem("gassi.snapshot", JSON.stringify({ personId: HIRSCH.id }));
+  localStorage.setItem("gassi.endedWalk", JSON.stringify({ key: "w" }));
   await expect(apiFor(loadDevice()!, { fetch: server.fetch }).me()).rejects.toEqual(new ApiError(401, "Bitte anmelden."));
   expect(loadDevice()).toBeNull();
   expect(localStorage.getItem("gassi.snapshot")).toBeNull();
+  expect(localStorage.getItem("gassi.endedWalk")).toBeNull();
   expect(server.calls[0].headers.authorization).toBe("Bearer removed");
 });
 

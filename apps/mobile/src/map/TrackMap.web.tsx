@@ -16,7 +16,7 @@ export function TrackMap({ routes, height, still = false }: TrackMapProps) {
   useEffect(() => {
     const drawn = routes.filter((r) => r.length > 0);
     if (!box.current || drawn.length === 0) return;
-    const map = L.map(box.current, { zoomControl: !still, dragging: !still, scrollWheelZoom: false, touchZoom: !still, doubleClickZoom: !still, attributionControl: true });
+    const map = L.map(box.current, { zoomControl: !still, dragging: !still, scrollWheelZoom: false, touchZoom: !still, doubleClickZoom: !still, keyboard: !still, boxZoom: !still, attributionControl: true });
     L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map);
     const lines = drawn.map((r) => L.polyline(r, { color: theme.walk, weight: 4 }).addTo(map));
     map.fitBounds(L.featureGroup(lines).getBounds(), { padding: [16, 16], maxZoom: 17 });

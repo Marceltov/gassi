@@ -81,8 +81,11 @@ test("a sessions answer asked for before a tap's answer came back does not undo 
   // the sessions answer is held back until the tap's answer is in: it shows the server before the tap
   let release = () => {};
   const held = new Promise<void>((r) => (release = r));
+  let asked = () => {};
+  const sessionsAsked = new Promise<void>((r) => (asked = r));
   const fetchFn: typeof fetch = async (input, init) => {
     if (String(input).endsWith("/api/sessions")) {
+      asked();
       await held;
       return new Response(JSON.stringify({ walk: null, training: null }), { headers: { "content-type": "application/json" } });
     }
@@ -90,7 +93,7 @@ test("a sessions answer asked for before a tap's answer came back does not undo 
   };
   const store = createGassiStore({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: fetchFn });
   const refreshing = store.refresh();
-  await new Promise((r) => setTimeout(r, 20)); // the refresh now waits for the sessions answer
+  await sessionsAsked; // the refresh now waits for the sessions answer
   store.send(start("s1"));
   await settle();
   expect(store.get()).toMatchObject({ unsent: 0, view: { walk: { key: "w1" } } });

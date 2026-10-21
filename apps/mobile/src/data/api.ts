@@ -3,6 +3,7 @@
 // removed or its token is gone) and forgets what it showed, which brings up the sign-in.
 import { ApiError, type Client, createClient } from "@gassi/api-client";
 import { clearDevice, type Device, loadDevice } from "./device";
+import { clearEnded } from "../walk/ended";
 import { clearSnapshot } from "./snapshot";
 
 /** The server: empty on the web, where the server serves the app (same origin); set for development. */
@@ -41,6 +42,7 @@ export function apiFor(device: Device, { fetch: fetchFn = (...a) => fetch(...a),
     // only if this device is still the signed-in one: another tab may have signed in anew meanwhile
     if (res.status === 401 && loadDevice()?.token === device.token) {
       clearSnapshot();
+      clearEnded();
       clearDevice();
     }
   };

@@ -27,16 +27,25 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
   const routes = useMemo(() => (track ? [simplify(track.points, 500)] : []), [track]);
 
   const done = () => (router.canGoBack() ? router.back() : router.replace("/"));
-  // an edit sends all of the walk's fields (left-out ones would become empty), with the change
-  const edit = async (s: Shown, change: { walkers?: string[]; note?: string | null }) => {
-    if (s.id === null || !api) return setMessage(OFFLINE);
+  // an edit sends all of the walk's fields (left-out ones would become empty), with the change; whether it went through
+  const edit = async (s: Shown, change: { walkers?: string[]; note?: string | null }): Promise<boolean> => {
+    if (s.id === null || !api) {
+      setMessage(OFFLINE);
+      return false;
+    }
     try {
       await api.editEntry({ id: s.id, at: s.startedAt, endedAt: s.endedAt, note: s.note, ...change });
       setMessage(null);
       reload();
+      return true;
     } catch (e) {
       setMessage(errorMessage(e));
+      return false;
     }
+  };
+  // the typed note stays until it is saved
+  const saveNote = async (s: Shown, text: string) => {
+    if (await edit(s, { note: text.trim() || null })) setNote(null);
   };
 
   if (!shown) {
@@ -90,7 +99,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
             multiline
             style={[styles.note, { color: theme.ink, backgroundColor: theme.surface }]}
           />
-          {note !== null && note !== (shown.note ?? "") ? <BigButton kind="neutral" size="m" label="Notiz speichern" onPress={() => void edit(shown, { note: note.trim() || null }).then(() => setNote(null))} /> : null}
+          {note !== null && note !== (shown.note ?? "") ? <BigButton kind="neutral" size="m" label="Notiz speichern" onPress={() => void saveNote(shown, note)} /> : null}
           {message ? <Text style={[styles.small, { color: theme.muted }]}>{message}</Text> : null}
         </>
       }

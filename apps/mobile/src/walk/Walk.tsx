@@ -49,8 +49,7 @@ export function Walk() {
 
   const at = () => new Date().toISOString();
   const dogName = (id: number) => dogs.find((d) => d.id === id)?.name ?? "Hund";
-  // a walk the server hasn't answered for yet may list no dogs: then every dog the phone knows
-  const walkDogs = walk.dogIds.length ? walk.dogIds : dogs.filter((d) => !d.archived).map((d) => d.id);
+  const walkDogs = walk.dogIds;
   const several = walkDogs.length > 1;
 
   const log = (type: Kind, dogId: number) => {

@@ -8,3 +8,6 @@ export const loadEnded = (key: string): Ended | null => (current?.key === key ? 
 export function saveEnded(e: Ended): void {
   current = e;
 }
+export function clearEnded(): void {
+  current = null;
+}

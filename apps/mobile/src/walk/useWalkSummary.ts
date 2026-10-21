@@ -6,7 +6,7 @@ import type { Output } from "@gassi/api-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage } from "../data/api";
 import { useGassi } from "../data/GassiProvider";
-import { loadEnded } from "./ended";
+import { clearEnded, loadEnded } from "./ended";
 import { fromEnded, fromServer, type Shown, tapsOf } from "./taps";
 
 type Answer = Output<"walk">;
@@ -24,7 +24,8 @@ export function useWalkSummary(idOrKey: string): WalkSummaryState {
     const n = ++asked.current;
     const call = /^\d+$/.test(idOrKey) ? api.walk({ id: Number(idOrKey) }) : api.walkByKey({ key: idOrKey });
     call.then(
-      (data) => n === asked.current && setAnswer({ for: idOrKey, data, error: null }),
+      // an answer like the one shown keeps its identity (the map isn't drawn anew)
+      (data) => n === asked.current && setAnswer((a) => (a?.for === idOrKey && a.error === null && JSON.stringify(a.data) === JSON.stringify(data) ? a : { for: idOrKey, data, error: null })),
       (e) => n === asked.current && setAnswer((a) => ({ for: idOrKey, data: a?.for === idOrKey ? a.data : null, error: errorMessage(e) })),
     );
   }, [api, idOrKey, unsent, online, asks]);
@@ -34,6 +35,11 @@ export function useWalkSummary(idOrKey: string): WalkSummaryState {
   const waiting = !!ended && pending.some((c) => c.at >= ended.startedAt && c.at <= ended.endedAt);
   const server = answer?.for === idOrKey ? answer : null;
   const done = server?.data && server.data.summary.endedAt !== null ? server.data : null;
+  const replaced = !!ended && !!done && !waiting;
+  // once the server's summary has replaced the copy kept at Zuhause, the copy goes
+  useEffect(() => {
+    if (replaced) clearEnded();
+  }, [replaced]);
   if (done && !waiting) return { shown: fromServer(done.summary), track: done.track, local: false, error: null, reload };
   if (local) return { shown: local, track: null, local: true, error: null, reload };
   if (server?.data) return { shown: fromServer(server.data.summary), track: server.data.track, local: false, error: null, reload };

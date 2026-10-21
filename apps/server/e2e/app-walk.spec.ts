@@ -40,6 +40,11 @@ test("Pipi with one dog logs at once; without reception Poopoo and Zuhause show 
     await expect(page.getByTestId("summary-pees")).toContainText("1×");
     await expect(page.getByTestId("summary-poops")).toContainText("1×");
     await expect(page.getByText("Noch nicht gesendet")).toBeVisible();
+    // a note typed without reception stays typed until it can be saved
+    await page.getByPlaceholder("Notiz").fill("Matschig am Bach");
+    await page.getByRole("button", { name: "Notiz speichern" }).click();
+    await expect(page.getByText("Keine Verbindung – bitte später nochmal.")).toBeVisible();
+    await expect(page.getByPlaceholder("Notiz")).toHaveValue("Matschig am Bach");
 
     await context.setOffline(false);
     await expect(page.getByText("Noch nicht gesendet")).toBeHidden();
@@ -48,6 +53,9 @@ test("Pipi with one dog logs at once; without reception Poopoo and Zuhause show 
     const walk = await client.walkByKey({ key });
     expect(walk.summary.endedAt).not.toBeNull();
     expect([walk.summary.pees.length, walk.summary.poops.length]).toEqual([1, 1]);
+    await page.getByRole("button", { name: "Notiz speichern" }).click();
+    await expect.poll(async () => (await client.walkByKey({ key })).summary.note).toBe("Matschig am Bach");
+    await expect(page.getByRole("button", { name: "Notiz speichern" })).toBeHidden();
 
     // who went can be changed afterwards: Herzii went too
     await page.getByRole("button", { name: "Herzii" }).click();
@@ -73,7 +81,7 @@ test("a reload during a walk returns to it with the clock right; Training starts
   await signIn(page);
   await startWalk(page);
   const before = Date.now();
-  await page.waitForTimeout(2500);
+  await expect.poll(async () => seconds(await clock(page).textContent())).toBeGreaterThanOrEqual(2);
   await page.reload();
   await expect(page).toHaveURL(`${BASE_URL}/runde`);
   await expect(clock(page)).toHaveText(/^\d+:\d\d$/);

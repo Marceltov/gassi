@@ -18,10 +18,10 @@ export async function stopEverything() {
   if (commands.length) await client.commands({ commands });
 }
 
-/** Archives every active dog but the first; returns how to bring them back. */
+/** Archives every active dog but the first; returns how to bring back those it archived. */
 export async function onlyOneDog(): Promise<() => Promise<void>> {
   const client = asHirsch();
-  const [, ...others] = (await client.dogs()).dogs;
+  const [, ...others] = (await client.dogs()).dogs.filter((d) => !d.archived);
   for (const d of others) await client.updateDog({ id: d.id, archived: true });
   return async () => {
     for (const d of others) await client.updateDog({ id: d.id, archived: false });
