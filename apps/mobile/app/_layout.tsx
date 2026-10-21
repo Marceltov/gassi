@@ -27,17 +27,8 @@ function Screens() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={signedIn} redirectTo="/anmelden">
+        {/* every screen of the signed-in app lives in a tab, so the tab bar stays (app/(tabs)/_layout.tsx) */}
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="runde" />
-        <Stack.Screen name="runde/[id]" />
-        <Stack.Screen name="eintrag/[id]" />
-        <Stack.Screen name="training" />
-        <Stack.Screen name="mehr/gewicht" />
-        <Stack.Screen name="mehr/vorrat" />
-        <Stack.Screen name="mehr/hunde" />
-        <Stack.Screen name="mehr/katalog" />
-        <Stack.Screen name="mehr/haushalt" />
-        <Stack.Screen name="mehr/geraete" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn} redirectTo="/">
         <Stack.Screen name="anmelden" />

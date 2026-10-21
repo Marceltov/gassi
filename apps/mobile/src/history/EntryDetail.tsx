@@ -70,14 +70,15 @@ export function EntryDetail({ id }: { id: number }) {
       await writeApi.editEntry(editInput(e, f));
       if (e.type === "training") await writeApi.editTraining(trainingInput(e, f));
     });
-  // a deleted walk has no summary to go back to: Verlauf (anything else goes back to where it was opened)
+  // a deleted walk has no summary to go back to: the first screen of the tab it was opened on (Verlauf, or Start right
+  // after the walk); anything else goes back to where it was opened
   const remove = (e: Entry) =>
     run(
       async () => {
         setAsking(false);
         if (writeApi) await writeApi.deleteEntry({ id });
       },
-      e.type === "walk" ? () => router.dismissTo("/verlauf") : back,
+      e.type === "walk" ? () => router.dismissAll() : back,
     );
 
   if (!entry || !form) {

@@ -69,9 +69,10 @@ test("Pipi with one dog logs at once; without reception Poopoo and Zuhause show 
     await expect(page.getByTestId("track-map")).toContainText("OpenStreetMap");
     await expect(page.getByText("1,2 km")).toBeVisible();
 
+    // after the reload the summary is a cold link, which opens on Verlauf: Fertig goes back to the list there
     await page.getByRole("button", { name: "Fertig" }).click();
-    await expect(page).toHaveURL(`${BASE_URL}/`);
-    await expect(page.getByRole("button", { name: "Gassi gehen" })).toBeVisible();
+    await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
+    await expect(page.getByRole("tab", { name: "Verlauf" })).toHaveAttribute("aria-selected", "true");
   } finally {
     await restore();
   }

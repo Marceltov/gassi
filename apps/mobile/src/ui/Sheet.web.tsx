@@ -1,15 +1,22 @@
-// The web's bottom sheet: a fixed backdrop and a panel at the bottom, closed by a tap outside or Escape; a modal
-// dialog for screen readers, and clear of the home indicator (the page runs with viewport-fit=cover). Rendered into
-// document.body so it sits above the tab bar, whatever screen opens it. Named by `label` (its title); opening moves the
-// focus to its first button, closing gives it back to what had it (the button that opened it).
-import { type ReactNode, useEffect, useRef } from "react";
+// The web's bottom sheet: a fixed backdrop and a panel at the bottom, closed by a tap outside, Escape or leaving the
+// screen (another tab); a modal dialog for screen readers. Rendered into document.body, whatever screen opens it, and
+// there it ends where the tab bar begins, so the bar stays visible and tappable; off a tab (the sign-in) the panel
+// keeps clear of the home indicator itself (the page runs with viewport-fit=cover). Named by `label` (its title);
+// opening moves the focus to its first button, closing gives it back to what had it (the button that opened it).
+import { BottomTabBarHeightContext } from "expo-router/tabs";
+import { type ReactNode, useContext, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Pressable, StyleSheet, View } from "react-native";
 import { radius, space, useTheme } from "../theme";
+import { useEdges } from "./edges";
+import { useCloseOnBlur } from "./useCloseOnBlur";
 
 export function Sheet({ open, onClose, label, children }: { open: boolean; onClose: () => void; label?: string; children?: ReactNode }) {
   const theme = useTheme();
   const panel = useRef<HTMLElement | null>(null);
+  const tabBar = useContext(BottomTabBarHeightContext); // the bar's measured height, undefined off a tab
+  const edges = useEdges();
+  useCloseOnBlur(open, onClose);
   useEffect(() => {
     if (!open) return;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -28,9 +35,9 @@ export function Sheet({ open, onClose, label, children }: { open: boolean; onClo
   }, [open, onClose]);
   if (!open) return null;
   return createPortal(
-    <View style={styles.overlay}>
+    <View testID="sheet-overlay" style={[styles.overlay, { bottom: tabBar ?? 0 }]}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Schließen" />
-      <View ref={panel as never} role="dialog" aria-modal aria-label={label} style={[styles.sheet, { backgroundColor: theme.background }]}>
+      <View ref={panel as never} role="dialog" aria-modal aria-label={label} style={[styles.sheet, { backgroundColor: theme.background, paddingLeft: edges.left(space.gutter), paddingRight: edges.right(space.gutter), paddingBottom: tabBar === undefined ? edges.bottom(space.gutter) : space.gutter }]}>
         {children}
       </View>
     </View>,
@@ -48,8 +55,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.sheet,
     borderTopRightRadius: radius.sheet,
     padding: space.gutter,
-    // CSS, which React Native's types don't know: the gutter plus the home indicator's height
-    paddingBottom: `calc(${space.gutter}px + env(safe-area-inset-bottom))` as unknown as number,
     gap: space.gap,
   },
 });
