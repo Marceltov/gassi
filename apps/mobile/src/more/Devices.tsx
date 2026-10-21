@@ -74,6 +74,8 @@ export function Devices() {
                 <Row
                   key={d.id}
                   testID={d.current ? "device-current" : `device-${d.id}`}
+                  icon={d.kind === "watch" ? "watch" : "phone"}
+                  tone="device"
                   label={d.name}
                   value={`${KIND[d.kind]} · ${seen(d)}`}
                   right={d.current ? null : <Small label="Abmelden" a11y={`${d.name} abmelden`} onPress={() => setAsking(d)} />}

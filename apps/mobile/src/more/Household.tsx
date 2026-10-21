@@ -22,7 +22,7 @@ export function Household() {
           <View testID="members">
             <Group title="Dabei">
               {people.map((p) => (
-                <Row key={p.id} label={p.name} value={p.id === me?.id ? "du" : undefined} />
+                <Row key={p.id} icon="people" tone="household" label={p.name} value={p.id === me?.id ? "du" : undefined} />
               ))}
             </Group>
           </View>

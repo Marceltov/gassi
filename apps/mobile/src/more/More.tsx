@@ -33,17 +33,17 @@ export function More() {
         <>
           <Text style={[styles.title, { color: theme.ink }]}>Mehr</Text>
           <Group>
-            <Row testID="more-Gewicht" icon="weight" label="Gewicht" value={weight} onPress={go("/mehr/gewicht")} />
-            <Row testID="more-Vorrat" icon="stock" label="Vorrat" value={food} onPress={go("/mehr/vorrat")} />
+            <Row testID="more-Gewicht" icon="weight" tone="weight" label="Gewicht" value={weight} onPress={go("/mehr/gewicht")} />
+            <Row testID="more-Vorrat" icon="stock" tone="food" label="Vorrat" value={food} onPress={go("/mehr/vorrat")} />
           </Group>
           <Group>
-            <Row testID="more-Hunde" icon="dog" label="Hunde" value={active.map((d) => d.name).join(", ")} onPress={go("/mehr/hunde")} />
-            <Row testID="more-Katalog" icon="training" label="Übungen und Leckerli" value="Listen bearbeiten" onPress={go("/mehr/katalog")} />
+            <Row testID="more-Hunde" icon="dog" tone="walk" label="Hunde" value={active.map((d) => d.name).join(", ")} onPress={go("/mehr/hunde")} />
+            <Row testID="more-Katalog" icon="training" tone="training" label="Übungen und Leckerli" value="Listen bearbeiten" onPress={go("/mehr/katalog")} />
           </Group>
           <Group>
-            <Row testID="more-Haushalt" icon="people" label="Haushalt" value={[me?.name, ...others].filter(Boolean).join(", ") + " · einladen"} onPress={go("/mehr/haushalt")} />
-            <Row testID="more-Geraete" icon="phone" label="Meine Geräte" value={devices ? `${devices.devices.length} angemeldet` : undefined} onPress={go("/mehr/geraete")} />
-            <Row testID="more-Garmin-Uhr" icon="watch" label="Garmin-Uhr" value="kommt später" muted />
+            <Row testID="more-Haushalt" icon="people" tone="household" label="Haushalt" value={[me?.name, ...others].filter(Boolean).join(", ") + " · einladen"} onPress={go("/mehr/haushalt")} />
+            <Row testID="more-Geraete" icon="phone" tone="device" label="Meine Geräte" value={devices ? `${devices.devices.length} angemeldet` : undefined} onPress={go("/mehr/geraete")} />
+            <Row testID="more-Garmin-Uhr" icon="watch" tone="garmin" label="Garmin-Uhr" value="kommt später" muted />
           </Group>
         </>
       }

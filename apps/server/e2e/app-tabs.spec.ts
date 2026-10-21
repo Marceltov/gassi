@@ -82,10 +82,17 @@ test("a running walk and its training keep the tab bar with Start highlighted, a
   await expect(page.getByTestId("walk-clock")).toBeVisible();
   await expectTabBar(page, "Start");
 
-  // another tab and back: the walk is still where it was
+  // another tab and back: Start opens at its top, the walk is still running and its tile opens it again
   await tab(page, "Verlauf").click();
   await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
   await tab(page, "Start").click();
+  await expect(page).toHaveURL(`${BASE_URL}/`);
+  await page.getByRole("button", { name: /Runde läuft/ }).click();
+  await expect(page).toHaveURL(`${BASE_URL}/runde`);
+  await tab(page, "Start").click(); // on the walk, the tab goes to Start's top
+  await expect(page).toHaveURL(`${BASE_URL}/`);
+  await expect(page.getByRole("button", { name: /Runde läuft/ })).toBeVisible();
+  await page.getByRole("button", { name: /Runde läuft/ }).click();
   await expect(page).toHaveURL(`${BASE_URL}/runde`);
   await page.getByRole("button", { name: "Training" }).click();
   await expect(page).toHaveURL(`${BASE_URL}/training`);
@@ -152,4 +159,32 @@ test("the food sheet sits above the tab bar, which stays tappable; another tab c
   await tab(page, "Start").click();
   await expect(page.getByRole("button", { name: "Futter geben" })).toBeVisible();
   await expect(sheet).toBeHidden();
+});
+
+test("every tab opens at its top page, not at the screen last open in it", async ({ page }) => {
+  const client = asHirsch();
+  const dog = (await client.dogs()).dogs.find((d) => !d.archived)!;
+  const key = `tabs-top-${Date.now()}`;
+  await client.commands({ commands: [{ id: key, at: new Date(Date.now() - 3 * 3_600_000).toISOString(), kind: "log", type: "pee", dogId: dog.id }] });
+  const pee = (await client.entries({ type: "pee" })).entries[0];
+  made.push(pee.id);
+
+  await signIn(page);
+  await page.goto("/mehr");
+  await page.getByRole("button", { name: /^Vorrat/ }).click();
+  await expect(page).toHaveURL(`${BASE_URL}/mehr/vorrat`);
+  await tab(page, "Start").click();
+  await expect(page).toHaveURL(`${BASE_URL}/`);
+  await tab(page, "Mehr").click();
+  await expect(page).toHaveURL(`${BASE_URL}/mehr`);
+  await expect(page.getByRole("button", { name: /^Hunde/ })).toBeVisible();
+
+  await tab(page, "Verlauf").click();
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
+  await page.getByRole("button", { name: /Pipi/ }).first().click();
+  await expect(page).toHaveURL(/\/eintrag\/\d+$/);
+  await tab(page, "Woche").click();
+  await expect(page).toHaveURL(`${BASE_URL}/woche`);
+  await tab(page, "Verlauf").click();
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
 });

@@ -44,7 +44,7 @@ export function Dogs() {
     });
   const archive = (dog: Dog, archived: boolean) => void change((api) => api.updateDog({ id: dog.id, archived }));
 
-  const rows = (list: Dog[]) => list.map((d) => <Row key={d.id} testID={`dog-${d.name}`} label={d.name} dot={d.color} onPress={() => open(d)} />);
+  const rows = (list: Dog[]) => list.map((d) => <Row key={d.id} testID={`dog-${d.name}`} label={d.name} icon="dog" square={d.color} onPress={() => open(d)} />);
   const active = dogs.filter((d) => !d.archived);
   const archived = dogs.filter((d) => d.archived);
 
