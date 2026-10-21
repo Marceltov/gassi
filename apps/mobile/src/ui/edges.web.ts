@@ -4,11 +4,11 @@
 export type Edge = (extra?: number) => number;
 
 const edge =
-  (side: "top" | "bottom" | "left" | "right"): Edge =>
+  (side: "bottom" | "left" | "right"): Edge =>
   (extra = 0) =>
     `calc(${extra}px + env(safe-area-inset-${side}, 0px))` as unknown as number;
 
-const EDGES = { top: edge("top"), bottom: edge("bottom"), left: edge("left"), right: edge("right") };
+const EDGES = { bottom: edge("bottom"), left: edge("left"), right: edge("right") };
 
 export function useEdges(): typeof EDGES {
   return EDGES;
