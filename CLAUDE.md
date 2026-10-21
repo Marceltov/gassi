@@ -16,7 +16,7 @@ the same app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay
 - `npm test` (Vitest over all workspaces); one test: `npx vitest run <path> -t <name>`
 - `npm run build` (the app export, then the server's build); `npm run build:app` alone exports the Expo app into
   `apps/server/public` and skips the export when nothing it depends on changed (`--force` exports anyway)
-- `npm run test:e2e` (the app step, the server's build, then Playwright: the API through the typed client, the link
+- `npm run test:e2e` (run it from the root: the workspace's own script tests whatever export is already in `public/`; it does the app step, the server's build, then Playwright: the API through the typed client, the link
   page and the app's screens (`apps/server/e2e/app-*.spec.ts`) in Chromium)
 - `npm run typecheck`, `npm run lint`
 - `npm run dev -w @gassi/server` (needs `apps/server/.env.local`, see `apps/server/.env.example`)

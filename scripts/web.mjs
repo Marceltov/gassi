@@ -1,7 +1,7 @@
 // Exports the Expo web app (apps/mobile) and copies the export into apps/server/public, where Next serves it; the
 // fallback rewrite in next.config.ts answers every other path with its index.html.
 // The export (about a minute) is skipped when nothing it depends on changed since the last one: a hash over the app's
-// sources, the two packages it imports, the lockfile and the EXPO_PUBLIC_* variables is kept in apps/mobile/dist/.stamp.
+// sources, the two packages it imports (with their package.json), the lockfile, the installed packages and the EXPO_PUBLIC_* variables is kept in apps/mobile/dist/.stamp.
 // `--force` exports anyway. The copy always runs (it is fast), so a cleaned public/ is refilled.
 // public/ also holds the server's own files (the icons, tracked in git): a copy never overwrites them. What the last
 // copy put there is listed in public/.web-export and removed first, so old hashed bundles don't pile up.
@@ -35,6 +35,10 @@ function sources() {
     if (entry.isFile() && !/^(tsconfig|vitest)/.test(entry.name)) add(`apps/mobile/${entry.name}`);
   }
   add("package-lock.json");
+  add("packages/domain/package.json");
+  add("packages/api-client/package.json");
+  // What is actually installed (npm records it here), which can differ from the lockfile.
+  if (existsSync(`${root}node_modules/.package-lock.json`)) add("node_modules/.package-lock.json");
   return files;
 }
 

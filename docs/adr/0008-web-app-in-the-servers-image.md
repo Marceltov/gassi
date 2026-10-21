@@ -36,7 +36,7 @@ Chosen option: "export into `public/`, and only when the app changed".
 - **One container.** The Dockerfile runs `npm run build:app` and the server's build explicitly, and always exports
   afresh; the image has no stale cache.
 - **The export is skipped when nothing changed.** `npm run build:app` hashes `apps/mobile/{app,src,public,assets}`, the
-  files directly in `apps/mobile`, `packages/domain/src`, `packages/api-client/src`, the lockfile and the
+  files directly in `apps/mobile`, `packages/domain/src`, `packages/api-client/src`, their `package.json` files, the lockfile, `node_modules/.package-lock.json` (what is installed) and the
   `EXPO_PUBLIC_*` variables, and compares the result with the stamp kept in `apps/mobile/dist/.stamp`. It prints "App
   unverändert, Export übersprungen" or "App exportiert"; `--force` exports anyway. The copy always runs. The server's
   `build` is `next build` only; the root `build` and `test:e2e` run the app step first. Development needs no export
@@ -51,5 +51,5 @@ Chosen option: "export into `public/`, and only when the app changed".
 
 * Good, because the image is one container and the web app and the API share an origin.
 * Good, because a server-only change builds in seconds and a second `test:e2e` skips the export.
-* Bad, because the skip trusts the list of inputs: a dependency outside it needs `--force`.
+* Bad, because the skip trusts the list of inputs: an install that differs from what npm recorded in `node_modules/.package-lock.json` goes unnoticed (`--force` exports anyway).
 * Bad, because `public/` holds generated files next to tracked ones, kept apart by the manifest and the clash check.

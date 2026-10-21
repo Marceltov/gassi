@@ -69,4 +69,4 @@ From the repo root: `npm install`, `npm test`, `npm run test:e2e`, `npm run lint
 `npm run dev -w @gassi/server` with `apps/server/.env.local` (see `.env.example` there) and the app with
 `npm run web -w @gassi/mobile` (see `apps/mobile/.env.example`).
 
-How it is planned and built: [docs/PLAN.md](docs/PLAN.md), [docs/BUILD.md](docs/BUILD.md), [docs/adr/](docs/adr/).
+How it is planned and built: [docs/PLAN.md](docs/PLAN.md), [docs/BUILD.md](docs/BUILD.md) (history of steps 1 and 2a), [docs/adr/](docs/adr/).

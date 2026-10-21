@@ -20,6 +20,12 @@ describe("exportStamp", () => {
     expect(exportStamp(files, { EXPO_PUBLIC_API: "http://x" })).not.toBe(base);
   });
 
+  it("changes with the installed packages or a package's manifest", () => {
+    const base = exportStamp(files, {});
+    expect(exportStamp([...files, { path: "node_modules/.package-lock.json", hash: "a" }], {})).not.toBe(base);
+    expect(exportStamp([...files, { path: "packages/domain/package.json", hash: "a" }], {})).not.toBe(base);
+  });
+
   it("ignores other variables", () => {
     expect(exportStamp(files, { PATH: "/bin", CORS_ORIGIN: "x" })).toBe(exportStamp(files, {}));
   });
