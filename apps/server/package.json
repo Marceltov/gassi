@@ -4,13 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build:app": "npm run export -w @gassi/mobile && node ../../scripts/web.mjs",
-    "build": "npm run build:app && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "npm run build && playwright test",
+    "test:e2e": "next build && playwright test",
     "oidc-stub": "node --experimental-strip-types --no-warnings -e \"import('./e2e/oidc-stub.ts').then((m) => m.startOidcStub())\""
   },
   "dependencies": {
