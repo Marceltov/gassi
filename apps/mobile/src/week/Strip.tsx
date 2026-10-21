@@ -23,8 +23,8 @@ export function Strip({ day }: { day: WeekDay }) {
         {day.ticks
           .filter((t) => t.type === "food")
           .map((t, i) => {
-            const { left, width } = tickSpan(t.min);
-            return <View key={`t${i}`} testID="tick-food" style={[styles.tick, { left: pct(left), width: pct(width), backgroundColor: theme.food }]} />;
+            const { left, width, shift } = tickSpan(t.min);
+            return <View key={`t${i}`} testID="tick-food" style={[styles.tick, { left: pct(left), width, marginLeft: shift, backgroundColor: theme.food }]} />;
           })}
       </View>
     </View>

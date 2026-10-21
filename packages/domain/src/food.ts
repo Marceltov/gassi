@@ -1,6 +1,6 @@
 // Food amounts in words and the food sheet's starting values, for the stock screen and the food sheet.
 import { FOOD_MAX_G, FOOD_MIN_G } from "./commands";
-import type { FoodKind } from "./entryTypes";
+import { FOOD_KINDS, FOOD_SHORT, type FoodKind } from "./entryTypes";
 import type { Stock } from "./stock";
 
 /** "11½ Dosen", "1 Dose", "½ Dose". */
@@ -65,4 +65,14 @@ export function stockLine(stock: Stock, kind: FoodKind): string | null {
   if (empty) return "Vorrat aufgebraucht";
   if (left === null) return null;
   return `Vorrat: noch ${left}${lasts ? ` · ${lasts}` : ""}`;
+}
+
+/** Both kinds' stock in one line, the same form for each: "Nass: 9 Dosen · Trocken: 1,2 kg", "Nass: aufgebraucht";
+ * a kind never entered stays out; null when neither is known. */
+export function stockSummary(stock: Stock): string | null {
+  const parts = FOOD_KINDS.flatMap((k) => {
+    const { left, empty } = stockParts(stock, k);
+    return empty ? [`${FOOD_SHORT[k]}: aufgebraucht`] : left ? [`${FOOD_SHORT[k]}: ${left}`] : [];
+  });
+  return parts.length ? parts.join(" · ") : null;
 }

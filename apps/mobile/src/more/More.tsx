@@ -1,7 +1,7 @@
 // Mehr: the data first (Gewicht, Vorrat), then the settings (Hunde; Übungen und Leckerli; Haushalt; Meine Geräte) and
 // the Garmin watch, which comes later. Each row says in short what is behind it; without reception the rows that need
 // the server stay without that line.
-import { formatAgo, formatKg, stockParts } from "@gassi/domain";
+import { formatAgo, formatKg, stockSummary } from "@gassi/domain";
 import { type Href, useRouter } from "expo-router";
 import { StyleSheet, Text } from "react-native";
 import { useGassi } from "../data/GassiProvider";
@@ -23,10 +23,7 @@ export function More() {
   const newest = weights?.weights[0];
   const weightDog = newest && active.length > 1 ? `${dogs.find((d) => d.id === newest.dogIds[0])?.name ?? "Hund"} ` : "";
   const weight = newest ? `${weightDog}${formatKg(newest.amountG ?? 0)} · ${formatAgo(Date.parse(newest.at), now)}` : weights ? "noch keins" : undefined;
-  const [wet, dry] = stock ? [stockParts(stock, "wet"), stockParts(stock, "dry")] : [null, null];
-  // per kind what is left, "aufgebraucht" when it ran out; a kind never entered stays out
-  const kindLine = (s: typeof wet, name: string, suffix: string) => (!s ? null : s.empty ? `${name} aufgebraucht` : s.left && `${s.left}${suffix}`);
-  const food = stock ? [kindLine(wet, "Nass", ""), kindLine(dry, "Trocken", " trocken")].filter(Boolean).join(" · ") || "noch nichts eingetragen" : undefined;
+  const food = stock ? (stockSummary(stock) ?? "noch nichts eingetragen") : undefined;
   const others = people.filter((p) => p.id !== me?.id).map((p) => p.name);
   const go = (path: Href) => () => router.push(path);
 

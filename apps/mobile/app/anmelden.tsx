@@ -18,7 +18,11 @@ export default function SignInScreen() {
   const theme = useTheme();
   const [oidc, setOidc] = useState(false);
   useEffect(() => {
-    void signInOptions().then((o) => setOidc(o.oidc));
+    let alive = true; // the sign-in may be left (a link signs in) before the answer comes
+    void signInOptions().then((o) => alive && setOidc(o.oidc));
+    return () => {
+      alive = false;
+    };
   }, []);
   return (
     <SignIn

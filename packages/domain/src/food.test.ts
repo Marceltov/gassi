@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { clampPortion, portionFor, prefillFood, quickPortions, stockLine, stockParts } from "./food";
+import { clampPortion, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
 import type { Stock } from "./stock";
 
 const wet = (amountG: number) => ({ foodKind: "wet" as const, amountG });
@@ -48,4 +48,11 @@ test("a portion is a whole number from 1 to 5000 grams", () => {
   expect(clampPortion(0)).toBe(1);
   expect(clampPortion(9000)).toBe(5000);
   expect(portionFor("wet", [], { wet: 7000, dry: null })).toBe(5000);
+});
+
+test("both kinds' stock in one form: what is left or that it ran out; a kind never entered stays out", () => {
+  const stock: Stock = { wet: { grams: 3600, cans: 9, canSizeG: 400, daysLeft: 12.4, belowZero: false }, dry: { grams: 1200, daysLeft: 1, belowZero: false } };
+  expect(stockSummary(stock)).toBe("Nass: 9 Dosen · Trocken: 1,2 kg");
+  expect(stockSummary({ ...stock, wet: { ...stock.wet, grams: 0, cans: 0, belowZero: false }, dry: { grams: null, daysLeft: null, belowZero: false } })).toBe("Nass: aufgebraucht");
+  expect(stockSummary({ wet: { grams: null, cans: null, canSizeG: null, daysLeft: null, belowZero: false }, dry: { grams: null, daysLeft: null, belowZero: false } })).toBeNull();
 });
