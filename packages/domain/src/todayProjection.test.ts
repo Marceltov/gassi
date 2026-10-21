@@ -14,10 +14,10 @@ test("without pending taps the server's answer is shown as it is", () => {
   expect(layerToday(null, [], ME)).toEqual(none);
 });
 
-test("a pending feeding or pee/poop shows at once, by me, and the newest wins", () => {
+test("a pending feeding (with its grams and kind) or pee/poop shows at once, by me, and the newest wins", () => {
   const today = { ...none, food: entry("2026-10-20T09:00:00.000Z"), pee: entry("2026-10-20T10:00:00.000Z") };
   const shown = layerToday(today, [food("2026-10-20T11:00:00.000Z"), food("2026-10-20T12:00:00.000Z"), log("2026-10-20T09:30:00.000Z", "pee"), log("2026-10-20T11:30:00.000Z", "poop")], ME);
-  expect(shown.food).toEqual(entry("2026-10-20T12:00:00.000Z", "Hirsch"));
+  expect(shown.food).toEqual({ ...entry("2026-10-20T12:00:00.000Z", "Hirsch"), amountG: 80, foodKind: "wet" });
   expect(shown.pee).toEqual(today.pee); // the server already has a newer one
   expect(shown.poop).toEqual(entry("2026-10-20T11:30:00.000Z", "Hirsch"));
 });

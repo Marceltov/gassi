@@ -1,4 +1,4 @@
-// The day at a glance from the API's `today`: refreshed when Start gains focus and whenever the walk or training
+// The day at a glance from the API's `today` (and the newest training, for Start's Training tile): refreshed when Start gains focus and whenever the walk or training
 // changes (a walk's pee/poop/stop all show in the tiles). Unreachable, the last value stays; a feeding or pee/poop
 // tapped without reception shows at once.
 import type { Output } from "@gassi/api-client";
@@ -7,8 +7,8 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGassi } from "../data/GassiProvider";
 
-/** The tiles: the server's `today` with the taps not sent yet laid over it. */
-export type Today = Tiles;
+/** The tiles: the server's `today` with the taps not sent yet laid over it; the newest training as the server has it. */
+export type Today = Tiles & { training: Output<"today">["training"] };
 
 export function useToday(): Today {
   const { api, view, unsent, pending, me } = useGassi();
@@ -42,5 +42,5 @@ export function useToday(): Today {
     seen.current = changed;
     if (focused.current) void load();
   }, [changed, load]);
-  return useMemo(() => layerToday(today, pending, me), [today, pending, me]);
+  return useMemo(() => ({ ...layerToday(today, pending, me), training: today?.training ?? null }), [today, pending, me]);
 }

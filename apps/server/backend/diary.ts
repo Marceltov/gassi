@@ -50,7 +50,7 @@ type Details = {
 };
 
 /** The newest entry of the types the Start screen shows. */
-export type Today = Record<"walk" | "food" | "pee" | "poop", EntryView | null>;
+export type Today = Record<"walk" | "food" | "pee" | "poop" | "training", EntryView | null>;
 
 const ROUTE_POINTS = 64;
 
@@ -260,9 +260,9 @@ export class Diary {
     return weekView({ entries, walkers, trainings, tracks, names, monday, timeZone, now });
   }
 
-  /** The newest walk, feeding, pee and poop (null where there is none yet). */
+  /** The newest walk, feeding, pee, poop and training (null where there is none yet). */
   async today(): Promise<Today> {
-    const types = ["walk", "food", "pee", "poop"] as const;
+    const types = ["walk", "food", "pee", "poop", "training"] as const;
     const newest = await Promise.all(types.map(async (type) => (await this.entries.list({ type, limit: 1 }))[0]));
     const views = await this.views(newest.filter((e) => e !== undefined));
     return Object.fromEntries(types.map((type) => [type, views.find((v) => v.type === type) ?? null])) as Today;
