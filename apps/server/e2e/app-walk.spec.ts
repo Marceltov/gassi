@@ -106,6 +106,9 @@ test("with several dogs Pipi asks for the dog, among the dogs on the walk only; 
     // Emma stays at home, Herzii comes along
     await page.getByRole("button", { name: "Emma entfernen" }).click();
     await expect(page.getByRole("button", { name: "Emma entfernen" })).toBeHidden();
+    // the only walker can't be tapped off: it says so
+    await page.getByRole("button", { name: "Hirsch, bleibt dabei" }).click();
+    await expect(page.getByText("Eine Person bleibt immer dabei.")).toBeVisible();
     await page.getByRole("button", { name: "Hinzufügen" }).click();
     await page.getByRole("button", { name: "Herzii", exact: true }).click();
     await expect(page.getByRole("button", { name: "Herzii entfernen" })).toBeVisible();

@@ -2,25 +2,25 @@
 // amount and kind, for weight the weight, for a training its repetitions per exercise and dog and its treats, a note;
 // Speichern sends it all, Löschen asks first. Both need the server (the writes' client): they say so without
 // reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
-import { clampPortion, dogRule, FOOD_MAX_G, type FoodKind, formatKg, keepsOne, trainingSummaryLine, TYPE_LABEL } from "@gassi/domain";
+import { clampPortion, dogRule, FOOD_MAX_G, formatKg, keepsOne, trainingSummaryLine, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { errorMessage } from "../data/api";
 import { type Gassi, useGassi } from "../data/GassiProvider";
 import { type ButtonKind, radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
+import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
+import { TYPE_ICON } from "../ui/icons";
 import { Screen } from "../ui/Screen";
+import { Segments } from "../ui/Segments";
 import { Sheet } from "../ui/Sheet";
-import { TYPE_ICON } from "./EntryRow";
+import { AmountStepper, StepButton } from "../ui/Stepper";
+import { LAST_WALKER } from "../walk/lastOne";
 import { bumpRep, bumpTreat, editInput, type Entry, type Form, formOf, pickDog, trainingInput } from "./form";
 import { TimeField } from "./TimeField";
 
-const KINDS: { kind: FoodKind; label: string }[] = [
-  { kind: "wet", label: "Nass" },
-  { kind: "dry", label: "Trocken" },
-];
 const BUTTON: Partial<Record<Entry["type"], ButtonKind>> = { walk: "walk", food: "food", training: "training", pee: "pee", poop: "poop" };
 
 export function EntryDetail({ id }: { id: number }) {
@@ -90,6 +90,7 @@ export function EntryDetail({ id }: { id: number }) {
   const toggleWalker = (pid: string) => {
     if (!form.walkerIds.includes(pid)) change({ walkerIds: [...form.walkerIds, pid] });
     else if (keepsOne(form.walkerIds, pid)) change({ walkerIds: form.walkerIds.filter((w) => w !== pid) });
+    else setMessage(LAST_WALKER);
   };
   const running = !!entry.clientKey && !entry.endedAt;
   const timed = entry.type === "walk" || entry.type === "training";
@@ -108,24 +109,11 @@ export function EntryDetail({ id }: { id: number }) {
 
           {entry.type === "food" ? (
             <>
-              <View style={[styles.switch, { borderColor: theme.line }]}>
-                {KINDS.map((k) => (
-                  <Pressable
-                    key={k.kind}
-                    accessibilityRole="tab"
-                    accessibilityLabel={k.label}
-                    aria-selected={form.foodKind === k.kind}
-                    onPress={() => change({ foodKind: k.kind })}
-                    style={[styles.segment, form.foodKind === k.kind && { backgroundColor: theme.food }]}
-                  >
-                    <Text style={[styles.segmentText, { color: form.foodKind === k.kind ? "#fff" : theme.muted }]}>{k.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <Amount value={`${form.amountG ?? 0} g`} step="10 g" onStep={(d) => change({ amountG: clampPortion((form.amountG ?? 0) + d * 10) })} min={(form.amountG ?? 0) <= 1} max={(form.amountG ?? 0) >= FOOD_MAX_G} />
+              <Segments options={FOOD_KIND_OPTIONS} value={form.foodKind ?? "wet"} onChange={(foodKind) => change({ foodKind })} kind="food" />
+              <AmountStepper testID="edit-amount" value={`${form.amountG ?? 0} g`} step="10 g" onStep={(d) => change({ amountG: clampPortion((form.amountG ?? 0) + d * 10) })} atMin={(form.amountG ?? 0) <= 1} atMax={(form.amountG ?? 0) >= FOOD_MAX_G} />
             </>
           ) : null}
-          {entry.type === "weight" ? <Amount value={formatKg(form.amountG ?? 0)} step="100 g" onStep={(d) => change({ amountG: Math.max(100, (form.amountG ?? 0) + d * 100) })} min={(form.amountG ?? 0) <= 100} max={false} /> : null}
+          {entry.type === "weight" ? <AmountStepper testID="edit-amount" value={formatKg(form.amountG ?? 0)} step="100 g" onStep={(d) => change({ amountG: Math.max(100, (form.amountG ?? 0) + d * 100) })} atMin={(form.amountG ?? 0) <= 100} atMax={false} /> : null}
 
           {rule !== "none" && shownDogs.length > 1 ? (
             <Group label={rule === "one" ? "Hund" : "Hunde"}>
@@ -246,43 +234,14 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Amount({ value, step, onStep, min, max }: { value: string; step: string; onStep: (d: 1 | -1) => void; min: boolean; max: boolean }) {
-  const theme = useTheme();
-  return (
-    <View style={styles.amountRow}>
-      <Step label={`${step} weniger`} sign="−" big disabled={min} onPress={() => onStep(-1)} />
-      <Text testID="edit-amount" style={[styles.amount, { color: theme.ink }]}>
-        {value}
-      </Text>
-      <Step label={`${step} mehr`} sign="+" big disabled={max} onPress={() => onStep(1)} />
-    </View>
-  );
-}
-
 function Counter({ sign, value, what, onStep }: { sign: string; value: number; what: string; onStep: (d: 1 | -1) => void }) {
   const theme = useTheme();
   return (
     <View style={styles.counter}>
-      <Step label={`${what}: eins weniger`} sign="−" disabled={value === 0} onPress={() => onStep(-1)} />
+      <StepButton small label={`${what}: eins weniger`} sign="−" disabled={value === 0} onPress={() => onStep(-1)} />
       <Text style={[styles.count, { color: theme.ink }]}>{`${sign}${sign ? " " : ""}${value}`}</Text>
-      <Step label={`${what}: eins mehr`} sign="+" disabled={false} onPress={() => onStep(1)} />
+      <StepButton small label={`${what}: eins mehr`} sign="+" disabled={false} onPress={() => onStep(1)} />
     </View>
-  );
-}
-
-function Step({ label, sign, disabled, big, onPress }: { label: string; sign: string; disabled: boolean; big?: boolean; onPress: () => void }) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [big ? styles.stepBig : styles.step, { backgroundColor: big ? theme.surface : theme.neutral, opacity: disabled ? 0.4 : pressed ? 0.7 : 1 }]}
-    >
-      <Text style={[big ? styles.stepTextBig : styles.stepText, { color: theme.ink }]}>{sign}</Text>
-    </Pressable>
   );
 }
 
@@ -291,11 +250,6 @@ const styles = StyleSheet.create({
   small: { fontSize: 13 },
   message: { fontSize: 15, fontWeight: "600" },
   times: { flexDirection: "row", gap: 8 },
-  switch: { flexDirection: "row", borderRadius: 12, borderWidth: 1, padding: 3 },
-  segment: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 10 },
-  segmentText: { fontSize: 14, fontWeight: "700" },
-  amountRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  amount: { fontSize: 30, fontWeight: "700" },
   group: { gap: 6 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   card: { borderRadius: radius.tile, padding: 12, gap: 8 },
@@ -304,10 +258,6 @@ const styles = StyleSheet.create({
   repName: { flex: 1, fontSize: 15 },
   counter: { flexDirection: "row", alignItems: "center", gap: 4 },
   count: { minWidth: 34, textAlign: "center", fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  step: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  stepText: { fontSize: 20, fontWeight: "700" },
-  stepBig: { width: 56, height: 56, borderRadius: radius.tile, alignItems: "center", justifyContent: "center" },
-  stepTextBig: { fontSize: 26, fontWeight: "700" },
   note: { borderRadius: 12, padding: 12, minHeight: 60, fontSize: 15 },
   sheet: { gap: 10 },
   sheetTitle: { fontSize: 17, fontWeight: "700" },

@@ -9,16 +9,13 @@ import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
+import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
 import { Segments } from "../ui/Segments";
 import { useBack } from "./back";
 import { useServer } from "./useServer";
 import { useWrite } from "./useWrite";
 
 type Mode = "restock" | "count";
-const KINDS = [
-  { value: "wet", label: "Nass" },
-  { value: "dry", label: "Trocken" },
-] as const;
 const MODES = [
   { value: "restock", label: "Eingekauft" },
   { value: "count", label: "Nachgezählt" },
@@ -85,7 +82,7 @@ export function Stock() {
               {message}
             </Text>
           ) : null}
-          <Segments options={KINDS} value={kind} onChange={setKind} kind="food" />
+          <Segments options={FOOD_KIND_OPTIONS} value={kind} onChange={setKind} kind="food" />
           <Segments options={MODES} value={mode} onChange={setMode} />
           <View style={styles.fields}>
             {kind === "wet" ? (

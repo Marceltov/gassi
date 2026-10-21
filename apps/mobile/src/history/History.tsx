@@ -1,17 +1,19 @@
 // Verlauf: who went when, fed how much, trained what and how well. The entries newest first under their day on top;
 // the filters (who, what, which dog) at the bottom for the thumb. A walk opens its summary, anything else its detail.
 import { byDay, ENTRY_TYPES, type EntryType, TYPE_LABEL } from "@gassi/domain";
-import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useRouter } from "expo-router";
+import { useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { useNow } from "../start/useNow";
 import { radius, useTheme } from "../theme";
 import { TIME_ZONE } from "../time";
 import { BigButton } from "../ui/BigButton";
+import { TYPE_ICON } from "../ui/icons";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
-import { EntryRow, TYPE_ICON } from "./EntryRow";
+import { useLeaving } from "../ui/useLeaving";
+import { EntryRow } from "./EntryRow";
 import type { Entry, Filter } from "./form";
 import { useHistory } from "./useHistory";
 
@@ -29,17 +31,8 @@ export function History() {
   const now = useNow(60_000); // "Heute" becomes "Gestern" at midnight
 
   // a second tap before the next screen is up must not open it twice
-  const leaving = useRef(false);
-  useFocusEffect(
-    useCallback(() => {
-      leaving.current = false;
-    }, []),
-  );
-  const open = (e: Entry) => {
-    if (leaving.current) return;
-    leaving.current = true;
-    router.push(e.type === "walk" ? `/runde/${e.id}` : `/eintrag/${e.id}`);
-  };
+  const { leave } = useLeaving();
+  const open = (e: Entry) => leave(() => router.push(e.type === "walk" ? `/runde/${e.id}` : `/eintrag/${e.id}`));
 
   const active = dogs.filter((d) => !d.archived);
   const dogName = (id: number) => dogs.find((d) => d.id === id)?.name ?? "Hund";

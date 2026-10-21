@@ -1,24 +1,13 @@
 // One entry in Verlauf: the time, a small map for a tracked walk, what it was ("🐕 Gassi · 42 Min. · 3,1 km"), what
 // happened on a walk or which dog, and who. Tapping opens it.
-import { describeEntry, type EntryType } from "@gassi/domain";
+import { describeEntry } from "@gassi/domain";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { TrackMap } from "../map/TrackMap";
 import { radius, useTheme } from "../theme";
 import { hhmm } from "../time";
+import { TYPE_ICON } from "../ui/icons";
 import type { Entry } from "./form";
-
-export const TYPE_ICON: Record<EntryType, string> = {
-  walk: "🐕",
-  food: "🥣",
-  training: "🎯",
-  pee: "💧",
-  poop: "💩",
-  weight: "⚖️",
-  note: "📝",
-  restock: "🛒",
-  stockcheck: "📦",
-};
 
 type Props = { entry: Entry; dogs: string; onPress: () => void };
 

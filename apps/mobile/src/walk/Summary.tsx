@@ -15,6 +15,7 @@ import { hhmm } from "../time";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
 import { Screen } from "../ui/Screen";
+import { LAST_WALKER } from "./lastOne";
 import { trainingLine } from "./lines";
 import type { Shown, Tap } from "./taps";
 import { useWalkSummary } from "./useWalkSummary";
@@ -63,6 +64,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
   const toggle = (id: string) => {
     if (!walkerIds.includes(id)) return edit(shown, { walkers: [...walkerIds, id] });
     if (keepsOne(walkerIds, id)) return edit(shown, { walkers: walkerIds.filter((w) => w !== id) });
+    setMessage(LAST_WALKER);
   };
   const noteText = note ?? shown.note ?? "";
 

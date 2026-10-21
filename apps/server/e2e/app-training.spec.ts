@@ -1,7 +1,7 @@
 // The training screen: ✓/✗ per repetition and exercise, a long press undoes the last (also without reception),
 // treats, Fertig, and the dog question when several dogs train.
 import { createClient } from "@gassi/api-client";
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
 import { asHirsch, onlyOneDog, stopEverything } from "./sessions";
 import { signIn } from "./signed-in";
@@ -15,6 +15,18 @@ async function household() {
   const exercise = (await client.exercises()).exercises.find((e) => e.name === "Sitz") ?? (await client.addExercise({ name: "Sitz" }));
   const treat = (await client.treatKinds()).treatKinds[0] ?? (await client.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false }));
   return { client, exercise, treat };
+}
+
+/** A long press: holds `button` down until `done` passes (the press did its work, however long that took), then lets
+ * go. */
+async function longPress(page: Page, button: Locator, done: () => Promise<void>) {
+  await button.hover();
+  await page.mouse.down();
+  try {
+    await done();
+  } finally {
+    await page.mouse.up();
+  }
 }
 
 const entryOf = async (client: ReturnType<typeof createClient>, key: string) => (await client.entries({ type: "training" })).entries.find((e) => e.clientKey === key);
@@ -42,8 +54,8 @@ test("✓ ✓ ✗ and a treat count per exercise; a long press undoes the last, 
     await context.setOffline(true);
     await page.getByRole("button", { name: "Sitz klappt nicht" }).click();
     await expect(line).toHaveText("Sitz 2/4");
-    await page.getByRole("button", { name: "Sitz klappt nicht" }).click({ delay: 700 });
-    await expect(line).toHaveText("Sitz 2/3");
+    await longPress(page, page.getByRole("button", { name: "Sitz klappt nicht" }), () => expect(line).toHaveText("Sitz 2/3"));
+    await expect(line).toHaveText("Sitz 2/3"); // letting go is no tap
     await page.getByRole("button", { name: `${treat.name} +1` }).click();
     await expect(line).toHaveText("Sitz 2/3 · 1 Leckerli");
     await context.setOffline(false);
@@ -83,6 +95,13 @@ test("with several dogs ✓ asks for the dog; Fertig on a walk's training leads 
     await page.getByRole("button", { name: "Fertig" }).click();
     await expect(page).toHaveURL(`${BASE_URL}/runde`);
     await expect.poll(async () => (await asHirsch().sessions()).training).toBeNull();
+    // back to the walk it was started from, not a second walk screen on top of it; Zuhause, then Fertig, is Start
+    await expect(page.getByTestId("walk-clock")).toHaveCount(1);
+    await page.getByRole("button", { name: "Zuhause" }).click();
+    await expect(page).toHaveURL(/\/runde\/[^/]+$/);
+    await page.getByRole("button", { name: "Fertig" }).click();
+    await expect(page).toHaveURL(`${BASE_URL}/`);
+    await expect(page.getByTestId("walk-clock")).toHaveCount(0);
   } finally {
     await client.updateDog({ id: luna.id, archived: true });
   }
@@ -107,8 +126,7 @@ test("with several dogs a long press after a reload asks which dog to undo, amon
 
     await page.reload(); // the last tap is forgotten: asks, offering the dogs that have a count
     await expect(page.getByTestId("training-summary")).toHaveText("Sitz 3/3");
-    await page.getByRole("button", { name: "Sitz klappt", exact: true }).click({ delay: 700 });
-    await expect(choice.getByRole("button", { name: "Luna" })).toBeVisible();
+    await longPress(page, page.getByRole("button", { name: "Sitz klappt", exact: true }), () => expect(choice.getByRole("button", { name: "Luna" })).toBeVisible());
     await expect(choice.getByRole("button", { name: "Toffee" })).toBeVisible();
     await choice.getByRole("button", { name: "Luna" }).click();
     await expect(page.getByTestId("training-summary")).toHaveText("Sitz 2/2");

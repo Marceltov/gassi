@@ -5,17 +5,16 @@ import { clampPortion, FOOD_MAX_G, type FoodKind, newId, portionFor, prefillFood
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
-import { radius, useTheme } from "../theme";
+import { useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
+import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
+import { Segments } from "../ui/Segments";
 import { Sheet } from "../ui/Sheet";
+import { AmountStepper } from "../ui/Stepper";
 import { type FoodFacts, loadFacts, RECENT, saveFacts, withFeeding } from "./memory";
 
 const STEP_G = 10;
-const KINDS: { kind: FoodKind; label: string }[] = [
-  { kind: "wet", label: "Nass" },
-  { kind: "dry", label: "Trocken" },
-];
 
 export function FoodSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
@@ -99,25 +98,8 @@ function FoodForm({ onClose }: { onClose: () => void }) {
   return (
     <View testID="food-sheet" style={styles.form}>
       <Text style={[styles.title, { color: theme.ink }]}>{active.length === 1 ? `Futter für ${active[0].name}` : "Futter geben"}</Text>
-      <View style={[styles.switch, { backgroundColor: theme.background, borderColor: theme.line }]}>
-        {KINDS.map((k) => (
-          <Pressable
-            key={k.kind}
-            accessibilityRole="tab"
-            accessibilityLabel={k.label}
-            aria-selected={kind === k.kind}
-            onPress={() => pick(k.kind)}
-            style={[styles.segment, kind === k.kind && { backgroundColor: theme.food }]}
-          >
-            <Text style={[styles.segmentText, { color: kind === k.kind ? "#fff" : theme.muted }]}>{k.label}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <View style={styles.amountRow}>
-        <Step label="10 g weniger" sign="−" disabled={amountG <= 1} onPress={() => set(amountG - STEP_G)} />
-        <Text testID="food-amount" style={[styles.amount, { color: theme.ink }]}>{`${amountG} g`}</Text>
-        <Step label="10 g mehr" sign="+" disabled={amountG >= FOOD_MAX_G} onPress={() => set(amountG + STEP_G)} />
-      </View>
+      <Segments options={FOOD_KIND_OPTIONS} value={kind} onChange={pick} kind="food" />
+      <AmountStepper testID="food-amount" value={`${amountG} g`} step={`${STEP_G} g`} onStep={(d) => set(amountG + d * STEP_G)} atMin={amountG <= 1} atMax={amountG >= FOOD_MAX_G} />
       {quick.length ? (
         <View style={styles.chips}>
           {quick.map((q) => (
@@ -140,32 +122,9 @@ function FoodForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Step({ label, sign, disabled, onPress }: { label: string; sign: string; disabled: boolean; onPress: () => void }) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [styles.step, { backgroundColor: theme.surface, opacity: disabled ? 0.4 : pressed ? 0.7 : 1 }]}
-    >
-      <Text style={[styles.stepText, { color: theme.ink }]}>{sign}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   form: { gap: 10 },
   title: { fontSize: 17, fontWeight: "700" },
-  switch: { flexDirection: "row", borderRadius: 12, borderWidth: 1, padding: 3 },
-  segment: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 10 },
-  segmentText: { fontSize: 14, fontWeight: "700" },
-  amountRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  amount: { fontSize: 30, fontWeight: "700" },
-  step: { width: 56, height: 56, borderRadius: radius.tile, alignItems: "center", justifyContent: "center" },
-  stepText: { fontSize: 26, fontWeight: "700" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   quick: { flexGrow: 1, alignItems: "center", borderRadius: 10, borderWidth: 1, paddingVertical: 9, paddingHorizontal: 10 },
   quickText: { fontSize: 14, fontWeight: "600" },

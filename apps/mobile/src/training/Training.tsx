@@ -13,6 +13,7 @@ import { BigButton } from "../ui/BigButton";
 import { DogChoiceSheet } from "../ui/DogChoiceSheet";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
+import { useLeaving } from "../ui/useLeaving";
 
 export function Training() {
   const router = useRouter();
@@ -31,16 +32,11 @@ export function Training() {
 
   // Fertig happens once, also on a double tap. Without a training (stopped on another phone) the focused screen goes
   // back to Start.
-  const leaving = useRef(false);
+  const { leave, isLeaving } = useLeaving();
   useFocusEffect(
     useCallback(() => {
-      leaving.current = false;
-    }, []),
-  );
-  useFocusEffect(
-    useCallback(() => {
-      if (!training && !leaving.current) router.replace("/");
-    }, [training, router]),
+      if (!training && !isLeaving()) router.replace("/");
+    }, [training, router, isLeaving]),
   );
   if (!training) return null;
 
@@ -81,12 +77,13 @@ export function Training() {
     if (delta === -1 && !training.treats[treatKindId]) return;
     send({ id: newId(), at: at(), kind: "training.treat", trainingKey, treatKindId, delta });
   };
-  const done = () => {
-    if (leaving.current) return;
-    leaving.current = true;
-    send({ id: newId(), at: at(), kind: "training.stop", trainingKey });
-    router.replace(training.walkKey && view.walk?.key === training.walkKey ? "/runde" : "/");
-  };
+  // back to the walk it was started from, or to Start: dismissTo pops back to that screen (a replace would leave
+  // the walk on the stack twice), and replaces this one when it isn't there (a training started from Start)
+  const done = () =>
+    leave(() => {
+      send({ id: newId(), at: at(), kind: "training.stop", trainingKey });
+      router.dismissTo(training.walkKey && view.walk?.key === training.walkKey ? "/runde" : "/");
+    });
 
   const shownIds = new Set([...added, ...training.reps.map((r) => r.exerciseId)]);
   const shown = exercises.filter((e) => shownIds.has(e.id));
