@@ -28,6 +28,8 @@ function Screens() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={signedIn} redirectTo="/anmelden">
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="runde" />
+        <Stack.Screen name="training" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn} redirectTo="/">
         <Stack.Screen name="anmelden" />
