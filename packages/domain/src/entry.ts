@@ -78,7 +78,7 @@ export const ENTRY_MESSAGES: Record<string, string> = {
   dogIds: "Diesen Hund gibt es nicht.",
   walkers: "Eine Runde braucht mindestens einen Mitgeher.",
   reps: "Die Wiederholungen stimmen nicht.",
-  treats: "Die Leckerlis stimmen nicht.",
+  treats: "Die Leckerli stimmen nicht.",
 };
 
 export type EntryFields = z.output<typeof entryFields>;

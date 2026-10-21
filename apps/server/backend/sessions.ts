@@ -10,7 +10,7 @@
 //   alias of the running walk, so its later taps land there. A start arriving after the stop joins the walk that was
 //   running at its time. Trainings do the same; a training started on a walk that has since ended ends with it.
 import { sql, type Kysely } from "kysely";
-import { type Command, type Entry, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, keepsOne, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView } from "@gassi/domain";
+import { type Command, type Entry, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, keepsOne, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView, withinWalk } from "@gassi/domain";
 import type { DB } from "./db/open";
 import type { Schema } from "./db/schema";
 import { DogRepository } from "./dogs";
@@ -34,8 +34,8 @@ export type WalkSummary = {
   pees: Mark[]; // oldest first
   poops: Mark[];
 };
-/** A pee or poop during a walk: when, and which dog. */
-export type Mark = { at: string; dogId: number };
+/** A pee or poop during a walk: its entry, when, and which dog. */
+export type Mark = { id: number; at: string; dogId: number };
 
 export type SessionsDeps = { db: DB; names: Names; now: () => Date };
 
@@ -84,7 +84,7 @@ export class Sessions {
     const walk = await repo.get(walkEntryId);
     if (!walk || walk.type !== "walk") throw new Error(`entry ${walkEntryId} is not a walk`);
     const end = walk.endedAt ?? this.deps.now().toISOString();
-    const during = await repo.list({ since: walk.at, until: end });
+    const during = await repo.list({ since: walk.at, until: end }); // withinWalk's bounds, in the query
     const { pauses } = await this.pauses(walk.id);
     const pauseMs = pausedWithin(pauses, walk.at, end);
     const trainings = during.filter((e) => e.type === "training").reverse();
@@ -130,7 +130,7 @@ export class Sessions {
       key: t.clientKey!,
       startedAt: t.at,
       dogIds: t.dogIds,
-      walkKey: walk && walk.at <= t.at ? walk.clientKey : null,
+      walkKey: walk && withinWalk(t.at, walk.at, walk.endedAt) ? walk.clientKey : null,
       reps: exercises.map((r) => ({ exerciseId: r.exercise_id, dogId: r.dog_id, ok: r.ok_count, fail: r.fail_count })),
       treats: Object.fromEntries(treats.map((r) => [r.treat_kind_id, r.count])),
     };
@@ -148,7 +148,7 @@ export class Sessions {
 
 // `during` is newest first; pee and poop are for exactly one dog
 const marks = (during: readonly Entry[], type: "pee" | "poop"): Mark[] =>
-  during.filter((e) => e.type === type).reverse().map((e) => ({ at: e.at, dogId: e.dogIds[0] }));
+  during.filter((e) => e.type === type).reverse().map((e) => ({ id: e.id, at: e.at, dogId: e.dogIds[0] }));
 
 /** The walk or training started with `key`, or the running one that a second start with `key` joined. */
 export async function findByKey(db: Tx, key: string, type: "walk" | "training"): Promise<Entry | undefined> {
@@ -213,7 +213,7 @@ class Step {
       }
       case "food":
         // the same kind of entry the diary logs, so stock and the usual portion see it
-        await this.create("food", c.at, null, await this.dogsFor(c.dogIds), { amountG: c.amountG, foodKind: c.foodKind });
+        await this.create("food", c.at, null, await this.dogsFor(c.dogIds), { amountG: c.amountG, foodKind: c.foodKind, unitG: c.foodKind === "wet" ? (c.unitG ?? null) : null });
         return "applied";
     }
   }
@@ -230,8 +230,8 @@ class Step {
     return resolveDogs(requested, await this.activeDogs());
   }
 
-  private create(type: Entry["type"], at: string, clientKey: string | null, dogIds: number[], food?: { amountG: number; foodKind: FoodKind }): Promise<Entry> {
-    return this.entries.create({ type, at, endedAt: null, amountG: food?.amountG ?? null, foodKind: food?.foodKind ?? null, unitG: null, note: null, dogIds, loggedBy: this.user.id, clientKey });
+  private create(type: Entry["type"], at: string, clientKey: string | null, dogIds: number[], food?: { amountG: number; foodKind: FoodKind; unitG: number | null }): Promise<Entry> {
+    return this.entries.create({ type, at, endedAt: null, amountG: food?.amountG ?? null, foodKind: food?.foodKind ?? null, unitG: food?.unitG ?? null, note: null, dogIds, loggedBy: this.user.id, clientKey });
   }
 
   // A start joins the walk/training that runs now, or the one that was running at the tap's time (a start queued without
@@ -342,7 +342,7 @@ class Step {
       .where((eb) => eb.or([eb("ended_at", "is", null), eb("ended_at", ">", end)]))
       .execute();
     const training = await this.entries.running("training");
-    if (training && training.at >= w.at && training.at < end) await this.end(training, end);
+    if (training && withinWalk(training.at, w.at, end)) await this.end(training, end);
     return "applied";
   }
 

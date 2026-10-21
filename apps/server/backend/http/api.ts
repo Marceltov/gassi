@@ -37,6 +37,7 @@ const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl, de
 const implementations: Implementations<ApiDeps> = {
   redeem: async ({ input, deps }) => links(deps).redeem(linkKey(input), input),
   linkInfo: async ({ input, deps }) => links(deps).info(linkKey(input)),
+  options: async ({ deps }) => ({ oidc: deps.oidc, mail: deps.mailer !== null }),
   magicLink: async ({ input, deps }) => {
     if (!deps.mailer) throw new InputError("E-Mail ist auf diesem Server nicht eingerichtet.");
     await sendMagicLink(deps.db, deps.now, deps.publicUrl, deps.codeKey, deps.mailer, input.email);
@@ -65,6 +66,7 @@ const implementations: Implementations<ApiDeps> = {
     const d = await diary(deps);
     return d.history(d.filter(input), input.offset ?? 0);
   },
+  entry: async ({ input, deps }) => (await (await diary(deps)).get(input.id)) ?? missing("Diesen Eintrag gibt es nicht."),
   logEntry: async ({ input, auth, deps }) => (await diary(deps)).log(auth.person, { at: deps.now().toISOString(), ...input }),
   editEntry: async ({ input: { id, ...fields }, deps }) => (await (await diary(deps)).edit(id, fields)) ?? missing("Diesen Eintrag gibt es nicht."),
   editTraining: async ({ input: { id, ...change }, deps }) => (await (await diary(deps)).editTraining(id, change)) ?? missing("Dieses Training gibt es nicht."),
@@ -75,6 +77,11 @@ const implementations: Implementations<ApiDeps> = {
     if (entry?.type !== "walk") throw new NotFound("Diese Runde gibt es nicht.");
     const [summary, track] = await Promise.all([(await sessions(deps)).summary(input.id), new Tracks(deps.db, deps.now).forWalk(input.id)]);
     return { summary, track };
+  },
+  walkByKey: async ({ input, deps }) => {
+    const summary = await (await sessions(deps)).summaryFor(input.key);
+    if (!summary) throw new NotFound("Diese Runde gibt es nicht.");
+    return { summary, track: await new Tracks(deps.db, deps.now).forWalk(summary.id) };
   },
   exercises: async ({ deps }) => ({ exercises: await new Catalog(deps.db).exercises() }),
   addExercise: async ({ input, deps }) => new Catalog(deps.db).addExercise(input.name),

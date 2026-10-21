@@ -73,6 +73,10 @@ export const entryViewSchema = z.object({
   treatCounts: z.array(z.object({ treatKindId: z.number(), count: z.number() })),
   distanceM: z.number().nullable(),
   route: routeSchema.nullable(),
+  // a walk's pee, poop and the trainings' exercises during it, decided by time (ADR 0002); null for other entries
+  during: z.object({ pees: z.number(), poops: z.number(), exercises: z.array(exerciseTotalSchema) }).nullable(),
+  // a wet count's can sizes (its rows at the same time, smallest can first), moved and deleted as one; null for others
+  count: z.array(z.object({ unitG: z.number(), amountG: z.number() })).nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -111,7 +115,7 @@ const metricsSchema = z.object({
   descentM: z.number(),
   bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).nullable(),
 });
-const markSchema = z.object({ at: z.string(), dogId: z.number() });
+const markSchema = z.object({ id: z.number(), at: z.string(), dogId: z.number() });
 export const walkSummarySchema = z.object({
   id: z.number(),
   note: z.string().nullable(),
@@ -122,16 +126,18 @@ export const walkSummarySchema = z.object({
   pauseCount: z.number(),
   walkers: z.array(personSchema),
   trainings: z.array(z.object({ min: z.number(), exercises: z.array(exerciseTotalSchema), treats: z.array(z.object({ name: z.string(), count: z.number() })) })),
-  // the walk's pee and poop entries, oldest first
+  // the walk's pee and poop entries (their ids, to open one), oldest first
   pees: z.array(markSchema),
   poops: z.array(markSchema),
 });
+const walkOutput = z.object({ summary: walkSummarySchema, track: z.object({ source: z.enum(["phone", "watch"]), points: z.array(trackPointSchema), metrics: metricsSchema }).nullable() });
 
 const exerciseSchema = z.object({ id: z.number(), name: z.string() });
 const treatKindSchema = z.object({ id: z.number(), name: z.string(), gramsPerPiece: z.number(), fromDry: z.boolean() });
 const treatKindInput = z.object({ name: z.string(), gramsPerPiece: z.number(), fromDry: z.boolean() });
 const kindStock = { grams: z.number().nullable(), daysLeft: z.number().nullable(), belowZero: z.boolean() };
-const stockSchema = z.object({ wet: z.object({ ...kindStock, cans: z.number().nullable(), canSizeG: z.number().nullable() }), dry: z.object(kindStock) });
+const canStock = z.object({ unitG: z.number(), grams: z.number(), cans: z.number(), belowZero: z.boolean(), lastAt: z.string().nullable() });
+const stockSchema = z.object({ wet: z.object({ ...kindStock, sizes: z.array(canStock), newestUnitG: z.number().nullable() }), dry: z.object(kindStock) });
 const weekSchema = z.object({
   monday: z.string(),
   days: z.array(
@@ -184,6 +190,8 @@ export const contract = {
     output: z.object({ kind: z.enum(linkKinds) }),
     messages: { token: LINK_OR_CODE, code: LINK_OR_CODE },
   }),
+  // what the sign-in can offer before there is a token: the household's OIDC provider, a link by e-mail
+  options: endpoint({ method: "GET", path: "/api/auth/options", auth: false, input: none, output: z.object({ oidc: z.boolean(), mail: z.boolean() }) }),
   magicLink: endpoint({
     method: "POST",
     path: "/api/auth/magic",
@@ -221,6 +229,7 @@ export const contract = {
     input: z.object({ type: z.string().optional(), by: z.string().optional(), day: z.string().optional(), dog: z.string().optional(), offset: z.coerce.number().int().min(0).optional() }),
     output: z.object({ entries: z.array(entryViewSchema), more: z.boolean() }),
   }),
+  entry: endpoint({ method: "GET", path: "/api/entries/:id", input: z.object({ id }), output: entryViewSchema }),
   logEntry: endpoint({ method: "POST", path: "/api/entries", input: entryCreateInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),
   // all fields are sent (a left-out note or amount becomes null), except walkers: left out, they stay as they are
   editEntry: endpoint({ method: "PATCH", path: "/api/entries/:id", input: entryEditInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),
@@ -232,12 +241,10 @@ export const contract = {
     input: z.object({ trackId: z.string().min(1).max(64), walkKey: z.string().min(1).max(64), source: z.enum(["phone", "watch"]), seq: z.number().int().min(0), points: z.array(trackPointSchema).min(1).max(2000) }),
     output: z.object({ stored: z.boolean() }),
   }),
-  walk: endpoint({
-    method: "GET",
-    path: "/api/walks/:id",
-    input: z.object({ id }),
-    output: z.object({ summary: walkSummarySchema, track: z.object({ source: z.enum(["phone", "watch"]), points: z.array(trackPointSchema), metrics: metricsSchema }).nullable() }),
-  }),
+  walk: endpoint({ method: "GET", path: "/api/walks/:id", input: z.object({ id }), output: walkOutput }),
+  // the same for the walk a phone started (or joined) with `key`, before it knows the walk's id; 404 while the server
+  // doesn't know the key yet
+  walkByKey: endpoint({ method: "GET", path: "/api/walks/key/:key", input: z.object({ key: z.string().min(1).max(64) }), output: walkOutput }),
   exercises: endpoint({ method: "GET", path: "/api/exercises", input: none, output: z.object({ exercises: z.array(exerciseSchema) }) }),
   addExercise: endpoint({ method: "POST", path: "/api/exercises", input: z.object({ name: z.string() }), output: exerciseSchema }),
   updateExercise: endpoint({ method: "PATCH", path: "/api/exercises/:id", input: z.object({ id, name: z.string().optional(), archived: z.literal(true).optional() }), output: z.object({ updated: z.literal(true) }) }),
@@ -250,9 +257,12 @@ export const contract = {
     output: z.object({ updated: z.literal(true) }),
   }),
   stock: endpoint({ method: "GET", path: "/api/stock", input: none, output: stockSchema }),
-  restock: endpoint({ method: "POST", path: "/api/stock/restock", input: restockInput, output: entryViewSchema, messages: RESTOCK_MESSAGES }),
-  correctStock: endpoint({ method: "POST", path: "/api/stock/correct", input: stockCountInput, output: entryViewSchema, messages: STOCK_COUNT_MESSAGES }),
-  lastFood: endpoint({ method: "GET", path: "/api/food/last", input: none, output: z.object({ wet: z.number().nullable(), dry: z.number().nullable() }) }),
+  // wet food: one entry per can size bought
+  restock: endpoint({ method: "POST", path: "/api/stock/restock", input: restockInput, output: z.object({ entries: z.array(entryViewSchema) }), messages: RESTOCK_MESSAGES }),
+  // a wet count is one entry per can size
+  correctStock: endpoint({ method: "POST", path: "/api/stock/correct", input: stockCountInput, output: z.object({ entries: z.array(entryViewSchema) }), messages: STOCK_COUNT_MESSAGES }),
+  // each kind's last portion, and the can size the last wet feeding came out of
+  lastFood: endpoint({ method: "GET", path: "/api/food/last", input: none, output: z.object({ wet: z.number().nullable(), dry: z.number().nullable(), wetUnitG: z.number().nullable() }) }),
   weights: endpoint({ method: "GET", path: "/api/weight", input: none, output: z.object({ weights: z.array(entryViewSchema) }) }),
   logWeight: endpoint({ method: "POST", path: "/api/weight", input: weightInput, output: entryViewSchema, messages: WEIGHT_MESSAGES }),
   today: endpoint({ method: "GET", path: "/api/today", input: none, output: z.object({ walk: entryViewSchema.nullable(), food: entryViewSchema.nullable(), pee: entryViewSchema.nullable(), poop: entryViewSchema.nullable() }) }),

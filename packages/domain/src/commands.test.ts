@@ -1,5 +1,5 @@
-import { expect, test } from "vitest";
-import { commandSchema } from "./commands";
+import { afterEach, expect, test, vi } from "vitest";
+import { commandSchema, newId } from "./commands";
 
 const at = "2026-10-20T09:00:00.000Z";
 
@@ -18,4 +18,19 @@ test("a food command needs a sensible amount and a kind of wet or dry", () => {
   expect(commandSchema.safeParse({ ...food, amountG: 0 }).success).toBe(false);
   expect(commandSchema.safeParse({ ...food, amountG: 5001 }).success).toBe(false);
   expect(commandSchema.safeParse({ ...food, foodKind: "raw" }).success).toBe(false);
+  // a wet feeding may name the can size it came out of
+  expect(commandSchema.parse({ ...food, unitG: 800 })).toMatchObject({ unitG: 800 });
+  expect(commandSchema.safeParse({ ...food, unitG: 0 }).success).toBe(false);
+});
+
+afterEach(() => vi.unstubAllGlobals());
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+test("new ids are UUIDs, also where the browser has no randomUUID (plain http on a home network)", () => {
+  expect(newId()).toMatch(UUID_V4);
+  const real = globalThis.crypto;
+  vi.stubGlobal("crypto", { getRandomValues: (a: Uint8Array) => real.getRandomValues(a) });
+  const ids = new Set(Array.from({ length: 50 }, () => newId()));
+  expect(ids.size).toBe(50);
+  for (const id of ids) expect(id).toMatch(UUID_V4);
 });

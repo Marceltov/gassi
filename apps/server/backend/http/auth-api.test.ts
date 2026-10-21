@@ -125,3 +125,11 @@ describe("magic links over the API", () => {
     expect(await (await call("/api/me", { token }, { mailer })).json()).toMatchObject({ household: { mail: true } });
   });
 });
+
+describe("sign-in options", () => {
+  test("without a token, the sign-in learns whether OIDC and mail are set up", async () => {
+    expect(await (await call("/api/auth/options")).json()).toEqual({ oidc: false, mail: false });
+    const mailer = { send: async () => {} } as unknown as ApiDeps["mailer"];
+    expect(await (await call("/api/auth/options", {}, { oidc: true, mailer })).json()).toEqual({ oidc: true, mail: true });
+  });
+});

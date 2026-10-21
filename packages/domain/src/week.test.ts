@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Entry } from "./entry";
-import { mondayOf, weekView } from "./week";
+import { mondayOf, successRate, weekLabel, weekView } from "./week";
 
 const TZ = "Europe/Berlin";
 let id = 0;
@@ -103,5 +103,19 @@ describe("mondayOf", () => {
     expect(mondayOf(Date.parse("2026-10-25T21:30:00Z"), TZ)).toBe("2026-10-19"); // Sunday 22:30, the night summer time ends
     expect(mondayOf(Date.parse("2026-10-25T23:30:00Z"), TZ)).toBe("2026-10-26"); // Monday 00:30
     expect(mondayOf(Date.parse("2026-10-18T22:30:00Z"), TZ)).toBe("2026-10-19"); // Monday 00:30 in Berlin, still Sunday in UTC
+  });
+});
+
+describe("week heading and success rate", () => {
+  test("success is ok of all tries, a dash when there were none", () => {
+    expect(successRate(0, 0)).toBe("–");
+    expect(successRate(5, 1)).toBe("83 %");
+    expect(successRate(0, 3)).toBe("0 %");
+  });
+
+  test("the heading names the days, with the year only across New Year", () => {
+    expect(weekLabel("2026-10-19")).toBe("19.–25. Okt.");
+    expect(weekLabel("2026-10-26")).toBe("26. Okt.–1. Nov.");
+    expect(weekLabel("2026-12-28")).toBe("28. Dez. 2026–3. Jan. 2027");
   });
 });

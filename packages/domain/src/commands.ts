@@ -2,6 +2,10 @@
 // the time of the tap (so taps queued without reception keep their real time). Runs in the browser too.
 import { z } from "zod";
 
+/** The grams one feeding may have. */
+export const FOOD_MIN_G = 1;
+export const FOOD_MAX_G = 5000;
+
 const key = z.string().min(1).max(64);
 const dogId = z.number().int().positive();
 // The dogs a walk or training is for; left out, the server takes every active dog.
@@ -22,12 +26,21 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("training.rep"), trainingKey: key, exerciseId: z.number().int().positive(), dogId, ok: z.boolean(), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("training.treat"), trainingKey: key, treatKindId: z.number().int().positive(), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("log"), type: z.enum(["pee", "poop"]), dogId }),
-  // a feeding; the dogs left out, the server takes every active dog
-  z.object({ ...base, kind: z.literal("food"), dogIds, amountG: z.number().int().min(1).max(5000), foodKind: z.enum(["wet", "dry"]) }),
+  // a feeding; the dogs left out, the server takes every active dog; wet food may name the can size it came out of
+  // (left out, it comes out of the size bought last)
+  z.object({ ...base, kind: z.literal("food"), dogIds, amountG: z.number().int().min(FOOD_MIN_G).max(FOOD_MAX_G), foodKind: z.enum(["wet", "dry"]), unitG: z.number().int().min(1).max(10_000).optional() }),
 ]);
 
 export type Command = z.output<typeof commandSchema>;
 export type CommandKind = Command["kind"];
 
-/** A new id for a command or a walk/training key. */
-export const newId = (): string => crypto.randomUUID();
+/** A new id for a command or a walk/training key: a v4 UUID. Browsers offer randomUUID only on https (and localhost),
+ * not over plain http on a home network's address, so it is made from random bytes there. */
+export function newId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40; // version 4
+  b[8] = (b[8] & 0x3f) | 0x80; // RFC 4122 variant
+  const hex = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}

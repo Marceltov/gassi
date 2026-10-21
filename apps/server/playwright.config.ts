@@ -17,7 +17,7 @@ export default defineConfig({
   use: { baseURL: BASE_URL, trace: "retain-on-failure", locale: "de-DE", timezoneId: "Europe/Berlin" },
   projects: [
     { name: "api", testMatch: /api\.spec\.ts|health\.spec\.ts/ },
-    { name: "browser", testMatch: /links\.spec\.ts/, dependencies: ["api"], use: { ...devices["Pixel 7"] } },
+    { name: "browser", testMatch: /links\.spec\.ts|app(-\w+)?\.spec\.ts/, dependencies: ["api"], use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
     // A fresh database each run, and only PUBLIC_URL set: what a self-hoster starts with.

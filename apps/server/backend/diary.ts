@@ -3,7 +3,7 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
+import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
@@ -13,7 +13,7 @@ import { dryTreats } from "./stock";
 import { type ShownTrack, Tracks } from "./tracks";
 
 /** An entry as the screens show it: with the display name of whoever logged it, and for walks the walkers (names and
- * ids), minutes paused and the distance and a thumbnail route of the shown track, for trainings the exercises practised
+ * ids), minutes paused, the distance and a thumbnail route of the shown track and what happened during it, for trainings the exercises practised
  * and treats given, in total and as editTraining takes them (repetitions per exercise and dog, treats per kind). */
 export type EntryView = Entry & {
   byName: string;
@@ -26,7 +26,14 @@ export type EntryView = Entry & {
   treatCounts: TreatCount[];
   distanceM: number | null;
   route: Route | null;
+  during: WalkDuring | null;
+  count: CountRow[] | null;
 };
+/** One can size of a wet count. */
+export type CountRow = { unitG: number; amountG: number };
+
+// A wet count is one stockcheck per can size at the same time: its rows are moved and deleted together.
+const isWetCount = (e: Entry) => e.type === "stockcheck" && e.foodKind === "wet";
 export type TreatCount = { treatKindId: number; count: number };
 
 
@@ -39,6 +46,7 @@ type Details = {
   treats: Map<number, number>;
   treatCounts: Map<number, TreatCount[]>;
   tracks: Map<number, ShownTrack>;
+  during: Map<number, WalkDuring>;
 };
 
 /** The newest entry of the types the Start screen shows. */
@@ -106,9 +114,19 @@ export class Diary {
     }
     // without an end it would run again (it was started on the walk screen); a walk logged afterwards may lose its end
     if (before?.clientKey && before.endedAt && !fields.endedAt) throw new InputError(before.type === "walk" ? "Eine beendete Runde braucht ein Ende." : "Ein beendetes Training braucht ein Ende.");
+    // a count moved onto another count's time would become one count with that one's sizes twice
+    if (before && isWetCount(before) && fields.at && new Date(fields.at).toISOString() !== before.at) {
+      const at = new Date(fields.at).toISOString();
+      const taken = await this.deps.db.selectFrom("entry").select("id").where("type", "=", "stockcheck").where("food_kind", "=", "wet").where("at", "=", at).executeTakeFirst();
+      if (taken) throw new InputError("Zu dieser Zeit gibt es schon eine Zählung.");
+    }
     // the entry and its walkers change together or not at all
     const entry = await this.deps.db.transaction().execute(async (tx) => {
       const updated = await new EntryRepository(tx, this.deps.now).update(id, fields);
+      // the other sizes of a wet count go to the same time (else the count would set them to 0, or lose this one)
+      if (updated && before && isWetCount(before) && updated.at !== before.at) {
+        await tx.updateTable("entry").set({ at: updated.at, updated_at: this.deps.now().toISOString() }).where("type", "=", "stockcheck").where("food_kind", "=", "wet").where("at", "=", before.at).where("id", "!=", id).execute();
+      }
       if (updated && walkers) await replaceWalkers(tx, id, [...new Set(walkers)]);
       // a dog taken out of a training takes its repetitions along
       if (updated?.type === "training" && fields.dogIds) await tx.deleteFrom("training_exercise").where("entry_id", "=", id).where("dog_id", "not in", fields.dogIds).execute();
@@ -158,34 +176,54 @@ export class Diary {
     return this.view1((await this.entries.get(id))!);
   }
 
-  remove(id: number): Promise<boolean> {
-    return this.entries.remove(id);
+  /** One entry as the screens show it, or null if there is none. */
+  async get(id: number): Promise<EntryView | null> {
+    const entry = await this.entries.get(id);
+    return entry ? this.view1(entry) : null;
   }
 
-  /** The amount of the newest feeding of each kind, offered as the usual portion. */
-  async lastFoodAmounts(): Promise<Record<FoodKind, number | null>> {
+  /** Deletes the entry; a wet count's row takes the whole count along. */
+  async remove(id: number): Promise<boolean> {
+    const e = await this.entries.get(id);
+    if (!e) return false;
+    if (!isWetCount(e)) return this.entries.remove(id);
+    await this.deps.db.deleteFrom("entry").where("type", "=", "stockcheck").where("food_kind", "=", "wet").where("at", "=", e.at).execute();
+    return true;
+  }
+
+  /** The amount of the newest feeding of each kind, offered as the usual portion, and the can size of the newest wet
+   * feeding that named one, offered as the can to feed from. */
+  async lastFoodAmounts(): Promise<Record<FoodKind, number | null> & { wetUnitG: number | null }> {
     const food = await this.entries.list({ type: "food" });
     const last = (kind: FoodKind) => food.find((e) => e.foodKind === kind)?.amountG ?? null;
-    return { wet: last("wet"), dry: last("dry") };
+    return { wet: last("wet"), dry: last("dry"), wetUnitG: food.find((e) => e.foodKind === "wet" && e.unitG)?.unitG ?? null };
   }
 
-  /** Bought food: wet as cans × grams per can, dry in grams. */
-  async restock(user: Person, input: unknown): Promise<EntryView> {
+  /** Bought food: wet as cans × grams per can, one restock per can size (together), dry in grams. */
+  async restock(user: Person, input: unknown): Promise<{ entries: EntryView[] }> {
     const r = parse(restockInput, input, RESTOCK_MESSAGES);
-    const amount = r.foodKind === "wet" ? { amountG: r.cans * r.unitG, unitG: r.unitG } : { amountG: r.grams, unitG: null };
-    return this.create(user, { type: "restock", foodKind: r.foodKind, ...amount });
+    const rows = r.foodKind === "wet" ? r.sizes.map((s) => ({ amountG: s.cans * s.unitG, unitG: s.unitG })) : [{ amountG: r.grams, unitG: null }];
+    return this.createAll(user, "restock", r.foodKind, rows);
   }
 
-  /** What is there now, counted by hand: wet in cans (of the last can size bought), dry in grams. */
-  async correctStock(user: Person, input: unknown): Promise<EntryView> {
+  /** What is there now, counted by hand: wet in cans per can size, one entry per size at the same time (a size left
+   * out is 0 from then on), dry in grams. */
+  async correctStock(user: Person, input: unknown): Promise<{ entries: EntryView[] }> {
     const r = parse(stockCountInput, input, STOCK_COUNT_MESSAGES);
-    let grams: number;
-    if (r.foodKind === "wet") {
-      const canSizeG = (await this.stock()).wet.canSizeG;
-      if (!canSizeG) throw new InputError("Trag erst einen Einkauf mit Dosengröße ein.");
-      grams = Math.round(r.cans * canSizeG);
-    } else grams = r.grams;
-    return this.create(user, { type: "stockcheck", foodKind: r.foodKind, amountG: grams, unitG: null });
+    const rows = r.foodKind === "wet" ? r.sizes.map((s) => ({ amountG: Math.round(s.cans * s.unitG), unitG: s.unitG })) : [{ amountG: r.grams, unitG: null }];
+    return this.createAll(user, "stockcheck", r.foodKind, rows);
+  }
+
+  /** Restocks or stock counts of one kind, at the same time, in one transaction. */
+  private async createAll(user: Person, type: "restock" | "stockcheck", foodKind: FoodKind, rows: readonly { amountG: number; unitG: number | null }[]): Promise<{ entries: EntryView[] }> {
+    const at = this.deps.now().toISOString();
+    const entries = await this.deps.db.transaction().execute(async (tx) => {
+      const repo = new EntryRepository(tx, this.deps.now);
+      const made: Entry[] = [];
+      for (const row of rows) made.push(await repo.create({ type, foodKind, ...row, at, endedAt: null, note: null, dogIds: [], loggedBy: user.id }));
+      return made;
+    });
+    return { entries: await this.views(entries) };
   }
 
   /** A dog's weight in kg (one decimal), stored as grams; the time defaults to now. */
@@ -199,11 +237,6 @@ export class Diary {
   async stock(): Promise<Stock> {
     const [entries, treats] = await Promise.all([this.entries.list({}), dryTreats(this.deps.db)]);
     return computeStock({ entries, treats, now: this.deps.now().getTime() });
-  }
-
-  private async create(user: Person, e: { type: EntryType; foodKind: FoodKind; amountG: number; unitG: number | null }): Promise<EntryView> {
-    const at = this.deps.now().toISOString();
-    return this.view1(await this.entries.create({ ...e, at, endedAt: null, note: null, dogIds: [], loggedBy: user.id }));
   }
 
   async history(filter: HistoryFilter, offset = 0): Promise<HistoryPage> {
@@ -266,12 +299,13 @@ export class Diary {
     const { db } = this.deps;
     const ids = (type: EntryType) => entries.filter((e) => e.type === type).map((e) => e.id);
     const [walkIds, trainingIds] = [ids("walk"), ids("training")];
-    const [walkers, pauses, exercises, treats, tracks] = await Promise.all([
+    const [walkers, pauses, exercises, treats, tracks, during] = await Promise.all([
       walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "person_id"]).where("entry_id", "in", walkIds).orderBy(sql`rowid`).execute() : [],
       walkIds.length ? db.selectFrom("walk_pause").select(["entry_id", "started_at", "ended_at"]).where("entry_id", "in", walkIds).execute() : [],
       trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise_id", "dog_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute() : [],
       trainingIds.length ? db.selectFrom("training_treat").select(["entry_id", "treat_kind_id", "count"]).where("entry_id", "in", trainingIds).where("count", ">", 0).orderBy("treat_kind_id").execute() : [],
       new Tracks(db, this.deps.now).shown(walkIds),
+      this.during(entries.filter((e) => e.type === "walk")),
     ]);
     const group = <R extends { entry_id: number }, V>(rows: R[], value: (r: R) => V) => {
       const out = new Map<number, V[]>();
@@ -286,12 +320,48 @@ export class Diary {
       treats: new Map([...group(treats, (t) => t.count)].map(([id, counts]) => [id, counts.reduce((n, c) => n + c, 0)])),
       treatCounts: group(treats, (t) => ({ treatKindId: t.treat_kind_id, count: t.count })),
       tracks,
+      during,
     };
+  }
+
+  // What happened during each walk, decided by time as the walk summary does (ADR 0002): the pee and poop and the
+  // trainings begun from its start until its end (now, while it runs), read at once for the time all of them span.
+  private async during(walks: readonly Entry[]): Promise<Map<number, WalkDuring>> {
+    if (walks.length === 0) return new Map();
+    const now = this.deps.now().toISOString();
+    const endOf = (w: Entry) => w.endedAt ?? now;
+    const since = walks.reduce((min, w) => (w.at < min ? w.at : min), walks[0].at);
+    const until = walks.reduce((max, w) => (endOf(w) > max ? endOf(w) : max), endOf(walks[0]));
+    const inside = (await this.entries.list({ since, until })).filter((e) => e.type === "pee" || e.type === "poop" || e.type === "training");
+    const trainingIds = inside.filter((e) => e.type === "training").map((e) => e.id);
+    const reps = trainingIds.length
+      ? await this.deps.db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute()
+      : [];
+    return new Map(
+      walks.map((w) => {
+        const mine = inside.filter((e) => withinWalk(e.at, w.at, endOf(w)));
+        // oldest training first, as the summary lists them
+        const trainings = mine.filter((e) => e.type === "training").reverse();
+        const rows = trainings.flatMap((t) => reps.filter((r) => r.entry_id === t.id).map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count })));
+        const count = (type: EntryType) => mine.filter((e) => e.type === type).length;
+        return [w.id, { pees: count("pee"), poops: count("poop"), exercises: exerciseTotals(rows) }];
+      }),
+    );
+  }
+
+  /** The rows of the wet counts among `entries`, by their time, smallest can first. */
+  private async counts(entries: readonly Entry[]): Promise<Map<string, CountRow[]>> {
+    const ats = [...new Set(entries.filter(isWetCount).map((e) => e.at))];
+    if (!ats.length) return new Map();
+    const rows = await this.deps.db.selectFrom("entry").select(["at", "unit_g", "amount_g"]).where("type", "=", "stockcheck").where("food_kind", "=", "wet").where("at", "in", ats).orderBy("unit_g").execute();
+    const byAt = new Map<string, CountRow[]>();
+    for (const r of rows) byAt.set(r.at, [...(byAt.get(r.at) ?? []), { unitG: r.unit_g ?? 0, amountG: r.amount_g ?? 0 }]);
+    return byAt;
   }
 
   private async views(entries: Entry[]): Promise<EntryView[]> {
     const { names } = this.deps;
-    const d = await this.details(entries);
+    const [d, counts] = await Promise.all([this.details(entries), this.counts(entries)]);
     const now = this.deps.now().toISOString();
     return entries.map((e) => {
       const isWalk = e.type === "walk";
@@ -309,6 +379,8 @@ export class Diary {
         treatCounts: d.treatCounts.get(e.id) ?? [],
         distanceM: track?.metrics.distanceM ?? null,
         route: track ? simplify(track.points, ROUTE_POINTS) : null,
+        during: isWalk ? (d.during.get(e.id) ?? null) : null,
+        count: isWetCount(e) ? (counts.get(e.at) ?? []) : null,
       };
     });
   }

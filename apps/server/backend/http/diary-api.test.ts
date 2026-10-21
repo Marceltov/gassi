@@ -73,6 +73,18 @@ describe("tracks over the API", () => {
     expect(Math.round(body.track.metrics.distanceM)).toBe(1000);
   });
 
+  test("the phone that started a walk finds it by its key, also a key that joined; an unknown key is 404", async () => {
+    const [hirsch, herzii] = [await tokenFor(HIRSCH.id), await tokenFor(HERZII.id)];
+    await json("/api/commands", { method: "POST", token: hirsch, body: { commands: [{ id: "k-s", at: "2026-10-20T07:00:00.000Z", kind: "walk.start", walkKey: "k1" }] } });
+    await json("/api/commands", { method: "POST", token: herzii, body: { commands: [{ id: "k-s2", at: "2026-10-20T07:01:00.000Z", kind: "walk.start", walkKey: "k2" }, { id: "k-p", at: "2026-10-20T07:05:00.000Z", kind: "log", type: "pee", dogId: 1 }, { id: "k-e", at: "2026-10-20T07:10:00.000Z", kind: "walk.stop", walkKey: "k2" }] } });
+    const { body: entries } = await json("/api/entries?type=walk&day=2026-10-20", { token: hirsch });
+    const walk = entries.entries.find((e: { clientKey: string }) => e.clientKey === "k1");
+    const { status, body } = await json("/api/walks/key/k2", { token: herzii });
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ summary: { id: walk.id, totalMin: 10, walkers: [HIRSCH, HERZII], pees: [{ at: "2026-10-20T07:05:00.000Z", dogId: 1 }] }, track: null });
+    expect((await json("/api/walks/key/nope", { token: hirsch })).status).toBe(404);
+  });
+
   test("a point out of range or too many points are refused; a walk id that isn't a walk is 404", async () => {
     const token = await tokenFor(HIRSCH.id);
     const bad = { trackId: "t", walkKey: "w", source: "phone", seq: 0, points: [{ ...point(0, 0), lat: 91 }] };
@@ -123,7 +135,7 @@ describe("the server checks inputs with the same schemas and messages", () => {
     const token = await tokenFor(HIRSCH.id);
     expect(await json("/api/entries", { method: "POST", token, body: { type: "food", foodKind: "wet", amountG: -1 } })).toEqual({ status: 400, body: { error: "Die Menge muss eine ganze Zahl Gramm sein." } });
     expect(await json("/api/entries", { method: "POST", token, body: { type: "bark" } })).toEqual({ status: 400, body: { error: "Diese Art von Eintrag gibt es nicht." } });
-    expect(await json("/api/stock/restock", { method: "POST", token, body: { foodKind: "dry" } })).toEqual({ status: 400, body: { error: "Wie viel Gramm hast du gekauft?" } });
+    expect(await json("/api/stock/restock", { method: "POST", token, body: { foodKind: "dry" } })).toEqual({ status: 400, body: { error: "Wie viel hast du gekauft?" } });
   });
 });
 
@@ -141,6 +153,8 @@ describe("editing afterwards over the API", () => {
     const { body: list } = await json("/api/entries", { token });
     const walk = list.entries.find((e: { type: string }) => e.type === "walk");
     const training = list.entries.find((e: { type: string }) => e.type === "training");
+    expect((await json(`/api/entries/${walk.id}`, { token })).body).toMatchObject({ id: walk.id, type: "walk", during: { pees: 0, poops: 0, exercises: [] } });
+    expect((await json("/api/entries/999", { token })).status).toBe(404);
     const fixed = await json(`/api/entries/${walk.id}`, { method: "PATCH", token, body: { at: walk.at, endedAt: walk.endedAt, walkers: [HERZII.id] } });
     expect(fixed.body).toMatchObject({ walkers: [HERZII.name], walkerIds: [HERZII.id] });
     const bad = await json(`/api/entries/${training.id}`, { method: "PATCH", token, body: { at: training.at, endedAt: training.endedAt, walkers: [HERZII.id] } });

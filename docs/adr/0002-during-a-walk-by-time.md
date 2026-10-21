@@ -34,4 +34,5 @@ what belongs to it without rewriting links.
 ### Confirmation
 
 `backend/sessions.test.ts` "summary counts pee/poop inside the walk's time only" and "late pipi after stop is a plain
-entry"; `Sessions.summary` and the training view use the interval only.
+entry"; `Sessions.summary` and the training view use the interval only. The interval is one rule, `withinWalk` in
+`packages/domain` (from the start, up to but not at the end): the server and the app's unsent taps both use it.

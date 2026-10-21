@@ -5,12 +5,16 @@ WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY packages/domain/package.json packages/domain/
 COPY packages/api-client/package.json packages/api-client/
+COPY apps/mobile/package.json apps/mobile/
 COPY apps/server/package.json apps/server/
 # No install scripts (.npmrc): better-sqlite3 ships prebuilt binaries (x64 and arm64) and loads them.
 RUN npm ci
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build -w @gassi/server && mkdir /data
+ENV EXPO_NO_TELEMETRY=1
+# Exports the Expo web app (apps/mobile) into apps/server/public, then builds the server. Both steps are explicit: the
+# image always exports afresh (there is no dist/ in the build context to skip on).
+RUN npm run build:app && npm run build -w @gassi/server && mkdir /data
 
 # Runtime: only the standalone server and its traced deps. Distroless: Node and its libraries, no shell or npm.
 FROM gcr.io/distroless/nodejs22-debian13

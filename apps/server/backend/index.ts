@@ -4,6 +4,7 @@ import { type Mailer, smtpMailer } from "./auth/mail";
 import { config } from "./config";
 import { database } from "./db/open";
 import { apiRouter } from "./http/api";
+import { cors } from "./http/cors";
 import { healthRoute } from "./http/health";
 import { type Landing, landing } from "./http/landing";
 import { logged } from "./http/requestlog";
@@ -16,10 +17,10 @@ export { startup } from "./startup";
 let cachedMailer: { url: string; mailer: Mailer } | null = null;
 const mailer = (smtp: { url: string; from: string }): Mailer => (cachedMailer?.url === smtp.url ? cachedMailer : (cachedMailer = { url: smtp.url, mailer: smtpMailer(smtp) })).mailer;
 
-/** Every endpoint of the API contract (packages/api-client). */
+/** Every endpoint of the API contract (packages/api-client), and their CORS preflight (OPTIONS). */
 export const api = logged(async (req) => {
-  const { publicUrl, oidc, smtp, timeZone, defaultDogName, secret, dataDir } = config();
-  return apiRouter({ db: await database(), now: () => new Date(), publicUrl, codeKey: linkCodeKey(secret, dataDir), oidc: oidc !== null, mailer: smtp && mailer(smtp), timeZone, defaultDogName })(req);
+  const { publicUrl, oidc, smtp, timeZone, defaultDogName, secret, dataDir, corsOrigin } = config();
+  return cors(corsOrigin, async (req) => apiRouter({ db: await database(), now: () => new Date(), publicUrl, codeKey: linkCodeKey(secret, dataDir), oidc: oidc !== null, mailer: smtp && mailer(smtp), timeZone, defaultDogName })(req))(req);
 });
 export const health = logged(() => healthRoute());
 export const oidcStart = logged((req) => oidcStartRoute(req));

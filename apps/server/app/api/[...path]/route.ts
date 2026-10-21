@@ -6,3 +6,4 @@ export const GET = api;
 export const POST = api;
 export const PATCH = api;
 export const DELETE = api;
+export const OPTIONS = api;

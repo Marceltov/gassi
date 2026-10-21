@@ -6,6 +6,9 @@ decision-makers: Marcel Bruckner
 
 # Android native, a web app for everything else, iOS left to the community
 
+Partly superseded by [ADR 0006](0006-one-expo-app-for-web-and-android.md): the web app and the Android app are one Expo
+app, so screens are written once.
+
 ## Context and Problem Statement
 
 The plan from 2026-10-20 was a native app for iOS and Android, a Garmin app and a web dashboard "for looking, not for

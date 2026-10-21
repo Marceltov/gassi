@@ -76,39 +76,105 @@ test("filter keeps only known types and people", () => {
 describe("food and stock", () => {
   test("suggests the last amount per food kind", async () => {
     const d = diary();
-    expect(await d.lastFoodAmounts()).toEqual({ wet: null, dry: null });
-    await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 200, at: "2026-10-20T07:00:00Z" });
+    expect(await d.lastFoodAmounts()).toEqual({ wet: null, dry: null, wetUnitG: null });
+    await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 200, unitG: 800, at: "2026-10-20T07:00:00Z" });
     await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 180, at: "2026-10-20T08:00:00Z" });
     await d.log(HIRSCH, { type: "food", foodKind: "dry", amountG: 80, at: "2026-10-20T08:30:00Z" });
-    expect(await d.lastFoodAmounts()).toEqual({ wet: 180, dry: 80 });
+    // the size of the newest wet feeding that named one
+    expect(await d.lastFoodAmounts()).toEqual({ wet: 180, dry: 80, wetUnitG: 800 });
   });
 
-  test("restocks: cans × grams per can for wet food, grams for dry food", async () => {
+  test("restocks: cans × grams per can for wet food, g or kg for dry food", async () => {
     clock = new Date("2026-10-20T10:00:00Z");
     const d = diary();
-    expect(await d.restock(HIRSCH, { foodKind: "wet", cans: 12, unitG: 400 })).toMatchObject({ type: "restock", foodKind: "wet", amountG: 4800, unitG: 400, at: clock.toISOString() });
-    expect(await d.restock(HIRSCH, { foodKind: "dry", grams: 10_000 })).toMatchObject({ type: "restock", foodKind: "dry", amountG: 10_000, unitG: null });
+    const wet = await d.restock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: 12 }, { unitG: 800, cans: 0 }, { unitG: 200, cans: 2 }] });
+    expect(wet.entries).toMatchObject([
+      { type: "restock", foodKind: "wet", amountG: 4800, unitG: 400, at: clock.toISOString() },
+      { type: "restock", foodKind: "wet", amountG: 400, unitG: 200, at: clock.toISOString() },
+    ]);
+    await d.remove(wet.entries[1].id); // a purchase's sizes stay apart: only that one goes
+    expect((await d.restock(HIRSCH, { foodKind: "dry", amount: "7,5", unit: "kg" })).entries).toMatchObject([{ type: "restock", foodKind: "dry", amountG: 7500, unitG: null }]);
+    expect((await d.restock(HIRSCH, { foodKind: "dry", amount: 2500, unit: "g" })).entries).toMatchObject([{ amountG: 2500 }]);
     await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 200, at: "2026-10-20T10:30:00Z" });
     clock = new Date("2026-10-20T11:00:00Z");
-    expect((await d.stock()).wet).toMatchObject({ grams: 4600, cans: 11.5 });
+    expect((await d.stock()).wet).toMatchObject({ grams: 4600, sizes: [{ unitG: 400, cans: 11.5 }] });
   });
 
-  test("a restock needs cans and can size, or grams", async () => {
-    await expect(diary().restock(HIRSCH, { foodKind: "wet", cans: 12 })).rejects.toThrow(new InputError("Wie viele Dosen, und wie viel Gramm hat eine Dose?"));
-    await expect(diary().restock(HIRSCH, { foodKind: "dry", grams: 0 })).rejects.toThrow(new InputError("Wie viel Gramm hast du gekauft?"));
+  test("a restock needs cans of some size, or an amount", async () => {
+    await expect(diary().restock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: 0 }] })).rejects.toThrow(new InputError("Wie viele Dosen welcher Größe hast du gekauft?"));
+    await expect(diary().restock(HIRSCH, { foodKind: "dry", amount: 0, unit: "kg" })).rejects.toThrow(new InputError("Wie viel hast du gekauft?"));
     await expect(diary().restock(HIRSCH, { foodKind: "canned", grams: 10 })).rejects.toThrow(InputError);
   });
 
-  test("correcting the stock: wet in cans of the last can size, dry in grams", async () => {
+  test("correcting the stock: wet in cans per size (every size at once, no purchase needed), dry in g or kg", async () => {
     clock = new Date("2026-10-20T10:00:00Z");
     const d = diary();
-    await expect(d.correctStock(HIRSCH, { foodKind: "wet", cans: 5 })).rejects.toThrow(new InputError("Trag erst einen Einkauf mit Dosengröße ein."));
-    await d.restock(HIRSCH, { foodKind: "wet", cans: 12, unitG: 400 });
+    const first = await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: "2,5" }] });
+    expect(first.entries).toMatchObject([{ type: "stockcheck", foodKind: "wet", amountG: 1000, unitG: 400 }]);
+    await d.restock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 800, cans: 2 }] });
     clock = new Date("2026-10-20T10:05:00Z");
-    expect(await d.correctStock(HIRSCH, { foodKind: "wet", cans: 5 })).toMatchObject({ type: "stockcheck", foodKind: "wet", amountG: 2000 });
-    expect(await d.correctStock(HIRSCH, { foodKind: "dry", grams: 0 })).toMatchObject({ type: "stockcheck", foodKind: "dry", amountG: 0 });
+    const both = await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: 5 }, { unitG: 800, cans: 1 }] });
+    expect(both.entries.map((e) => [e.amountG, e.unitG, e.at])).toEqual([[2000, 400, clock.toISOString()], [800, 800, clock.toISOString()]]);
+    expect((await d.correctStock(HIRSCH, { foodKind: "dry", amount: "0", unit: "kg" })).entries).toMatchObject([{ type: "stockcheck", foodKind: "dry", amountG: 0, unitG: null }]);
     clock = new Date("2026-10-20T10:10:00Z");
-    expect(await d.stock()).toMatchObject({ wet: { grams: 2000, cans: 5 }, dry: { grams: 0 } });
+    const stock = await d.stock();
+    expect(stock.wet.sizes.map((s) => [s.unitG, s.cans])).toEqual([[400, 5], [800, 1]]);
+    expect(stock).toMatchObject({ wet: { grams: 2800 }, dry: { grams: 0 } });
+    // a size left out of a count is 0, and no longer offered
+    clock = new Date("2026-10-20T10:15:00Z");
+    await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 800, cans: 2 }] });
+    expect((await d.stock()).wet.sizes.map((s) => [s.unitG, s.cans])).toEqual([[800, 2]]);
+  });
+});
+
+describe("a wet count is one thing", () => {
+  const twoSizes = async () => {
+    clock = new Date("2026-10-20T10:00:00Z");
+    const d = diary();
+    const { entries } = await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: 3 }, { unitG: 800, cans: 1 }] });
+    clock = new Date("2026-10-20T12:00:00Z");
+    return { d, entries };
+  };
+  const counts = async (d: ReturnType<typeof diary>) => (await d.stock()).wet.sizes.map((s) => [s.unitG, s.cans]);
+
+  test("its rows show the whole count", async () => {
+    const { d, entries } = await twoSizes();
+    expect((await d.get(entries[1].id))?.count).toEqual([{ unitG: 400, amountG: 1200 }, { unitG: 800, amountG: 800 }]);
+    expect((await d.get(entries[0].id))?.count).toHaveLength(2);
+  });
+
+  test("moving one row's time moves the whole count: the other size keeps its count", async () => {
+    const { d, entries } = await twoSizes();
+    await d.edit(entries[0].id, { at: "2026-10-20T09:00:00Z", amountG: 1200, foodKind: "wet", unitG: 400 });
+    expect((await d.get(entries[1].id))?.at).toBe("2026-10-20T09:00:00.000Z");
+    expect(await counts(d)).toEqual([[400, 3], [800, 1]]);
+    await d.edit(entries[1].id, { at: "2026-10-20T11:00:00Z", amountG: 800, foodKind: "wet", unitG: 800 });
+    expect(await counts(d)).toEqual([[400, 3], [800, 1]]);
+  });
+
+  test("a count can't be moved onto another count's time", async () => {
+    const { d, entries } = await twoSizes();
+    const other = (await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: 9 }] })).entries[0];
+    await expect(d.edit(entries[0].id, { at: other.at, amountG: 1200, foodKind: "wet", unitG: 400 })).rejects.toThrow(new InputError("Zu dieser Zeit gibt es schon eine Zählung."));
+    expect((await d.get(entries[1].id))?.at).toBe(entries[1].at); // nothing moved
+    expect((await d.edit(entries[0].id, { at: entries[0].at, amountG: 1200, foodKind: "wet", unitG: 400, note: "gleiche Zeit" }))?.note).toBe("gleiche Zeit"); // its own time is fine
+  });
+
+  test("deleting one row deletes the whole count", async () => {
+    const { d, entries } = await twoSizes();
+    expect(await d.remove(entries[0].id)).toBe(true);
+    expect(await d.get(entries[1].id)).toBeNull();
+    expect((await d.stock()).wet.grams).toBeNull();
+  });
+
+  test("other entries keep their own time and go alone", async () => {
+    clock = new Date("2026-10-20T10:00:00Z");
+    const d = diary();
+    const dry = (await d.correctStock(HIRSCH, { foodKind: "dry", amount: 500 })).entries[0];
+    const wet = (await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: 1 }] })).entries[0];
+    expect((await d.get(dry.id))?.count).toBeNull();
+    await d.remove(dry.id);
+    expect(await d.get(wet.id)).not.toBeNull();
   });
 });
 
@@ -190,6 +256,32 @@ describe("entries carry their walk and training details", () => {
     expect(training.treatCounts).toEqual([{ treatKindId: kaese.id, count: 3 }]);
     const pee = await diary().log(HIRSCH, { type: "pee", at: "2026-10-20T10:00:00Z" });
     expect(pee).toMatchObject({ walkers: [], walkerIds: [], pauseMin: null, exercises: [], treats: null, reps: [], treatCounts: [] });
+  });
+});
+
+describe("what happened during a walk", () => {
+  test("a walk carries the pee, poop and the trainings' exercises that fell into its time; other entries carry none", async () => {
+    clock = new Date("2026-10-20T12:00:00Z");
+    const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"]]), now: () => clock });
+    const sitz = await new Catalog(db()).addExercise("Sitz");
+    await s.apply(HIRSCH, [
+      { id: "1", at: "2026-10-20T08:00:00.000Z", kind: "walk.start", walkKey: "w" },
+      { id: "2", at: "2026-10-20T08:05:00.000Z", kind: "log", type: "pee", dogId: 1 },
+      { id: "3", at: "2026-10-20T08:06:00.000Z", kind: "log", type: "pee", dogId: 1 },
+      { id: "4", at: "2026-10-20T08:07:00.000Z", kind: "log", type: "poop", dogId: 1 },
+      { id: "5", at: "2026-10-20T08:10:00.000Z", kind: "training.start", trainingKey: "t", walkKey: "w" },
+      { id: "6", at: "2026-10-20T08:11:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, ok: true, delta: 1 },
+      { id: "7", at: "2026-10-20T08:12:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, ok: false, delta: 1 },
+      { id: "8", at: "2026-10-20T08:15:00.000Z", kind: "training.stop", trainingKey: "t" },
+      { id: "9", at: "2026-10-20T08:30:00.000Z", kind: "walk.stop", walkKey: "w" },
+      { id: "10", at: "2026-10-20T09:00:00.000Z", kind: "log", type: "pee", dogId: 1 },
+    ]);
+    const { entries } = await diary().history({ type: "walk" });
+    expect(entries[0].during).toEqual({ pees: 2, poops: 1, exercises: [{ name: "Sitz", ok: 1, fail: 1 }] });
+    const pee = (await diary().history({ type: "pee" })).entries[0];
+    expect(pee.during).toBeNull();
+    expect((await diary().get(entries[0].id))?.during).toEqual(entries[0].during);
+    expect(await diary().get(999)).toBeNull();
   });
 });
 

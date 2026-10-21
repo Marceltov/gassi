@@ -5,6 +5,8 @@ coverage/
 test-results/
 playwright-report/
 data/
+# the app's data modules are code, not a data folder
+!/apps/mobile/src/data/
 .env*
 !.env.example
 *.tsbuildinfo
@@ -13,3 +15,11 @@ next-env.d.ts
 # Superpowers specs/plans are local working notes; decisions are recorded as ADRs (/ccp:ship-pr).
 /docs/superpowers/
 /.superpowers/
+# The Expo web export, copied into the server's public/ at build time (scripts/web.mjs): everything there but the
+# server's own files (the icons), which stay tracked. A new file of the server's own needs a line here.
+/apps/server/public/*
+!/apps/server/public/apple-icon.png
+!/apps/server/public/icon-192.png
+!/apps/server/public/icon-512.png
+!/apps/server/public/icon-maskable-512.png
+!/apps/server/public/icon.svg

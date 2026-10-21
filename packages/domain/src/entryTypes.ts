@@ -24,6 +24,8 @@ export const FOOD_KINDS = ["wet", "dry"] as const;
 export type FoodKind = (typeof FOOD_KINDS)[number];
 
 export const FOOD_LABEL: Record<FoodKind, string> = { wet: "Nassfutter", dry: "Trockenfutter" };
+/** The short name of a food kind, for a switch or a line with both: "Nass", "Trocken". */
+export const FOOD_SHORT: Record<FoodKind, string> = { wet: "Nass", dry: "Trocken" };
 
 export const isFoodKind = (v: unknown): v is FoodKind => (FOOD_KINDS as readonly unknown[]).includes(v);
 

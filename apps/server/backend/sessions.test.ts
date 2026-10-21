@@ -203,6 +203,10 @@ describe("walks", () => {
     ]);
     const walk = (await entries()).find((e) => e.type === "walk")!;
     expect(await s.summary(walk.id)).toMatchObject({ pees: [{ at: at(5), dogId: 1 }, { at: at(7), dogId: 1 }], poops: [{ at: at(6), dogId: 1 }] });
+    // each with its entry's id, so the summary can open it
+    const idAt = async (type: string, t: string) => (await entries()).find((e) => e.type === type && e.at === t)!.id;
+    expect((await s.summary(walk.id)).pees.map((m) => m.id)).toEqual([await idAt("pee", at(5)), await idAt("pee", at(7))]);
+    expect((await s.summary(walk.id)).poops[0].id).toBe(await idAt("poop", at(6)));
   });
 });
 
@@ -345,6 +349,13 @@ describe("food", () => {
     expect(all[0]).toMatchObject({ type: "food", at: at(5), amountG: 80, foodKind: "wet", loggedBy: "marcel" });
     const active = (await new DogRepository(db()).activeIds()).sort();
     expect([...all[0].dogIds].sort()).toEqual(active);
+  });
+
+  test("a wet feeding keeps the can size it came out of; dry food has none", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(5, { kind: "food", amountG: 400, foodKind: "wet", unitG: 800 }), cmd(6, { kind: "food", amountG: 40, foodKind: "dry", unitG: 800 })]);
+    const all = await new EntryRepository(db()).list({ type: "food" });
+    expect(all.map((e) => [e.foodKind, e.unitG])).toEqual([["dry", null], ["wet", 800]]);
   });
 });
 

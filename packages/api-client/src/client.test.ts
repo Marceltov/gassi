@@ -54,7 +54,7 @@ describe("inputs are checked before anything is sent, with the server's German m
     const r = recorder({ body: {} });
     const api = createClient({ baseUrl: "https://gassi.example", token: "t", fetch: r.fetch });
     await expect(api.logEntry({ type: "food", foodKind: "wet", amountG: -5 })).rejects.toEqual(new ApiError(400, "Die Menge muss eine ganze Zahl Gramm sein."));
-    await expect(api.restock({ foodKind: "wet", cans: 12 } as never)).rejects.toEqual(new ApiError(400, "Wie viele Dosen, und wie viel Gramm hat eine Dose?"));
+    await expect(api.restock({ foodKind: "wet", sizes: [] } as never)).rejects.toEqual(new ApiError(400, "Wie viele Dosen welcher Größe hast du gekauft?"));
     await expect(api.logWeight({ kg: "120" })).rejects.toEqual(new ApiError(400, "Das Gewicht muss zwischen 0,5 und 100 kg liegen."));
     expect(r.calls).toEqual([]);
   });
