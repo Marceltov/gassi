@@ -13,6 +13,7 @@ export * from "./result";
 export * from "./sessionProjection";
 export * from "./sessionRules";
 export * from "./stock";
+export * from "./todayProjection";
 export * from "./time";
 export * from "./track";
 export * from "./week";
