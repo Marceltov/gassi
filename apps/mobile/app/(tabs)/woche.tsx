@@ -1,5 +1,5 @@
-import { Placeholder } from "@/components/Placeholder";
+import { Week } from "@/src/week/Week";
 
 export default function WocheScreen() {
-  return <Placeholder title="Woche" />;
+  return <Week />;
 }

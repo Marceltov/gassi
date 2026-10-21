@@ -134,3 +134,18 @@ export function weekView({ entries, walkers, trainings, tracks, names, monday, t
     treats,
   };
 }
+
+/** The share of exercises that worked, "83 %"; "–" when none were practised. */
+export function successRate(ok: number, fail: number): string {
+  return ok + fail === 0 ? "–" : `${Math.round((100 * ok) / (ok + fail))} %`;
+}
+
+/** The week starting `monday` for a heading: "19.–25. Okt.", "28. Okt.–3. Nov.", across New Year with the year. */
+export function weekLabel(monday: string): string {
+  const [from, to] = [monday, addDays(monday, 6)].map((d) => new Date(`${d}T12:00:00Z`));
+  const part = (d: Date, withYear: boolean) => d.toLocaleDateString("de-DE", { day: "numeric", month: "short", timeZone: "UTC", ...(withYear ? { year: "numeric" } : {}) });
+  const sameMonth = from.getUTCMonth() === to.getUTCMonth();
+  const crossYear = from.getUTCFullYear() !== to.getUTCFullYear();
+  const start = sameMonth ? `${from.getUTCDate()}.` : part(from, crossYear);
+  return `${start}–${part(to, crossYear)}`;
+}
