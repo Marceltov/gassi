@@ -1,13 +1,6 @@
 // The app's colors, sizes and the hook that picks light or dark.
 import { useColorScheme } from "react-native";
-
-const kinds = {
-  walk: "#2e7d4f",
-  food: "#b8571a", // a clear orange, dark enough for white text (4.8:1); Poopoo stays brown
-  training: "#3b5ba5",
-  pee: "#b08a16",
-  poop: "#6b4a2b",
-};
+import { gradients, kinds } from "./colors";
 
 // The icon squares of Mehr's lists and the other lists' rows (like the iPhone's settings): the weight's rose, the
 // household's violet, the devices' slate, the watch's grey. Vorrat uses food, Hunde walk, Übungen training.
@@ -18,15 +11,7 @@ const listTones = {
   garmin: "#3a4048",
 };
 
-// Start's big tiles and every colored button: each kind's color as a diagonal from lighter (top left) to darker
-// (bottom right), with white on it.
-const gradients = {
-  walk: ["#3fb26b", "#1f7a45"],
-  food: ["#ee8a32", "#b8571a"],
-  training: ["#5a7fe0", "#2f4ea8"],
-  pee: ["#d4a92a", "#8f6d0c"],
-  poop: ["#8c6440", "#533720"],
-} as const;
+
 // a soft shadow under a tile or colored button and a light top edge on it; lighter on a light background. A neutral
 // button is calmer: a faint shadow and edge only.
 const edge = "inset 0 1px 0 rgba(255,255,255,0.25)";
