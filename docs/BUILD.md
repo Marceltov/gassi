@@ -315,3 +315,65 @@ Built from a local spec and plan (brainstormed on 2026-10-20); the lasting decis
   a dog taken out of a training takes its reps along.
 - **Gone:** the CSV export. The Douglas-Peucker `simplify` is now `trimTrack`; `simplify` makes the thumbnail route.
 - **Data:** the schema changes are folded into `0.3_schema`, so the live 0.3 database is deleted at this deploy.
+
+## 0.3, step 2b: the web app (issue #16)
+
+- **One Expo app** (ADR 0006): `apps/mobile` (Expo Router) is the web app now and the Android app in step 3. Its
+  web export (`output: "single"`, `asyncRoutes: false`: one bundle, so every screen opens offline) is copied into
+  `apps/server/public` by `scripts/web.mjs` and served by the server from the same container; a fallback rewrite
+  answers app paths with its `index.html` but never `/api`, `/l/`, `/health`, `/_next`, `/_expo` or a path with a
+  file extension (a missing bundle is a 404). The copy writes only generated files, never over the server's tracked
+  icons, and removes what the last copy put there (`public/.web-export`).
+- **Build:** the server's `build` runs `build:app` (the Expo export) itself, since `.npmrc`'s `ignore-scripts` also
+  stops `prebuild`; so every `npm run test:e2e` does a full Expo export first. The root `workspaces` list is
+  explicit (`packages/*`, `apps/mobile`, `apps/server`): npm runs workspace scripts in that order (the app before
+  the server that serves its export), and an app folder that isn't an npm package (the Garmin app, step 4) stays
+  out. One React for the workspace, 19.3 (Expo SDK 58 pins it; Next 16 accepts any React 19).
+- **CORS** only for development: with `CORS_ORIGIN` (the Expo dev server) `/api/*` answers carry it; in production
+  it is empty and the app is same-origin. Any `OPTIONS /api/*` answers 204 (with the CORS headers only when set).
+- **The phone's data:** the device (with its person, from the redeem), the queue of unsent taps per person (from the
+  first tap on, ADR 0001) and, kept through one seam (`src/data/kept.ts`, `kept.web.ts` in localStorage), the last
+  household + sessions the server showed (snapshot), the walk ended last (its summary until the server knows it) and
+  the food sheet's facts. A reopened app shows them at once, also without reception; a running walk survives a
+  reload. Signing out (or a 401) forgets everything kept but the queue, which goes out at the same person's next
+  sign-in. A refresh sends the queue independently of the household's calls and keeps what came; a late answer
+  after sign-out keeps nothing. Storage seams are `.web.ts` files held to the native file's interface by a
+  `sameAsNative` type check.
+- **Writes that need the server** (Mehr, the walk summary, an entry's detail) use a client with a 10 s timeout: no
+  reception or a proxy's 502–504 says "Keine Verbindung – bitte später nochmal.", no answer in time "Keine Antwort –
+  ob es gespeichert wurde, ist unklar. Bitte im Verlauf prüfen." (it may have arrived; trying again could save it
+  twice). A training's edit is two calls (`editEntry`, then `editTraining`): it can half-save, and saving again is
+  safe since both replace what they send.
+- **API additions:** `GET /api/walks/key/:key` (`walkByKey`, the summary right after an offline Zuhause), `GET
+  /api/entries/:id`, public `GET /api/auth/options` (`{ oidc, mail }`, instead of probing the OIDC route's error
+  codes), `entryView.during` (a walk's pee/poop counts and training success, by time on the server), and ids on the
+  summary's pee/poop marks (to open one). `/anmelden` asks `linkInfo` whether a code needs a name (and dog).
+- **Rules in the domain:** `withinWalk` decides "during a walk" (from its start, up to but not at its end) for the
+  server and the app's unsent taps alike (ADR 0002); Start lays pending food and pee/poop over `today`
+  (`layerToday`), so a tap offline shows at once; the food sheet starts from 100 g wet / 50 g dry in a household
+  without feedings; `newId` falls back to `crypto.getRandomValues` where `randomUUID` is missing (plain http);
+  trainings read the same everywhere (`trainingParts`, "Leckerli" for any number), and Mehr's stock line is
+  `stockSummary`.
+- **Service worker** (`apps/mobile/public/sw.js`): an app page comes from the kept shell at once (cache first) and
+  the shell is refetched in the background, so one bar or a captive network never holds up opening; before a shell
+  is kept, the network. A shell is kept only when it is the app's own page (no redirect, same origin, links an
+  `/_expo/` bundle), with the bundles it links; bundles no shell links go. Hashed files (`/_expo/`, `/assets/`) come
+  from the cache once kept. `/api/*`, `/l/…` and `/health` always go to the network and are never kept.
+- **Secure context:** the service worker and copying (Clipboard) work only on https or localhost. On a plain-http
+  address in the LAN the app works, but opens only with reception and its copy buttons stay away.
+- **Tests:** the app's plain modules run in Vitest (Node, `.web.ts` first, a fresh localStorage per test; the
+  service worker in a sandbox); the screens are covered by Playwright against the production build (Pixel 7,
+  `de-DE`, Europe/Berlin), each spec with its own data on the shared server, waiting on results, not on time.
+
+### Step 3 checklist (Android, from the 2b reviews)
+
+- `data/signin.ts` redeems as `deviceKind: "web"`: the Android app is a `phone`.
+- `app/anmelden.tsx`'s "Mit authentik anmelden" uses `window.location.assign`: native needs the browser and the
+  `gassi://join` return (`/api/oidc/start?app=1`).
+- `newId` needs `crypto.getRandomValues` (Hermes: a polyfill such as expo-crypto).
+- `weekLabel` and the other `de-DE` date texts need ICU with German on Hermes.
+- The native `TimeField` commits only on end editing.
+- `data/kept.ts`, the queue and the device keep only in memory on native: real storage (the food facts, the
+  snapshot and the ended walk included).
+- Android icons and the adaptive icon.
+- Native stand-ins to replace: `ui/Sheet.tsx`, `more/Curve.tsx`, `map/TrackMap.tsx`, `ui/copy.ts`.

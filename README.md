@@ -35,7 +35,8 @@ invite link you create in the app (Mehr → Haushalt) and send them; each phone,
 device, which you can sign out (Mehr → Meine Geräte). Each link's page (and a sign-in mail) also shows a short code:
 the web app installed on an iPhone's home screen doesn't share Safari's storage, so there you install first
 (Teilen → Zum Home-Bildschirm) and type the code in the installed app. On Android, Chrome offers to install it. After
-the first visit the web app opens without reception too, and taps wait until it is back.
+the first visit the web app opens without reception too, and taps wait until it is back. That needs https (or
+localhost): on a plain-http address the browser runs no service worker, so the app opens only with reception.
 
 Optional settings:
 
