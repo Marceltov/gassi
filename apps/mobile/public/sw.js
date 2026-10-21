@@ -2,7 +2,9 @@
 // - An app page (any app path, /woche too) comes from the kept app shell (index.html) at once, and the shell is taken
 //   anew in the background: one bar or a captive network never holds up opening the app. A new version shows from the
 //   next opening on. Before a shell is kept, the page comes from the network (and is kept).
-// - The shell is kept with the files it names (the hashed bundles under /_expo/); bundles of older versions go.
+// - The shell is kept with the files it names (the hashed bundles under /_expo/); bundles of older versions go. Only
+//   the app's own page counts as a shell: not one that came by a redirect or from another origin (a proxy's sign-in,
+//   a captive portal), nor one that links no bundle of the app; then the kept shell stays as it is.
 // - Hashed build files (/_expo/, /assets/) come from the cache once kept: their names change with their content.
 // - The server's own pages (/l/…, the link pages) and the API (/api/*, the OIDC routes too) always go to the network
 //   and are never kept; nor is anything from another origin.
@@ -12,14 +14,16 @@ const SHELL = "/";
 const hashed = (path) => path.startsWith("/_expo/") || path.startsWith("/assets/");
 const serverOwn = (path) => path.startsWith("/api/") || path.startsWith("/l/") || path === "/health";
 const isHtml = (res) => res.ok && (res.headers.get("content-type") ?? "").includes("text/html");
+const ownPage = (res) => isHtml(res) && !res.redirected && (!res.url || new URL(res.url).origin === self.location.origin);
 
 // Keeps `res` (the app's index.html, fetched now unless given) as the shell with the files it links, and drops the
 // bundles no longer linked.
 async function keepShell(given) {
   const res = given ?? (await fetch(SHELL, { cache: "no-store" }));
-  if (!isHtml(res)) return;
+  if (!ownPage(res)) return;
   const html = await res.clone().text();
   const linked = [...html.matchAll(/(?:src|href)="(\/_expo\/[^"]+)"/g)].map((m) => m[1]);
+  if (!linked.some((path) => path.startsWith("/_expo/static/"))) return;
   const cache = await caches.open(CACHE);
   await Promise.all(linked.map(async (path) => (await cache.match(path)) ?? cache.add(path)));
   await cache.put(SHELL, res);
