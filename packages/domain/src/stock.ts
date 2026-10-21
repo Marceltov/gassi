@@ -12,7 +12,7 @@ import type { Entry } from "./entry";
 import type { FoodKind } from "./entryTypes";
 
 export type KindStock = { grams: number | null; daysLeft: number | null; belowZero: boolean };
-/** One can size: grams left (never below 0), whole and half cans (rounded down to ½), and whether it counts below 0. */
+/** One can size: grams left (never below 0), cans (rounded down to ¼), and whether it counts below 0. */
 export type CanStock = { unitG: number; grams: number; cans: number; belowZero: boolean };
 /** `sizes`: every can size bought or counted, smallest first; `newestUnitG`: the size bought last. */
 export type WetStock = KindStock & { sizes: CanStock[]; newestUnitG: number | null };
@@ -26,8 +26,8 @@ const HALF_SLACK_G = 5;
  * can, so that many halves don't drift; anything else is its grams. */
 export const canGrams = (grams: number, unitG: number): number => (grams === Math.round(unitG / 2) ? unitG / 2 : grams);
 
-/** Whole and half cans in `grams` of cans of `unitG` grams, rounded down to ½, give or take a few grams. */
-export const cansOf = (grams: number, unitG: number): number => Math.max(0, Math.floor(((grams + HALF_SLACK_G) / unitG) * 2) / 2);
+/** Cans in `grams` of cans of `unitG` grams, rounded down to quarters (Ruling W), give or take a few grams. */
+export const cansOf = (grams: number, unitG: number): number => Math.max(0, Math.floor(((grams + HALF_SLACK_G) / unitG) * 4) / 4);
 
 const WINDOW_MS = 14 * 86_400_000;
 const DAY_MS = 86_400_000;

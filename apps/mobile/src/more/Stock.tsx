@@ -5,7 +5,7 @@
 // size added with "+ Dosengröße" ("Dosen à [ ] g"; one without grams isn't recorded), × on a row takes it away
 // (counting, a known size is then 0, which retires it); dry food one amount in g or kg. One Eintragen records it all.
 import type { DryUnit, FoodKind } from "@gassi/domain";
-import { formatCans, mergeSizes, stockParts } from "@gassi/domain";
+import { formatCans, parseDecimal, stockParts } from "@gassi/domain";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { radius, useTheme } from "../theme";
@@ -30,6 +30,9 @@ const UNITS = [
 ] as const;
 const MAX_CANS = 1000;
 
+/** A number of cans as the count field shows it: "2,75", "3". */
+const decimalText = (n: number): string => n.toLocaleString("de-DE", { maximumFractionDigits: 2, useGrouping: false });
+
 /** A whole number of grams per can typed in, else null. */
 const typedSize = (v: string): number | null => (/^\d{1,5}$/.test(v.trim()) && Number(v) > 0 ? Number(v) : null);
 
@@ -43,23 +46,24 @@ export function Stock() {
   const [amount, setAmount] = useState("");
   const [unit, setUnit] = useState<DryUnit>("kg"); // dry food: sacks in kg, the rest of one maybe in g
   // wet food: one row per known can size, and one per size typed in ("+ Dosengröße"); bought counts start at 0 in
-  // whole cans, counted ones at what the stock says, in halves
+  // whole cans, counted ones at what the stock says and can be typed freely ("2,75"; the domain checks them); − and +
+  // step by a whole can
   const known = stock?.wet.sizes.map((s) => s.unitG) ?? [];
   const [extras, setExtras] = useState<string[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [counts, setCounts] = useState<Record<string, string>>({});
   // rows taken away with ×: counting, a known size is then 0 (and retired); buying, it is only left out of this form
   const [removed, setRemoved] = useState<string[]>([]);
-  const step = mode === "restock" ? 1 : 0.5;
   const rows = [
     ...known.map((u) => ({ key: `k${u}`, unitG: u as number | null, extra: null as number | null })),
     ...extras.map((text, i) => ({ key: `x${i}`, unitG: typedSize(text), extra: i })),
   ];
   // only a known size's row starts at the stock: a new row (even of a known size) starts at 0, so it adds what is typed
-  const countOf = (key: string, unitG: number | null) => counts[key] ?? (mode === "count" && unitG && key.startsWith("k") ? (stock?.wet.sizes.find((s) => s.unitG === unitG)?.cans ?? 0) : 0);
+  const textOf = (key: string, unitG: number | null) => counts[key] ?? decimalText(mode === "count" && unitG && key.startsWith("k") ? (stock?.wet.sizes.find((s) => s.unitG === unitG)?.cans ?? 0) : 0);
+  const countOf = (key: string, unitG: number | null) => parseDecimal(textOf(key, unitG)) || 0;
   const gone = (key: string) => removed.includes(key);
   const shown = rows.filter((r) => !gone(r.key));
-  const sized = rows.flatMap((r) => (!r.unitG || (gone(r.key) && r.extra !== null) ? [] : [{ unitG: r.unitG, cans: gone(r.key) ? 0 : countOf(r.key, r.unitG) }]));
-  const sizes = mergeSizes(sized); // a new row typed with a known size adds to that size
+  // what Eintragen sends: bought whole cans, counted ones as typed; a size in two rows adds up (the domain does that)
+  const sizes = rows.flatMap((r) => (!r.unitG || (gone(r.key) && r.extra !== null) ? [] : [{ unitG: r.unitG, cans: gone(r.key) ? "0" : textOf(r.key, r.unitG) }]));
 
   // a message is about what was entered, and the rows are for one mode: both go when the form changes
   const reset = () => {
@@ -78,13 +82,13 @@ export function Stock() {
     reset();
   };
 
-  const ready = kind === "dry" ? !!amount.trim() : mode === "restock" ? sizes.some((s) => s.cans > 0) : sizes.length > 0;
+  const ready = kind === "dry" ? !!amount.trim() : mode === "restock" ? sizes.some((s) => parseDecimal(s.cans) > 0) : sizes.length > 0;
   const save = () =>
     void run(async (api) => {
       if (kind === "dry") {
         if (mode === "restock") await api.restock({ foodKind: "dry", amount, unit });
         else await api.correctStock({ foodKind: "dry", amount, unit });
-      } else if (mode === "restock") await api.restock({ foodKind: "wet", sizes });
+      } else if (mode === "restock") await api.restock({ foodKind: "wet", sizes: sizes.map((s) => ({ unitG: s.unitG, cans: parseDecimal(s.cans) || 0 })) });
       else await api.correctStock({ foodKind: "wet", sizes });
       setAmount("");
       setCounts({});
@@ -124,8 +128,8 @@ export function Stock() {
       {shown.map((r) => {
         const n = countOf(r.key, r.unitG);
         const name = r.unitG ? `à ${r.unitG} g` : "neuer Größe";
-        const change = (d: number) => setCounts({ ...counts, [r.key]: Math.min(MAX_CANS, Math.max(0, n + d)) });
-        const what = step === 1 ? "1 Dose" : "½ Dose";
+        const change = (d: number) => setCounts({ ...counts, [r.key]: decimalText(Math.min(MAX_CANS, Math.max(0, n + d))) });
+        const what = "1 Dose";
         return (
           <View key={r.key} testID={r.unitG ? `count-${r.unitG}` : "count-new"} style={[styles.row, { backgroundColor: theme.surface }]}>
             {r.extra === null ? (
@@ -147,11 +151,24 @@ export function Stock() {
                 <Text style={[styles.labelText, { color: theme.muted }]}>g</Text>
               </View>
             )}
-            <StepButton small label={`${what} ${name} weniger`} sign="−" disabled={n <= 0} onPress={() => change(-step)} />
-            <Text testID={r.unitG ? `count-${r.unitG}-value` : undefined} style={[styles.rowValue, { color: theme.ink }]}>
-              {formatCans(n)}
-            </Text>
-            <StepButton small label={`${what} ${name} mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => change(step)} />
+            <StepButton small label={`${what} ${name} weniger`} sign="−" disabled={n <= 0} onPress={() => change(-1)} />
+            {mode === "count" ? (
+              <TextInput
+                testID={r.unitG ? `count-${r.unitG}-value` : undefined}
+                accessibilityLabel={`Anzahl Dosen ${name}`}
+                value={textOf(r.key, r.unitG)}
+                onChangeText={(v) => setCounts({ ...counts, [r.key]: v })}
+                inputMode="decimal"
+                keyboardType="decimal-pad"
+                selectTextOnFocus
+                style={[styles.rowValue, styles.countInput, { color: theme.ink, borderColor: theme.line, backgroundColor: theme.background }]}
+              />
+            ) : (
+              <Text testID={r.unitG ? `count-${r.unitG}-value` : undefined} style={[styles.rowValue, { color: theme.ink }]}>
+                {formatCans(n)}
+              </Text>
+            )}
+            <StepButton small label={`${what} ${name} mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => change(1)} />
             <Pressable accessibilityRole="button" accessibilityLabel="Dosengröße entfernen" hitSlop={8} onPress={() => setRemoved([...removed, r.key])} style={({ pressed }) => [styles.remove, { opacity: pressed ? 0.6 : 1 }]}>
               <Text style={[styles.removeText, { color: theme.muted }]}>×</Text>
             </Pressable>
@@ -218,5 +235,6 @@ const styles = StyleSheet.create({
   removeText: { fontSize: 20, fontWeight: "700" },
   gramInput: { width: 64, borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 6, fontSize: 15, fontWeight: "600" },
   rowValue: { minWidth: 76, textAlign: "center", fontSize: 16, fontWeight: "700" },
+  countInput: { width: 76, borderRadius: 8, borderWidth: 1, paddingVertical: 6 },
   message: { fontSize: 15, fontWeight: "600" },
 });

@@ -54,9 +54,11 @@ describe("computeStock", () => {
     expect(wetOf(s)).toEqual([[400, 3], [800, 1.5]]);
   });
 
-  test("cans are rounded down to halves, per size", () => {
+  test("cans are rounded down to quarters, per size", () => {
     expect(wetOf(stock([restockWet(day(3), 2, 400), feed(day(1), "wet", 150)]))).toEqual([[400, 1.5]]);
-    expect(wetOf(stock([restockWet(day(3), 2, 400), feed(day(1), "wet", 250)]))).toEqual([[400, 1]]);
+    expect(wetOf(stock([restockWet(day(3), 2, 400), feed(day(1), "wet", 250)]))).toEqual([[400, 1.25]]);
+    expect(wetOf(stock([restockWet(day(3), 2, 400), feed(day(1), "wet", 350)]))).toEqual([[400, 1]]);
+    expect(wetOf(stock([check(day(2), 400, 2.75)]))).toEqual([[400, 2.75]]); // a count typed as 2,75
   });
 
   test("half cans of any size: a few grams lost to rounding a half don't take the half away", () => {
@@ -64,7 +66,8 @@ describe("computeStock", () => {
     expect(wetOf(stock([restockWet(day(3), 2, 395), feedCan(day(1), 198, 395)]))).toEqual([[395, 1.5]]);
     expect(wetOf(stock([restockWet(day(3), 2, 425), feedCan(day(2), 213, 425), feedCan(day(1), 213, 425)]))).toEqual([[425, 1]]);
     expect(wetOf(stock([restockWet(day(3), 4, 395), ...[1, 2, 3, 4, 5].map((d) => feedCan(day(d * 0.1), 198, 395))]))).toEqual([[395, 1.5]]);
-    expect(cansOf(190, 395)).toBe(0); // well short of a half is no half
+    expect(cansOf(90, 395)).toBe(0); // well short of a quarter is none
+    expect(cansOf(190, 395)).toBe(0.25);
     expect(cansOf(395 * 2, 395)).toBe(2);
   });
 
@@ -95,7 +98,7 @@ describe("computeStock", () => {
   test("a wet count works without any purchase, and a new size starts there", () => {
     const at = day(2);
     const s = stock([check(at, 400, 2.5), check(at, 800, 1), feedCan(day(1), 200, 800)]);
-    expect(wetOf(s)).toEqual([[400, 2.5], [800, 0.5]]);
+    expect(wetOf(s)).toEqual([[400, 2.5], [800, 0.75]]);
     expect(s.wet).toMatchObject({ grams: 1000 + 600, newestUnitG: null });
   });
 
@@ -146,6 +149,8 @@ test("formatCans", () => {
   expect(formatCans(11.5)).toBe("11½ Dosen");
   expect(formatCans(1)).toBe("1 Dose");
   expect(formatCans(0.5)).toBe("½ Dose");
+  expect(formatCans(2.75)).toBe("2¾ Dosen");
+  expect(formatCans(0.25)).toBe("¼ Dose");
   expect(formatCans(0)).toBe("0 Dosen");
 });
 test("formatWeight", () => {

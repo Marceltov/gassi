@@ -4,16 +4,18 @@ import { FOOD_KINDS, FOOD_SHORT, type FoodKind } from "./entryTypes";
 import { type CanStock, cansOf, type Stock } from "./stock";
 import { utcToLocal } from "./time";
 
-/** "11½", "½", "0": whole and half cans. */
+const QUARTERS = ["", "¼", "½", "¾"];
+/** "11½", "2¾", "¼", "0": whole cans and quarters (the stock rounds down to quarters). */
 const halves = (cans: number): string => {
   const whole = Math.floor(cans);
-  return `${whole === 0 && cans % 1 ? "" : whole}${cans % 1 ? "½" : ""}`;
+  const part = QUARTERS[Math.round((cans - whole) * 4)] ?? "";
+  return `${whole === 0 && part ? "" : whole}${part}`;
 };
 
-/** "11½ Dosen", "1 Dose", "½ Dose". */
+/** "11½ Dosen", "2¾ Dosen", "1 Dose", "½ Dose". */
 export const formatCans = (cans: number): string => `${halves(cans)} ${cans > 0 && cans <= 1 ? "Dose" : "Dosen"}`;
 
-/** One can size's count: "3 × 400 g", "2½ × 800 g". */
+/** One can size's count: "3 × 400 g", "2¾ × 800 g". */
 export const formatCanCount = (s: Pick<CanStock, "unitG" | "cans">): string => `${halves(s.cans)} × ${s.unitG} g`;
 
 /** "4,4 kg" from 1 kg on, else "800 g". */

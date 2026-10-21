@@ -2,6 +2,7 @@
 // field, and how a failed check becomes that message. The server, the client and the use cases share them, so an
 // input is checked one way everywhere and says what is wrong in the same words.
 import { z } from "zod";
+import { mergeSizes } from "./food";
 
 /** Field name → message; "" is the fallback. */
 export type FieldMessages = Record<string, string>;
@@ -37,39 +38,36 @@ const dryAmount = (min: number) =>
     .transform((r) => ({ foodKind: r.foodKind, grams: r.amount === undefined ? r.grams : Math.round(r.unit === "kg" ? r.amount * 1000 : r.amount) }))
     .pipe(z.object({ foodKind: z.literal("dry"), grams: z.number().int().min(min).max(1_000_000) }));
 
-/** No can size twice. */
-const onceEach = (sizes: readonly { unitG: number }[]) => new Set(sizes.map((s) => s.unitG)).size === sizes.length;
-
-/** Bought food: wet as whole cans per can size (one restock each; sizes bought none of are left out), dry in g or kg. */
+/** Bought food: wet as whole cans per can size (one restock each; sizes bought none of are left out; a size in two
+ * rows adds up), dry in g or kg. */
 export const restockInput = z.discriminatedUnion("foodKind", [
   z
     .object({ foodKind: z.literal("wet"), sizes: z.array(z.object({ unitG: canSize, cans: z.coerce.number().int().min(0).max(1000) })).min(1).max(20) })
-    .refine((r) => onceEach(r.sizes), { path: ["unitG"], message: "twice" })
-    .transform((r) => ({ ...r, sizes: r.sizes.filter((s) => s.cans > 0) }))
+    .transform((r) => ({ ...r, sizes: mergeSizes(r.sizes).filter((s) => s.cans > 0) }))
     .refine((r) => r.sizes.length > 0, { path: ["sizes"], message: "none" }),
   dryAmount(1),
 ]);
 export const RESTOCK_MESSAGES: FieldMessages = {
   foodKind: "Diese Futterart gibt es nicht.",
   sizes: "Wie viele Dosen welcher Größe hast du gekauft?",
-  unitG: "Jede Dosengröße nur einmal.",
+  unitG: "Welche Dosengröße? Ganze Gramm, bis 10000.",
   amount: "Wie viel hast du gekauft?",
   grams: "Wie viel hast du gekauft?",
   unit: "Gramm oder Kilogramm?",
 };
 
-/** What is there now, counted by hand: wet in cans per can size ("2,5" or 2.5 for an opened can; every size at once,
- * a size left out is 0), dry in g or kg. */
+/** What is there now, counted by hand: wet in cans per can size, any number typed ("2,75" or 2.75 for opened cans;
+ * every size at once, a size left out is 0; a size in two rows adds up), dry in g or kg. */
 export const stockCountInput = z.discriminatedUnion("foodKind", [
   z
     .object({ foodKind: z.literal("wet"), sizes: z.array(z.object({ unitG: canSize, cans: z.preprocess(decimal, z.number().min(0).max(1000)) })).min(1).max(20) })
-    .refine((r) => onceEach(r.sizes), { path: ["unitG"], message: "twice" }),
+    .transform((r) => ({ ...r, sizes: mergeSizes(r.sizes) })),
   dryAmount(0),
 ]);
 export const STOCK_COUNT_MESSAGES: FieldMessages = {
   foodKind: "Diese Futterart gibt es nicht.",
-  sizes: "Wie viele Dosen jeder Größe sind noch da?",
-  unitG: "Jede Dosengröße nur einmal.",
+  sizes: "Wie viele Dosen sind noch da? Eine Zahl, z. B. 2,75.",
+  unitG: "Welche Dosengröße? Ganze Gramm, bis 10000.",
   amount: "Wie viel ist noch da?",
   grams: "Wie viel ist noch da?",
   unit: "Gramm oder Kilogramm?",

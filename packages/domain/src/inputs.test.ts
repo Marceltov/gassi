@@ -6,13 +6,14 @@ const message = (schema: typeof restockInput | typeof stockCountInput, messages:
   return r.success ? null : messageFor(messages, r.error);
 };
 
-test("a wet count gives the cans per size, with a decimal comma for an opened can", () => {
-  expect(stockCountInput.parse({ foodKind: "wet", sizes: [{ unitG: 400, cans: "2,5" }, { unitG: "800", cans: 0 }] })).toEqual({ foodKind: "wet", sizes: [{ unitG: 400, cans: 2.5 }, { unitG: 800, cans: 0 }] });
+test("a wet count gives the cans per size, typed freely with a decimal comma", () => {
+  expect(stockCountInput.parse({ foodKind: "wet", sizes: [{ unitG: 400, cans: "2,75" }, { unitG: "800", cans: 0 }, { unitG: 200, cans: " 11 " }] })).toEqual({ foodKind: "wet", sizes: [{ unitG: 400, cans: 2.75 }, { unitG: 800, cans: 0 }, { unitG: 200, cans: 11 }] });
   expect(weightInput.parse({ kg: "12,4" }).kg).toBe(12.4);
-  expect(message(stockCountInput, STOCK_COUNT_MESSAGES, { foodKind: "wet", sizes: [{ unitG: 400, cans: "zwei" }] })).toBe("Wie viele Dosen jeder Größe sind noch da?");
-  expect(message(stockCountInput, STOCK_COUNT_MESSAGES, { foodKind: "wet", sizes: [{ unitG: 400, cans: "" }] })).toBe("Wie viele Dosen jeder Größe sind noch da?");
-  expect(message(stockCountInput, STOCK_COUNT_MESSAGES, { foodKind: "wet", sizes: [] })).toBe("Wie viele Dosen jeder Größe sind noch da?");
-  expect(message(stockCountInput, STOCK_COUNT_MESSAGES, { foodKind: "wet", sizes: [{ unitG: 400, cans: 1 }, { unitG: 400, cans: 2 }] })).toBe("Jede Dosengröße nur einmal.");
+  const COUNT = "Wie viele Dosen sind noch da? Eine Zahl, z. B. 2,75.";
+  for (const cans of ["zwei", "", "-1", "1001"]) expect(message(stockCountInput, STOCK_COUNT_MESSAGES, { foodKind: "wet", sizes: [{ unitG: 400, cans }] }), cans).toBe(COUNT);
+  expect(message(stockCountInput, STOCK_COUNT_MESSAGES, { foodKind: "wet", sizes: [] })).toBe(COUNT);
+  // a size in two rows (a new row typed with a known size) adds up
+  expect(stockCountInput.parse({ foodKind: "wet", sizes: [{ unitG: 400, cans: "1,5" }, { unitG: 800, cans: 1 }, { unitG: 400, cans: 2 }] })).toEqual({ foodKind: "wet", sizes: [{ unitG: 400, cans: 3.5 }, { unitG: 800, cans: 1 }] });
 });
 
 test("dry food is entered in g or kg (with a decimal comma) and comes out in whole grams", () => {
@@ -32,7 +33,7 @@ test("what a check gives back passes the check again (the client sends it so)", 
     const once = restockInput.parse(input);
     expect(restockInput.parse(once)).toEqual(once);
   }
-  for (const input of [{ foodKind: "dry", amount: "250", unit: "g" }, { foodKind: "wet", sizes: [{ unitG: 400, cans: "2,5" }] }]) {
+  for (const input of [{ foodKind: "dry", amount: "250", unit: "g" }, { foodKind: "wet", sizes: [{ unitG: 400, cans: "2,75" }] }]) {
     const once = stockCountInput.parse(input);
     expect(stockCountInput.parse(once)).toEqual(once);
   }
@@ -42,5 +43,5 @@ test("a wet restock is whole cans per size; sizes bought none of are left out", 
   expect(restockInput.parse({ foodKind: "wet", sizes: [{ unitG: "400", cans: "6" }, { unitG: 800, cans: 0 }] })).toEqual({ foodKind: "wet", sizes: [{ unitG: 400, cans: 6 }] });
   expect(message(restockInput, RESTOCK_MESSAGES, { foodKind: "wet", sizes: [{ unitG: 400, cans: 0 }] })).toBe("Wie viele Dosen welcher Größe hast du gekauft?");
   expect(message(restockInput, RESTOCK_MESSAGES, { foodKind: "wet", sizes: [{ unitG: 400, cans: 1.5 }] })).toBe("Wie viele Dosen welcher Größe hast du gekauft?");
-  expect(message(restockInput, RESTOCK_MESSAGES, { foodKind: "wet", sizes: [{ unitG: 400, cans: 1 }, { unitG: 400, cans: 2 }] })).toBe("Jede Dosengröße nur einmal.");
+  expect(restockInput.parse({ foodKind: "wet", sizes: [{ unitG: 400, cans: 1 }, { unitG: 400, cans: 2 }] })).toEqual({ foodKind: "wet", sizes: [{ unitG: 400, cans: 3 }] }); // one size twice adds up
 });

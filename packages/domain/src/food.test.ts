@@ -32,6 +32,8 @@ test("a can size's count: whole and half cans × grams", () => {
   expect(formatCanCount(can(400, 3))).toBe("3 × 400 g");
   expect(formatCanCount(can(800, 2.5))).toBe("2½ × 800 g");
   expect(formatCanCount(can(400, 0.5))).toBe("½ × 400 g");
+  expect(formatCanCount(can(400, 2.75))).toBe("2¾ × 400 g");
+  expect(formatCanCount(can(400, 1.25))).toBe("1¼ × 400 g");
 });
 
 test("the stock line says what is left per can size and for how long", () => {
