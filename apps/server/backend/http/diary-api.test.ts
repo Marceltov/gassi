@@ -135,7 +135,7 @@ describe("the server checks inputs with the same schemas and messages", () => {
     const token = await tokenFor(HIRSCH.id);
     expect(await json("/api/entries", { method: "POST", token, body: { type: "food", foodKind: "wet", amountG: -1 } })).toEqual({ status: 400, body: { error: "Die Menge muss eine ganze Zahl Gramm sein." } });
     expect(await json("/api/entries", { method: "POST", token, body: { type: "bark" } })).toEqual({ status: 400, body: { error: "Diese Art von Eintrag gibt es nicht." } });
-    expect(await json("/api/stock/restock", { method: "POST", token, body: { foodKind: "dry" } })).toEqual({ status: 400, body: { error: "Wie viel Gramm hast du gekauft?" } });
+    expect(await json("/api/stock/restock", { method: "POST", token, body: { foodKind: "dry" } })).toEqual({ status: 400, body: { error: "Wie viel hast du gekauft?" } });
   });
 });
 

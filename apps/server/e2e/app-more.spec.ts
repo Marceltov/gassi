@@ -95,6 +95,32 @@ test("Vorrat: a wet count sets every can size at once, a new size typed in witho
   await expect(page.getByTestId("stock-message")).toBeHidden();
 });
 
+test("Vorrat: dry food bought in kg with a decimal comma, counted in g", async ({ page }) => {
+  const token = await signIn(page);
+  const client = createClient({ baseUrl: BASE_URL, token });
+  await page.goto("/mehr/vorrat");
+  await page.getByRole("tab", { name: "Trocken" }).click();
+  await page.getByRole("tab", { name: "Eingekauft" }).click();
+  await page.getByRole("tab", { name: "kg", exact: true }).click();
+  await page.getByLabel("Menge").fill("1,5");
+  const bought = page.waitForResponse((r) => r.url().endsWith("/api/stock/restock") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Eintragen" }).click();
+  const { id } = (await (await bought).json()) as { id: number };
+  made.push(id);
+  expect(await client.entry({ id })).toMatchObject({ foodKind: "dry", amountG: 1500 });
+  await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
+
+  await page.getByRole("tab", { name: "Nachgezählt" }).click();
+  await page.getByRole("tab", { name: "g", exact: true }).click();
+  await page.getByLabel("Menge").fill("750");
+  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Eintragen" }).click();
+  const { entries } = (await (await counted).json()) as { entries: { id: number; amountG: number }[] };
+  made.push(...entries.map((e) => e.id));
+  expect(entries.map((e) => e.amountG)).toEqual([750]);
+  await expect(page.getByTestId("stock-dry")).toContainText("750 g");
+});
+
 test("Haushalt: an invite shows its link, its code and when it ends; Zurückziehen takes it back", async ({ page }) => {
   await signIn(page);
   await page.goto("/mehr/haushalt");

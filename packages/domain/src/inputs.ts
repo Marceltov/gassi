@@ -20,31 +20,52 @@ const instant = z.iso.datetime({ offset: true }).transform((v) => new Date(v).to
 /** Grams per can: a whole number from 1 to 10000. */
 const canSize = z.coerce.number().int().min(1).max(10_000);
 
-/** Bought food: wet as cans × grams per can, dry in grams. */
+/** The units dry food is entered in. */
+export const DRY_UNITS = ["g", "kg"] as const;
+export type DryUnit = (typeof DRY_UNITS)[number];
+
+/** Dry food as typed: an amount ("1,5" or 1.5) in g or kg (g when left out), checked and kept as whole grams from
+ * `min` to 1000 kg. What it gives back ({ grams }) passes it again: the client sends its checked input on. */
+const dryAmount = (min: number) =>
+  z
+    .object({
+      foodKind: z.literal("dry"),
+      amount: z.preprocess(decimal, z.number().min(0).max(1_000_000)).optional(),
+      unit: z.enum(DRY_UNITS).default("g"),
+      grams: z.number().optional(),
+    })
+    .transform((r) => ({ foodKind: r.foodKind, grams: r.amount === undefined ? r.grams : Math.round(r.unit === "kg" ? r.amount * 1000 : r.amount) }))
+    .pipe(z.object({ foodKind: z.literal("dry"), grams: z.number().int().min(min).max(1_000_000) }));
+
+/** Bought food: wet as cans × grams per can, dry in g or kg. */
 export const restockInput = z.discriminatedUnion("foodKind", [
   z.object({ foodKind: z.literal("wet"), cans: z.coerce.number().int().min(1).max(1000), unitG: canSize }),
-  z.object({ foodKind: z.literal("dry"), grams: z.coerce.number().int().min(1).max(1_000_000) }),
+  dryAmount(1),
 ]);
 export const RESTOCK_MESSAGES: FieldMessages = {
   foodKind: "Diese Futterart gibt es nicht.",
   cans: "Wie viele Dosen, und wie viel Gramm hat eine Dose?",
   unitG: "Wie viele Dosen, und wie viel Gramm hat eine Dose?",
-  grams: "Wie viel Gramm hast du gekauft?",
+  amount: "Wie viel hast du gekauft?",
+  grams: "Wie viel hast du gekauft?",
+  unit: "Gramm oder Kilogramm?",
 };
 
 /** What is there now, counted by hand: wet in cans per can size ("2,5" or 2.5 for an opened can; every size at once,
- * a size left out is 0), dry in grams. */
+ * a size left out is 0), dry in g or kg. */
 export const stockCountInput = z.discriminatedUnion("foodKind", [
   z
     .object({ foodKind: z.literal("wet"), sizes: z.array(z.object({ unitG: canSize, cans: z.preprocess(decimal, z.number().min(0).max(1000)) })).min(1).max(20) })
     .refine((r) => new Set(r.sizes.map((s) => s.unitG)).size === r.sizes.length, { path: ["unitG"], message: "twice" }),
-  z.object({ foodKind: z.literal("dry"), grams: z.coerce.number().int().min(0).max(1_000_000) }),
+  dryAmount(0),
 ]);
 export const STOCK_COUNT_MESSAGES: FieldMessages = {
   foodKind: "Diese Futterart gibt es nicht.",
   sizes: "Wie viele Dosen jeder Größe sind noch da?",
   unitG: "Jede Dosengröße nur einmal.",
-  grams: "Wie viel Gramm sind noch da?",
+  amount: "Wie viel ist noch da?",
+  grams: "Wie viel ist noch da?",
+  unit: "Gramm oder Kilogramm?",
 };
 
 /** A dog's weight in kg ("12,4" or 12.4), when (default now) and for which dog. */

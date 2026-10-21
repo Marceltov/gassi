@@ -84,11 +84,12 @@ describe("food and stock", () => {
     expect(await d.lastFoodAmounts()).toEqual({ wet: 180, dry: 80, wetUnitG: 800 });
   });
 
-  test("restocks: cans × grams per can for wet food, grams for dry food", async () => {
+  test("restocks: cans × grams per can for wet food, g or kg for dry food", async () => {
     clock = new Date("2026-10-20T10:00:00Z");
     const d = diary();
     expect(await d.restock(HIRSCH, { foodKind: "wet", cans: 12, unitG: 400 })).toMatchObject({ type: "restock", foodKind: "wet", amountG: 4800, unitG: 400, at: clock.toISOString() });
-    expect(await d.restock(HIRSCH, { foodKind: "dry", grams: 10_000 })).toMatchObject({ type: "restock", foodKind: "dry", amountG: 10_000, unitG: null });
+    expect(await d.restock(HIRSCH, { foodKind: "dry", amount: "7,5", unit: "kg" })).toMatchObject({ type: "restock", foodKind: "dry", amountG: 7500, unitG: null });
+    expect(await d.restock(HIRSCH, { foodKind: "dry", amount: 2500, unit: "g" })).toMatchObject({ amountG: 2500 });
     await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 200, at: "2026-10-20T10:30:00Z" });
     clock = new Date("2026-10-20T11:00:00Z");
     expect((await d.stock()).wet).toMatchObject({ grams: 4600, sizes: [{ unitG: 400, cans: 11.5 }] });
@@ -96,11 +97,11 @@ describe("food and stock", () => {
 
   test("a restock needs cans and can size, or grams", async () => {
     await expect(diary().restock(HIRSCH, { foodKind: "wet", cans: 12 })).rejects.toThrow(new InputError("Wie viele Dosen, und wie viel Gramm hat eine Dose?"));
-    await expect(diary().restock(HIRSCH, { foodKind: "dry", grams: 0 })).rejects.toThrow(new InputError("Wie viel Gramm hast du gekauft?"));
+    await expect(diary().restock(HIRSCH, { foodKind: "dry", amount: 0, unit: "kg" })).rejects.toThrow(new InputError("Wie viel hast du gekauft?"));
     await expect(diary().restock(HIRSCH, { foodKind: "canned", grams: 10 })).rejects.toThrow(InputError);
   });
 
-  test("correcting the stock: wet in cans per size (every size at once, no purchase needed), dry in grams", async () => {
+  test("correcting the stock: wet in cans per size (every size at once, no purchase needed), dry in g or kg", async () => {
     clock = new Date("2026-10-20T10:00:00Z");
     const d = diary();
     const first = await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: "2,5" }] });
@@ -109,7 +110,7 @@ describe("food and stock", () => {
     clock = new Date("2026-10-20T10:05:00Z");
     const both = await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: 5 }, { unitG: 800, cans: 1 }] });
     expect(both.entries.map((e) => [e.amountG, e.unitG, e.at])).toEqual([[2000, 400, clock.toISOString()], [800, 800, clock.toISOString()]]);
-    expect((await d.correctStock(HIRSCH, { foodKind: "dry", grams: 0 })).entries).toMatchObject([{ type: "stockcheck", foodKind: "dry", amountG: 0, unitG: null }]);
+    expect((await d.correctStock(HIRSCH, { foodKind: "dry", amount: "0", unit: "kg" })).entries).toMatchObject([{ type: "stockcheck", foodKind: "dry", amountG: 0, unitG: null }]);
     clock = new Date("2026-10-20T10:10:00Z");
     const stock = await d.stock();
     expect(stock.wet.sizes.map((s) => [s.unitG, s.cans])).toEqual([[400, 5], [800, 1]]);

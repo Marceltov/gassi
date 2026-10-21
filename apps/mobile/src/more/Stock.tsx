@@ -1,8 +1,8 @@
 // Vorrat: what is left of the wet food (per can size, with the total) and of the dry food, and how long it lasts
 // (from the server, worked out by the domain) on top; at the bottom what was bought (Eingekauft: a can size and how
-// many, or grams) or what is there when counted by hand (Nachgezählt: every can size at once, in halves for an opened
-// can, or grams), then Eintragen.
-import type { FoodKind } from "@gassi/domain";
+// many, or dry food in g or kg) or what is there when counted by hand (Nachgezählt: every can size at once, in halves
+// for an opened can, or dry food in g or kg), then Eintragen.
+import type { DryUnit, FoodKind } from "@gassi/domain";
 import { formatCans, stockParts } from "@gassi/domain";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -23,6 +23,10 @@ const MODES = [
   { value: "restock", label: "Eingekauft" },
   { value: "count", label: "Nachgezählt" },
 ] as const;
+const UNITS = [
+  { value: "kg", label: "kg" },
+  { value: "g", label: "g" },
+] as const;
 const OTHER = "other";
 const MAX_CANS = 1000;
 
@@ -37,6 +41,7 @@ export function Stock() {
   const [kind, setKind] = useState<FoodKind>("wet");
   const [mode, setMode] = useState<Mode>("restock");
   const [amount, setAmount] = useState("");
+  const [unit, setUnit] = useState<DryUnit>("kg"); // dry food: sacks in kg, the rest of one maybe in g
   // the can size: one of the known ones (the last bought to start with) or another one typed in
   const known = stock?.wet.sizes.map((s) => s.unitG) ?? [];
   const [size, setSize] = useState<number | typeof OTHER | null>(null);
@@ -63,8 +68,8 @@ export function Stock() {
   const save = () =>
     void run(async (api) => {
       if (kind === "dry") {
-        if (mode === "restock") await api.restock({ foodKind: "dry", grams: amount });
-        else await api.correctStock({ foodKind: "dry", grams: amount });
+        if (mode === "restock") await api.restock({ foodKind: "dry", amount, unit });
+        else await api.correctStock({ foodKind: "dry", amount, unit });
       } else if (mode === "restock") await api.restock({ foodKind: "wet", cans: amount, unitG: restockUnit ?? 0 });
       else await api.correctStock({ foodKind: "wet", sizes: rows.map((unitG) => ({ unitG, cans: countOf(unitG) })) });
       setAmount("");
@@ -166,7 +171,10 @@ export function Stock() {
             wet
           ) : (
             <View style={styles.fields}>
-              <Field label="Gramm" value={amount} onChangeText={setAmount} inputMode="numeric" keyboardType="number-pad" />
+              <Field label="Menge" value={amount} onChangeText={setAmount} inputMode="decimal" keyboardType="decimal-pad" />
+              <View style={styles.unit}>
+                <Segments options={UNITS} value={unit} onChange={setUnit} />
+              </View>
             </View>
           )}
           <BigButton kind="food" size="l" label="Eintragen" disabled={!ready} onPress={save} />
@@ -184,7 +192,8 @@ const styles = StyleSheet.create({
   card: { flex: 1, borderRadius: radius.tile, padding: 12, gap: 2 },
   big: { fontSize: 22, fontWeight: "700" },
   small: { fontSize: 13 },
-  fields: { flexDirection: "row", gap: 8 },
+  fields: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  unit: { width: 120 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   row: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: radius.tile, paddingVertical: 6, paddingHorizontal: 12 },
   rowLabel: { flex: 1, fontSize: 14, fontWeight: "600" },
