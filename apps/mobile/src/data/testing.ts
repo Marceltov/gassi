@@ -28,7 +28,8 @@ export function fakeServer(handlers: Record<string, Handler>) {
   return server;
 }
 
-const hirsch = { id: "p-hirsch", name: "Hirsch" };
+export const HIRSCH = { id: "p-hirsch", name: "Hirsch" };
+const hirsch = HIRSCH;
 
 /** A household as the API shows it to Hirsch's phone: Toffee, no walk running, commands applied as they come. */
 export function household() {

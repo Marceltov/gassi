@@ -1,8 +1,9 @@
 // The typed client as the app uses it. Every call through it tells whether it reached the server (for `online`),
 // turns "no reception" into the German message the screens show, and a 401 signs this device out (the device was
-// removed or its token is gone), which brings up the sign-in.
+// removed or its token is gone) and forgets what it showed, which brings up the sign-in.
 import { ApiError, type Client, createClient } from "@gassi/api-client";
 import { clearDevice, type Device, loadDevice } from "./device";
+import { clearSnapshot } from "./snapshot";
 
 /** The server: empty on the web, where the server serves the app (same origin); set for development. */
 export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
@@ -38,7 +39,10 @@ function wrap(fetchFn: typeof fetch, onReached: (reached: boolean) => void, onAn
 export function apiFor(device: Device, { fetch: fetchFn = (...a) => fetch(...a), onReached = () => {} }: Options = {}): Client {
   const signOutOn401 = (res: Response) => {
     // only if this device is still the signed-in one: another tab may have signed in anew meanwhile
-    if (res.status === 401 && loadDevice()?.token === device.token) clearDevice();
+    if (res.status === 401 && loadDevice()?.token === device.token) {
+      clearSnapshot();
+      clearDevice();
+    }
   };
   return createClient({ baseUrl: device.serverUrl, token: device.token, fetch: wrap(fetchFn, onReached, signOutOn401) });
 }

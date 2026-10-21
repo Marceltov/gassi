@@ -1,12 +1,15 @@
 // What the screens read and how their taps go out, for one signed-in device, without React (GassiProvider wraps it).
 // The household (me, people, dogs, exercises, treat kinds) and the running walk and training come from the server;
 // taps go through @gassi/domain's command queue (kept per person) and show at once through its projection, with or
-// without reception.
+// without reception. What the server showed last is kept (snapshot.ts), so a reopened app shows the household and a
+// running walk at once, before or without an answer.
 import { ApiError, type Client, type Output } from "@gassi/api-client";
-import { type Command, type CommandQueue, createCommandQueue, type Person, project, RejectedCommands, type SessionsView } from "@gassi/domain";
+import { type Command, createCommandQueue, type Person, project, RejectedCommands, type SessionsView } from "@gassi/domain";
 import { apiFor } from "./api";
 import type { Device } from "./device";
+import { onReconnect } from "./network";
 import { onQueueChanged, queueStorage } from "./queue";
+import { loadSnapshot, saveSnapshot } from "./snapshot";
 
 export type Household = Output<"me">["household"];
 export type Dog = Output<"dogs">["dogs"][number];
@@ -14,7 +17,7 @@ export type Exercise = Output<"exercises">["exercises"][number];
 export type TreatKind = Output<"treatKinds">["treatKinds"][number];
 
 export type GassiState = {
-  /** null until the first answer from the server */
+  /** who signed in (null only while signed out) */
   me: Person | null;
   household: Household | null;
   people: Person[];
@@ -36,9 +39,11 @@ export type GassiStore = {
   send(cmd: Command): void;
   /** Sends what is queued, then reloads the household and the sessions. */
   refresh(): Promise<void>;
-  /** Listens to other tabs' taps while started; returns the stop. */
+  /** Listens to other tabs' taps and to reception coming back; returns the stop. */
   start(): () => void;
 };
+
+type Known = Omit<GassiState, "view" | "unsent" | "online" | "me"> & { me: Person };
 
 const NOTHING_RUNS: SessionsView = { walk: null, training: null };
 
@@ -54,23 +59,23 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
     },
   });
 
-  let household: Omit<GassiState, "view" | "unsent" | "online"> = { me: null, household: null, people: [], dogs: [], exercises: [], treatKinds: [] };
-  let serverView = NOTHING_RUNS;
-  let queue: CommandQueue | null = null;
-  let early: Command[] = []; // taps before the first answer said who this is (the queue is per person)
-  let started = false;
-  let stopWatching = () => {};
+  // What the server showed last time (or only who signed in), until it answers now.
+  const kept = loadSnapshot(device.person.id);
+  let household: Known = kept
+    ? { me: kept.me, household: kept.household, people: kept.people, dogs: kept.dogs, exercises: kept.exercises, treatKinds: kept.treatKinds }
+    : { me: device.person, household: null, people: [device.person], dogs: [], exercises: [], treatKinds: [] };
+  let serverView = kept?.view ?? NOTHING_RUNS;
   let state: GassiState;
   const listeners = new Set<() => void>();
 
   function update() {
     const { me, people, dogs } = household;
-    const pending = queue?.pending() ?? [];
+    const pending = queue.pending();
     const activeDogs = dogs.filter((d) => !d.archived).map((d) => d.id);
-    state = { ...household, view: me ? project(serverView, pending, me, people, activeDogs) : serverView, unsent: pending.length + early.length, online };
+    state = { ...household, me, view: project(serverView, pending, me, people, activeDogs), unsent: pending.length, online };
     listeners.forEach((fn) => fn());
   }
-  update();
+  const keep = () => saveSnapshot({ ...household, view: serverView });
 
   const sendCommands = async (commands: Command[]) => {
     try {
@@ -82,24 +87,30 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
     }
   };
 
-  const queueKey = (personId: string) => `gassi.commands.${personId}`;
-  // another tab's taps (the queue re-reads storage) show here too
-  function watch() {
-    const personId = household.me?.id;
-    if (started && queue && personId) stopWatching = onQueueChanged(queueKey(personId), () => queue?.refresh());
-  }
+  // the queue of the person signed in, there from the start: taps without reception are kept from the first one
+  const queueKey = `gassi.commands.${device.person.id}`;
+  const queue = createCommandQueue({ storage: queueStorage(), send: sendCommands, key: queueKey });
+  queue.subscribe((_, view) => {
+    if (view) {
+      serverView = view;
+      keep();
+    }
+    update();
+  });
+  update();
 
-  function queueFor(personId: string): CommandQueue {
-    if (queue) return queue;
-    queue = createCommandQueue({ storage: queueStorage(), send: sendCommands, key: queueKey(personId) });
-    queue.subscribe((_, view) => {
-      if (view) serverView = view;
-      update();
-    });
-    watch();
-    for (const cmd of early) void queue.push(cmd);
-    early = [];
-    return queue;
+  async function refresh() {
+    try {
+      const [me, people, dogs, exercises, treatKinds] = await Promise.all([api.me(), api.people(), api.dogs(), api.exercises(), api.treatKinds()]);
+      household = { me: me.person, household: me.household, people: people.people, dogs: dogs.dogs, exercises: exercises.exercises, treatKinds: treatKinds.treatKinds };
+      await queue.flush();
+      serverView = await api.sessions();
+      keep();
+    } catch {
+      // no reception, signed out (the 401 already cleared the device), or an answer that didn't fit: keep showing
+      // what we have; the next refresh tries again
+    }
+    update();
   }
 
   return {
@@ -110,31 +121,16 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
       return () => listeners.delete(fn);
     },
     send(cmd) {
-      if (queue) void queue.push(cmd);
-      else {
-        early.push(cmd);
-        update();
-      }
+      void queue.push(cmd);
     },
-    async refresh() {
-      try {
-        const [me, people, dogs, exercises, treatKinds] = await Promise.all([api.me(), api.people(), api.dogs(), api.exercises(), api.treatKinds()]);
-        household = { me: me.person, household: me.household, people: people.people, dogs: dogs.dogs, exercises: exercises.exercises, treatKinds: treatKinds.treatKinds };
-        await queueFor(me.person.id).flush();
-        serverView = await api.sessions();
-      } catch (e) {
-        // no reception, or signed out (the 401 already cleared the device): keep showing what we have
-        if (!(e instanceof ApiError)) throw e;
-      }
-      update();
-    },
+    refresh,
     start() {
-      started = true;
-      watch();
+      // another tab's taps (the queue re-reads storage) show here too; reception back sends the queued ones at once
+      const stopWatching = onQueueChanged(queueKey, () => queue.refresh());
+      const stopReconnect = onReconnect(() => void refresh());
       return () => {
-        started = false;
         stopWatching();
-        stopWatching = () => {};
+        stopReconnect();
       };
     },
   };

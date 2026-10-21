@@ -26,7 +26,7 @@ test("signing in with a code keeps the device's token; a used code says why", as
   });
   await signIn({ code: "abcd efgh" }, { personName: "Herzii" }, "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", server.fetch);
   expect(server.calls[0].body).toEqual({ code: "abcd efgh", deviceKind: "web", deviceName: "iPhone (Web)", personName: "Herzii" });
-  expect(loadDevice()).toEqual({ token: "dev-1", serverUrl: "" });
+  expect(loadDevice()).toEqual({ token: "dev-1", serverUrl: "", person: { id: "p", name: "Herzii" } });
   await expect(signIn({ code: "used" }, {}, "", server.fetch)).rejects.toThrow("Dieser Link ist abgelaufen oder schon benutzt.");
 });
 

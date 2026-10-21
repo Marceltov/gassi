@@ -17,8 +17,8 @@ export async function linkKind(key: LinkKey, fetchFn?: typeof fetch): Promise<Li
 /** Redeems the link and signs this browser in; throws ApiError with the server's German message. */
 export async function signIn(key: LinkKey, names: { personName?: string; dogName?: string }, userAgent: string, fetchFn?: typeof fetch): Promise<void> {
   const blank = (s?: string) => (s?.trim() ? s.trim() : undefined);
-  const { deviceToken } = await publicApi(fetchFn).redeem({ ...key, deviceKind: "web", deviceName: deviceName(userAgent), personName: blank(names.personName), dogName: blank(names.dogName) });
-  saveDevice({ token: deviceToken, serverUrl: API_URL });
+  const { deviceToken, person } = await publicApi(fetchFn).redeem({ ...key, deviceKind: "web", deviceName: deviceName(userAgent), personName: blank(names.personName), dogName: blank(names.dogName) });
+  saveDevice({ token: deviceToken, serverUrl: API_URL, person });
 }
 
 /** "iPhone (Web)" and the like, for the household's list of devices. */

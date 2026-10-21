@@ -7,7 +7,7 @@ import { BASE_URL, TOKEN_FILE } from "../playwright.config";
 
 export async function signIn(page: Page): Promise<string> {
   const invite = await createClient({ baseUrl: BASE_URL, token: readFileSync(TOKEN_FILE, "utf8").trim() }).createInvite({ kind: "device" });
-  const { deviceToken } = await createClient({ baseUrl: BASE_URL }).redeem({ code: invite.code, deviceKind: "web", deviceName: "Playwright (Web)" });
-  await page.addInitScript((token) => localStorage.setItem("gassi.device", JSON.stringify({ token, serverUrl: "" })), deviceToken);
+  const { deviceToken, person } = await createClient({ baseUrl: BASE_URL }).redeem({ code: invite.code, deviceKind: "web", deviceName: "Playwright (Web)" });
+  await page.addInitScript((device) => localStorage.setItem("gassi.device", JSON.stringify(device)), { token: deviceToken, serverUrl: "", person });
   return deviceToken;
 }

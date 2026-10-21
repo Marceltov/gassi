@@ -2,20 +2,22 @@ import { ApiError } from "@gassi/api-client";
 import { expect, test } from "vitest";
 import { apiFor, errorMessage, OFFLINE } from "./api";
 import { loadDevice, saveDevice } from "./device";
-import { fakeServer, status } from "./testing";
+import { fakeServer, HIRSCH, status } from "./testing";
 
-test("a 401 signs the device out", async () => {
+test("a 401 signs the device out and forgets what it showed", async () => {
   const server = fakeServer({ "GET /api/me": () => status(401, { error: "Bitte anmelden." }) });
-  saveDevice({ token: "removed", serverUrl: "" });
+  saveDevice({ token: "removed", serverUrl: "", person: HIRSCH });
+  localStorage.setItem("gassi.snapshot", JSON.stringify({ personId: HIRSCH.id }));
   await expect(apiFor(loadDevice()!, { fetch: server.fetch }).me()).rejects.toEqual(new ApiError(401, "Bitte anmelden."));
   expect(loadDevice()).toBeNull();
+  expect(localStorage.getItem("gassi.snapshot")).toBeNull();
   expect(server.calls[0].headers.authorization).toBe("Bearer removed");
 });
 
 test("a 401 for an older token leaves a newer sign-in alone", async () => {
   const server = fakeServer({ "GET /api/me": () => status(401, { error: "Bitte anmelden." }) });
-  const api = apiFor({ token: "old", serverUrl: "" }, { fetch: server.fetch });
-  saveDevice({ token: "new", serverUrl: "" });
+  const api = apiFor({ token: "old", serverUrl: "", person: HIRSCH }, { fetch: server.fetch });
+  saveDevice({ token: "new", serverUrl: "", person: HIRSCH });
   await expect(api.me()).rejects.toThrow("Bitte anmelden.");
   expect(loadDevice()?.token).toBe("new");
 });
@@ -23,7 +25,7 @@ test("a 401 for an older token leaves a newer sign-in alone", async () => {
 test("a server out of reach says so in German and reports offline; any answer reports online", async () => {
   const server = fakeServer({ "GET /api/stock": () => status(400, { error: "Nein." }) });
   const reached: boolean[] = [];
-  const api = apiFor({ token: "t", serverUrl: "" }, { fetch: server.fetch, onReached: (r) => reached.push(r) });
+  const api = apiFor({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: server.fetch, onReached: (r) => reached.push(r) });
   server.reachable = false;
   const offline = await api.stock().catch((e: unknown) => e);
   expect(errorMessage(offline)).toBe(OFFLINE);

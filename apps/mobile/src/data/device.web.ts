@@ -23,7 +23,9 @@ function parse(raw: string | null): Device | null {
   if (raw === null) return null;
   try {
     const v = JSON.parse(raw) as Partial<Device> | null;
-    return typeof v?.token === "string" && v.token && typeof v.serverUrl === "string" ? { token: v.token, serverUrl: v.serverUrl } : null;
+    const p = v?.person;
+    if (typeof v?.token !== "string" || !v.token || typeof v.serverUrl !== "string" || typeof p?.id !== "string" || typeof p.name !== "string") return null;
+    return { token: v.token, serverUrl: v.serverUrl, person: { id: p.id, name: p.name } };
   } catch {
     return null;
   }
@@ -38,7 +40,7 @@ export function loadDevice(): Device | null {
 
 export function saveDevice(d: Device): void {
   try {
-    localStorage.setItem(DEVICE_KEY, JSON.stringify({ token: d.token, serverUrl: d.serverUrl }));
+    localStorage.setItem(DEVICE_KEY, JSON.stringify({ token: d.token, serverUrl: d.serverUrl, person: { id: d.person.id, name: d.person.name } }));
   } catch {
     // storage blocked (private mode): nothing to keep the sign-in in
   }
