@@ -8,6 +8,7 @@ import {
   ENTRY_TYPES,
   entryCreateInput,
   entryEditInput,
+  trainingEditInput,
   FOOD_KINDS,
   type FieldMessages,
   RESTOCK_MESSAGES,
@@ -197,6 +198,7 @@ export const contract = {
   }),
   logEntry: endpoint({ method: "POST", path: "/api/entries", input: entryCreateInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),
   editEntry: endpoint({ method: "PATCH", path: "/api/entries/:id", input: entryEditInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),
+  editTraining: endpoint({ method: "PATCH", path: "/api/trainings/:id", input: trainingEditInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),
   deleteEntry: endpoint({ method: "DELETE", path: "/api/entries/:id", input: z.object({ id }), output: z.object({ deleted: z.literal(true) }) }),
   uploadTrack: endpoint({
     method: "POST",

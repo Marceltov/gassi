@@ -256,3 +256,67 @@ describe("entries and dogs", () => {
     expect((await diary().history({ dog: bruno })).entries.map((e) => e.id)).toEqual([his.id]);
   });
 });
+
+describe("editing walkers and a training's repetitions afterwards", () => {
+  const startedWalk = async () => {
+    const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), now: () => clock });
+    await s.apply(HIRSCH, [
+      { id: "1", at: "2026-10-20T09:00:00.000Z", kind: "walk.start", walkKey: "w" },
+      { id: "2", at: "2026-10-20T09:50:00.000Z", kind: "walk.stop", walkKey: "w" },
+    ]);
+    return (await diary().history({})).entries[0];
+  };
+
+  test("a walk's walkers are replaced", async () => {
+    const walk = await startedWalk();
+    expect(walk.walkers).toEqual(["Hirsch"]);
+    expect(await diary().edit(walk.id, { at: walk.at, endedAt: walk.endedAt, walkers: ["bille"] })).toMatchObject({ walkers: ["Herzii"] });
+    expect(await diary().edit(walk.id, { at: walk.at, endedAt: walk.endedAt })).toMatchObject({ walkers: ["Herzii"] }); // left out: unchanged
+  });
+
+  test("walkers must be members, at least one, and only on walks", async () => {
+    const walk = await startedWalk();
+    const food = await diary().log(HIRSCH, { type: "food", foodKind: "wet", at: "2026-10-20T09:00:00Z", amountG: 200 });
+    await expect(diary().edit(food.id, { at: food.at, foodKind: "wet", walkers: ["marcel"] })).rejects.toThrow(new InputError("Mitgeher gibt es nur bei Runden."));
+    await expect(diary().edit(walk.id, { at: walk.at, endedAt: walk.endedAt, walkers: ["nobody"] })).rejects.toThrow(new InputError("Diese Person gibt es nicht."));
+    await expect(diary().edit(walk.id, { at: walk.at, endedAt: walk.endedAt, walkers: [] })).rejects.toThrow(new InputError("Eine Runde braucht mindestens einen Mitgeher."));
+    expect((await diary().history({})).entries.find((e) => e.id === walk.id)!.walkers).toEqual(["Hirsch"]);
+  });
+
+  describe("editTraining", () => {
+    const training = async () => {
+      const sitz = await new Catalog(db()).addExercise("Sitz");
+      const platz = await new Catalog(db()).addExercise("Platz");
+      const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
+      const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"]]), now: () => clock });
+      await s.apply(HIRSCH, [
+        { id: "1", at: "2026-10-20T09:00:00.000Z", kind: "training.start", trainingKey: "t" },
+        { id: "2", at: "2026-10-20T09:01:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, ok: true, delta: 1 },
+        { id: "3", at: "2026-10-20T09:02:00.000Z", kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: 1 },
+      ]);
+      const entry = (await diary().history({})).entries[0];
+      return { entry, sitz, platz, kaese };
+    };
+
+    test("replaces both lists and shows the new exercises", async () => {
+      const { entry, sitz, platz, kaese } = await training();
+      expect(entry.exercises).toEqual([{ name: "Sitz", ok: 1, fail: 0 }]);
+      const view = await diary().editTraining(entry.id, { reps: [{ exerciseId: platz.id, dogId: 1, ok: 3, fail: 1 }, { exerciseId: sitz.id, dogId: 1, ok: 0, fail: 0 }], treats: [{ treatKindId: kaese.id, count: 5 }] });
+      expect(view).toMatchObject({ exercises: [{ name: "Platz", ok: 3, fail: 1 }], treats: 5 });
+      expect(await diary().editTraining(entry.id, { reps: [], treats: [] })).toMatchObject({ exercises: [], treats: 0 });
+    });
+
+    test("refuses dogs outside the training, unknown ids, negative counts and other entries", async () => {
+      const { entry, sitz, kaese } = await training();
+      const food = await diary().log(HIRSCH, { type: "food", foodKind: "wet", at: "2026-10-20T09:00:00Z", amountG: 200 });
+      const rep = { exerciseId: sitz.id, dogId: 1, ok: 1, fail: 0 };
+      await expect(diary().editTraining(entry.id, { reps: [{ ...rep, dogId: 99 }], treats: [] })).rejects.toThrow(new InputError("Dieser Hund gehört nicht zum Training."));
+      await expect(diary().editTraining(entry.id, { reps: [{ ...rep, exerciseId: 999 }], treats: [] })).rejects.toThrow(new InputError("Diese Übung gibt es nicht."));
+      await expect(diary().editTraining(entry.id, { reps: [], treats: [{ treatKindId: 999, count: 1 }] })).rejects.toThrow(new InputError("Diese Leckerli-Art gibt es nicht."));
+      await expect(diary().editTraining(entry.id, { reps: [{ ...rep, ok: -1 }], treats: [] })).rejects.toThrow(new InputError("Die Wiederholungen stimmen nicht."));
+      await expect(diary().editTraining(food.id, { reps: [], treats: [{ treatKindId: kaese.id, count: 1 }] })).rejects.toThrow(new InputError("Das ist kein Training."));
+      expect(await diary().editTraining(999, { reps: [], treats: [] })).toBeNull();
+      expect((await diary().history({})).entries.find((e) => e.id === entry.id)).toMatchObject({ exercises: [{ name: "Sitz", ok: 1, fail: 0 }], treats: 1 });
+    });
+  });
+});

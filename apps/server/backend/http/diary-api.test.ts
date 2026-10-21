@@ -126,3 +126,28 @@ describe("the server checks inputs with the same schemas and messages", () => {
     expect(await json("/api/stock/restock", { method: "POST", token, body: { foodKind: "dry" } })).toEqual({ status: 400, body: { error: "Wie viel Gramm hast du gekauft?" } });
   });
 });
+
+describe("editing afterwards over the API", () => {
+  test("walkers and a training's repetitions", async () => {
+    const token = await tokenFor(HIRSCH.id);
+    const { body: sitz } = await json("/api/exercises", { method: "POST", token, body: { name: "Sitz" } });
+    const cmds = [
+      { id: "c1", at: "2026-10-20T09:00:00.000Z", kind: "walk.start", walkKey: "w" },
+      { id: "c2", at: "2026-10-20T09:10:00.000Z", kind: "training.start", trainingKey: "t", walkKey: "w" },
+      { id: "c3", at: "2026-10-20T09:20:00.000Z", kind: "training.stop", trainingKey: "t" },
+      { id: "c4", at: "2026-10-20T09:30:00.000Z", kind: "walk.stop", walkKey: "w" },
+    ];
+    await json("/api/commands", { method: "POST", token, body: { commands: cmds } });
+    const { body: list } = await json("/api/entries", { token });
+    const walk = list.entries.find((e: { type: string }) => e.type === "walk");
+    const training = list.entries.find((e: { type: string }) => e.type === "training");
+    const fixed = await json(`/api/entries/${walk.id}`, { method: "PATCH", token, body: { at: walk.at, endedAt: walk.endedAt, walkers: [HERZII.id] } });
+    expect(fixed.body.walkers).toEqual([HERZII.name]);
+    const bad = await json(`/api/entries/${training.id}`, { method: "PATCH", token, body: { at: training.at, endedAt: training.endedAt, walkers: [HERZII.id] } });
+    expect(bad).toMatchObject({ status: 400, body: { error: "Mitgeher gibt es nur bei Runden." } });
+    const edited = await json(`/api/trainings/${training.id}`, { method: "PATCH", token, body: { reps: [{ exerciseId: sitz.id, dogId: 1, ok: 2, fail: 1 }], treats: [] } });
+    expect(edited.body.exercises).toEqual([{ name: "Sitz", ok: 2, fail: 1 }]);
+    expect((await json(`/api/trainings/${training.id}`, { method: "PATCH", token, body: { reps: [{ exerciseId: sitz.id, dogId: 1, ok: -1, fail: 0 }], treats: [] } })).status).toBe(400);
+    expect((await json("/api/trainings/999", { method: "PATCH", token, body: { reps: [], treats: [] } })).status).toBe(404);
+  });
+});

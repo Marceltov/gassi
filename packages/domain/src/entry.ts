@@ -53,7 +53,18 @@ export const newEntryInput = z.object({ ...fieldShape, type: z.enum(ENTRY_TYPES)
 // What the API takes: a new entry whose time defaults to now, and an edit of the entry with `id`.
 const endIfBoth = (f: { at?: string; endedAt: string | null }) => !f.at || endNotBeforeStart({ at: f.at, endedAt: f.endedAt });
 export const entryCreateInput = z.object({ ...fieldShape, at: instant.optional(), type: z.enum(ENTRY_TYPES) }).refine(endIfBoth, endIssue);
-export const entryEditInput = z.object({ ...fieldShape, id: z.coerce.number().int().positive() }).refine(endNotBeforeStart, endIssue);
+// An edit may also replace a walk's walkers (person ids; at least one).
+const editShape = { ...fieldShape, walkers: z.array(z.string().min(1)).min(1).max(20).optional() };
+export const entryEditFields = z.object(editShape).refine(endNotBeforeStart, endIssue);
+export const entryEditInput = z.object({ ...editShape, id: z.coerce.number().int().positive() }).refine(endNotBeforeStart, endIssue);
+
+const count = z.number().int().min(0).max(10_000);
+/** Replaces a training's repetitions (per exercise and dog) and treats (per kind) afterwards. */
+export const trainingEditInput = z.object({
+  id: z.coerce.number().int().positive(),
+  reps: z.array(z.object({ exerciseId: z.number().int().positive(), dogId: z.number().int().positive(), ok: count, fail: count })).max(500),
+  treats: z.array(z.object({ treatKindId: z.number().int().positive(), count })).max(100),
+});
 
 /** The German message for each field of an entry, shown when it doesn't fit. */
 export const ENTRY_MESSAGES: Record<string, string> = {
@@ -65,6 +76,9 @@ export const ENTRY_MESSAGES: Record<string, string> = {
   note: "Die Notiz ist zu lang (höchstens 1000 Zeichen).",
   type: "Diese Art von Eintrag gibt es nicht.",
   dogIds: "Diesen Hund gibt es nicht.",
+  walkers: "Eine Runde braucht mindestens einen Mitgeher.",
+  reps: "Die Wiederholungen stimmen nicht.",
+  treats: "Die Leckerlis stimmen nicht.",
 };
 
 export type EntryFields = z.output<typeof entryFields>;

@@ -3,7 +3,7 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
+import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
@@ -81,14 +81,64 @@ export class Diary {
   }
 
   async edit(id: number, input: unknown): Promise<EntryView | null> {
-    const fields = parse(entryFields, input, ENTRY_MESSAGES);
+    const { walkers, ...fields } = parse(entryEditFields, input, ENTRY_MESSAGES);
     const before = await this.entries.get(id);
     if (before) needsKind(before.type, fields.foodKind);
     if (before && fields.dogIds) fields.dogIds = await this.dogsFor(before.type, fields.dogIds, before.dogIds);
+    if (before && walkers) {
+      if (before.type !== "walk") throw new InputError("Mitgeher gibt es nur bei Runden.");
+      if (walkers.some((p) => !this.deps.names.has(p))) throw new InputError("Diese Person gibt es nicht.");
+    }
     // without an end it would run again (it was started on the walk screen); a walk logged afterwards may lose its end
     if (before?.clientKey && before.endedAt && !fields.endedAt) throw new InputError(before.type === "walk" ? "Eine beendete Runde braucht ein Ende." : "Ein beendetes Training braucht ein Ende.");
     const entry = await this.entries.update(id, fields);
+    if (entry && walkers) await this.replaceWalkers(id, [...new Set(walkers)]);
     return entry ? this.view1(entry) : null;
+  }
+
+  /** Replaces a training's repetitions and treats afterwards (the Verlauf's fix-ups); null if there is no such entry. */
+  async editTraining(id: number, input: unknown): Promise<EntryView | null> {
+    const { reps, treats } = parse(trainingEditInput.omit({ id: true }), input, ENTRY_MESSAGES);
+    const training = await this.entries.get(id);
+    if (!training) return null;
+    if (training.type !== "training") throw new InputError("Das ist kein Training.");
+    const { db } = this.deps;
+    const [exerciseIds, kinds] = await Promise.all([
+      db.selectFrom("exercise").select("id").execute(),
+      db.selectFrom("treat_kind").select(["id", "grams_per_piece", "from_dry"]).execute(),
+    ]);
+    // the same exercise and dog (or treat kind) twice add up
+    const repRows = new Map<string, { exercise_id: number; dog_id: number; ok_count: number; fail_count: number }>();
+    for (const r of reps) {
+      if (!training.dogIds.includes(r.dogId)) throw new InputError("Dieser Hund gehört nicht zum Training.");
+      if (!exerciseIds.some((x) => x.id === r.exerciseId)) throw new InputError("Diese Übung gibt es nicht.");
+      const row = repRows.get(`${r.exerciseId}/${r.dogId}`) ?? { exercise_id: r.exerciseId, dog_id: r.dogId, ok_count: 0, fail_count: 0 };
+      repRows.set(`${r.exerciseId}/${r.dogId}`, { ...row, ok_count: row.ok_count + r.ok, fail_count: row.fail_count + r.fail });
+    }
+    const treatCounts = new Map<number, number>();
+    for (const t of treats) {
+      if (!kinds.some((k) => k.id === t.treatKindId)) throw new InputError("Diese Leckerli-Art gibt es nicht.");
+      treatCounts.set(t.treatKindId, (treatCounts.get(t.treatKindId) ?? 0) + t.count);
+    }
+    await db.transaction().execute(async (tx) => {
+      await tx.deleteFrom("training_exercise").where("entry_id", "=", id).execute();
+      await tx.deleteFrom("training_treat").where("entry_id", "=", id).execute();
+      const exerciseRows = [...repRows.values()].filter((r) => r.ok_count > 0 || r.fail_count > 0).map((r) => ({ entry_id: id, ...r }));
+      if (exerciseRows.length) await tx.insertInto("training_exercise").values(exerciseRows).execute();
+      const treatRows = [...treatCounts].filter(([, count]) => count > 0).map(([kindId, count]) => {
+        const kind = kinds.find((k) => k.id === kindId)!;
+        return { entry_id: id, treat_kind_id: kindId, count, grams_per_piece: kind.grams_per_piece, from_dry: kind.from_dry };
+      });
+      if (treatRows.length) await tx.insertInto("training_treat").values(treatRows).execute();
+    });
+    return this.view1(training);
+  }
+
+  private async replaceWalkers(id: number, personIds: string[]): Promise<void> {
+    await this.deps.db.transaction().execute(async (tx) => {
+      await tx.deleteFrom("walk_walker").where("entry_id", "=", id).execute();
+      await tx.insertInto("walk_walker").values(personIds.map((person_id) => ({ entry_id: id, person_id }))).execute();
+    });
   }
 
   remove(id: number): Promise<boolean> {
