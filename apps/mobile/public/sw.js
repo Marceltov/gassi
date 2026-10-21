@@ -1,18 +1,23 @@
-// Gassi's service worker: just enough for the installed app to open without reception after the first visit.
-// - A page (any app path, /woche too) comes from the network; without it, the kept app shell (index.html) answers.
-// - The shell is kept with the files it names (the hashed bundles under /_expo/), taken anew on every page load
-//   that reaches the network, so a new version is kept once it has been opened; bundles of older versions go.
+// Gassi's service worker: just enough for the installed app to open at once, with or without reception.
+// - An app page (any app path, /woche too) comes from the kept app shell (index.html) at once, and the shell is taken
+//   anew in the background: one bar or a captive network never holds up opening the app. A new version shows from the
+//   next opening on. Before a shell is kept, the page comes from the network (and is kept).
+// - The shell is kept with the files it names (the hashed bundles under /_expo/); bundles of older versions go.
 // - Hashed build files (/_expo/, /assets/) come from the cache once kept: their names change with their content.
-// - Nothing else is touched: the API (/api/*) always goes to the network and is never kept, nor are the link pages.
-const CACHE = "gassi-shell-v1";
+// - The server's own pages (/l/…, the link pages) and the API (/api/*, the OIDC routes too) always go to the network
+//   and are never kept; nor is anything from another origin.
+const CACHE = "gassi-shell-v2";
 const SHELL = "/";
 
-const hashed = (url) => url.origin === self.location.origin && (url.pathname.startsWith("/_expo/") || url.pathname.startsWith("/assets/"));
+const hashed = (path) => path.startsWith("/_expo/") || path.startsWith("/assets/");
+const serverOwn = (path) => path.startsWith("/api/") || path.startsWith("/l/") || path === "/health";
+const isHtml = (res) => res.ok && (res.headers.get("content-type") ?? "").includes("text/html");
 
-// Keeps the shell and the files it links, and drops the bundles no longer linked.
-async function keepShell() {
-  const res = await fetch(SHELL, { cache: "no-store" });
-  if (!res.ok || !(res.headers.get("content-type") ?? "").includes("text/html")) return;
+// Keeps `res` (the app's index.html, fetched now unless given) as the shell with the files it links, and drops the
+// bundles no longer linked.
+async function keepShell(given) {
+  const res = given ?? (await fetch(SHELL, { cache: "no-store" }));
+  if (!isHtml(res)) return;
   const html = await res.clone().text();
   const linked = [...html.matchAll(/(?:src|href)="(\/_expo\/[^"]+)"/g)].map((m) => m[1]);
   const cache = await caches.open(CACHE);
@@ -40,23 +45,26 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
-  if (req.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (req.method !== "GET" || url.origin !== self.location.origin || serverOwn(url.pathname)) return;
 
-  if (req.mode === "navigate") {
+  // a file opened directly (/manifest.json, /icon.svg) is the server's, not an app page
+  if (req.mode === "navigate" && !/\.[^/]*$/.test(url.pathname)) {
     event.respondWith(
-      fetch(req).then(
-        (res) => {
-          // the link pages (/l/…) and the OIDC routes are the server's own pages, not the shell
-          if (res.ok && !url.pathname.startsWith("/l/")) event.waitUntil(keepShell().catch(() => {}));
-          return res;
-        },
-        async () => (await caches.match(SHELL)) ?? Response.error(),
-      ),
+      (async () => {
+        const kept = await caches.match(SHELL);
+        if (kept) {
+          event.waitUntil(keepShell().catch(() => {}));
+          return kept;
+        }
+        const res = await fetch(req);
+        if (isHtml(res)) event.waitUntil(keepShell(res.clone()).catch(() => {}));
+        return res;
+      })(),
     );
     return;
   }
 
-  if (hashed(url)) {
+  if (hashed(url.pathname)) {
     event.respondWith(
       (async () => {
         const cache = await caches.open(CACHE);

@@ -5,7 +5,6 @@ import type { FoodKind } from "@gassi/domain";
 import { stockParts } from "@gassi/domain";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { useGassi } from "../data/GassiProvider";
 import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Field } from "../ui/Field";
@@ -28,7 +27,6 @@ const MODES = [
 export function Stock() {
   const theme = useTheme();
   const back = useBack();
-  const { api } = useGassi();
   const { data: stock, error, reload } = useServer((a) => a.stock());
   const { message, run } = useWrite();
   const [kind, setKind] = useState<FoodKind>("wet");
@@ -39,10 +37,9 @@ export function Stock() {
   const unitG = unit ?? (stock?.wet.canSizeG ? String(stock.wet.canSizeG) : "");
 
   const save = () =>
-    void run(async () => {
-      if (!api) return;
+    void run(async (api) => {
       if (mode === "restock") await api.restock(kind === "wet" ? { foodKind: "wet", cans: amount, unitG } : { foodKind: "dry", grams: amount });
-      else await api.correctStock(kind === "wet" ? { foodKind: "wet", cans: amount.replace(",", ".") } : { foodKind: "dry", grams: amount });
+      else await api.correctStock(kind === "wet" ? { foodKind: "wet", cans: amount } : { foodKind: "dry", grams: amount });
       setAmount("");
       reload();
     }, "Eingetragen.");
@@ -93,7 +90,11 @@ export function Stock() {
           <View style={styles.fields}>
             {kind === "wet" ? (
               <>
-                <Field label="Dosen" value={amount} onChangeText={setAmount} inputMode="decimal" keyboardType="decimal-pad" />
+                {mode === "restock" ? (
+                  <Field label="Dosen" value={amount} onChangeText={setAmount} inputMode="numeric" keyboardType="number-pad" />
+                ) : (
+                  <Field label="Dosen" value={amount} onChangeText={setAmount} inputMode="decimal" keyboardType="decimal-pad" />
+                )}
                 {mode === "restock" ? <Field label="Gramm pro Dose" value={unitG} onChangeText={setUnit} inputMode="numeric" keyboardType="number-pad" /> : null}
               </>
             ) : (

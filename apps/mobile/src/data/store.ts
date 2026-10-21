@@ -5,7 +5,7 @@
 // running walk at once, before or without an answer.
 import { ApiError, type Client, type Output } from "@gassi/api-client";
 import { type Command, createCommandQueue, type Person, project, RejectedCommands, type SessionsView } from "@gassi/domain";
-import { apiFor } from "./api";
+import { apiFor, WRITE_TIMEOUT_MS } from "./api";
 import type { Device } from "./device";
 import { onReconnect } from "./network";
 import { onQueueChanged, queueStorage } from "./queue";
@@ -35,6 +35,8 @@ export type GassiState = {
 
 export type GassiStore = {
   api: Client;
+  /** The same, for writes that need the server: gives up after WRITE_TIMEOUT_MS as unreachable. */
+  writeApi: Client;
   get(): GassiState;
   subscribe(fn: () => void): () => void;
   send(cmd: Command): void;
@@ -50,15 +52,14 @@ const NOTHING_RUNS: SessionsView = { walk: null, training: null };
 
 export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: typeof fetch } = {}): GassiStore {
   let online = true;
-  const api = apiFor(device, {
-    fetch: fetchFn,
-    onReached: (reached) => {
-      if (reached !== online) {
-        online = reached;
-        update();
-      }
-    },
-  });
+  const onReached = (reached: boolean) => {
+    if (reached !== online) {
+      online = reached;
+      update();
+    }
+  };
+  const api = apiFor(device, { fetch: fetchFn, onReached });
+  const writeApi = apiFor(device, { fetch: fetchFn, onReached, timeoutMs: WRITE_TIMEOUT_MS });
 
   // What the server showed last time (or only who signed in), until it answers now.
   const kept = loadSnapshot(device.person.id);
@@ -123,6 +124,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
 
   return {
     api,
+    writeApi,
     get: () => state,
     subscribe(fn) {
       listeners.add(fn);

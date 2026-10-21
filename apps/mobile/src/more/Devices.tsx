@@ -21,6 +21,9 @@ import { useWrite } from "./useWrite";
 
 type Device = Output<"devices">["devices"][number];
 
+/** How long signing out here waits for the server before it signs out locally anyway. */
+const SIGN_OUT_WAIT_MS = 3000;
+
 const KIND: Record<Device["kind"], string> = { phone: "Handy", watch: "Uhr", web: "Browser", script: "Skript" };
 
 export function Devices() {
@@ -28,7 +31,7 @@ export function Devices() {
   const router = useRouter();
   const back = useBack();
   const now = useNow(60_000);
-  const { api } = useGassi();
+  const { writeApi } = useGassi();
   const { data, error, reload } = useServer((a) => a.devices());
   const { message, run } = useWrite();
   const invites = useInvites("device");
@@ -40,17 +43,22 @@ export function Devices() {
   const seen = (d: Device) => (d.current ? "dieses Gerät" : d.lastSeenAt ? `zuletzt ${formatAgo(Date.parse(d.lastSeenAt), now)}` : "noch nie benutzt");
 
   const remove = (d: Device) =>
-    void run(async () => {
+    void run(async (api) => {
       setAsking(null);
-      if (api) await api.removeDevice({ id: d.id });
+      await api.removeDevice({ id: d.id });
       reload();
     });
   const signOutHere = async () => {
     setAsking(null);
-    // without reception the server keeps the device: it can be removed from another one later
+    // without reception (or an answer within SIGN_OUT_WAIT_MS) the server keeps the device: it can be removed from
+    // another one later; this browser signs out either way
+    const api = writeApi;
     if (api) {
-      const id = current?.id ?? (await api.me().then((m) => m.device.id, () => null));
-      if (id !== null) await api.removeDevice({ id }).catch(() => undefined);
+      const removeHere = async () => {
+        const id = current?.id ?? (await api.me()).device.id;
+        await api.removeDevice({ id });
+      };
+      await Promise.race([removeHere().catch(() => undefined), new Promise((r) => setTimeout(r, SIGN_OUT_WAIT_MS))]);
     }
     forgetDevice();
     router.replace("/anmelden");

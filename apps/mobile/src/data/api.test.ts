@@ -1,5 +1,5 @@
 import { ApiError } from "@gassi/api-client";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { apiFor, errorMessage, OFFLINE } from "./api";
 import { loadDevice, saveDevice } from "./device";
 import { fakeServer, HIRSCH, status } from "./testing";
@@ -35,4 +35,21 @@ test("a server out of reach says so in German and reports offline; any answer re
   server.reachable = true;
   expect(errorMessage(await api.stock().catch((e: unknown) => e))).toBe("Nein.");
   expect(reached).toEqual([false, true]);
+});
+
+test("a call with a timeout that gets no answer in time gives up as unreachable", async () => {
+  vi.useFakeTimers();
+  try {
+    // a fetch that never answers, only its abort ends it
+    const hanging: typeof fetch = (_, init) => new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(new Error("aborted"))));
+    const reached: boolean[] = [];
+    const call = apiFor({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: hanging, onReached: (r) => reached.push(r), timeoutMs: 3000 }).stock().catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(2999);
+    expect(reached).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(errorMessage(await call)).toBe(OFFLINE);
+    expect(reached).toEqual([false]);
+  } finally {
+    vi.useRealTimers();
+  }
 });

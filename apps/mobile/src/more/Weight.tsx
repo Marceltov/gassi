@@ -21,7 +21,7 @@ export function Weight() {
   const theme = useTheme();
   const router = useRouter();
   const back = useBack();
-  const { api, dogs } = useGassi();
+  const { dogs } = useGassi();
   const active = dogs.filter((d) => !d.archived);
   const [chosen, setChosen] = useState<number | null>(null);
   const dogId = chosen ?? active[0]?.id ?? null;
@@ -32,8 +32,7 @@ export function Weight() {
   const mine = (data?.weights ?? []).filter((w) => dogId === null || w.dogIds.includes(dogId));
   const points = mine.map((w) => ({ at: Date.parse(w.at), kg: (w.amountG ?? 0) / 1000 }));
   const save = () =>
-    void run(async () => {
-      if (!api) return;
+    void run(async (api) => {
       await api.logWeight({ kg, ...(dogId !== null ? { dogIds: [dogId] } : {}) });
       setKg("");
       reload();
@@ -71,7 +70,7 @@ export function Weight() {
       bottom={
         <>
           {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-          <Field label="Gewicht in kg" value={kg} onChangeText={setKg} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" onSubmitEditing={save} />
+          <Field label="Gewicht in kg" value={kg} onChangeText={setKg} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" onSubmitEditing={() => kg.trim() && save()} />
           <BigButton kind="walk" size="l" label="Eintragen" disabled={!kg.trim()} onPress={save} />
           <BigButton kind="neutral" size="m" label="Zurück" onPress={back} />
         </>

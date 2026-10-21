@@ -1,5 +1,6 @@
 // Übungen und Leckerli: the household's lists for training. A tap opens one to rename it (a treat also its grams per
 // piece and whether it comes out of the dry food) or remove it; removed ones keep their name in past trainings.
+import type { Client } from "@gassi/api-client";
 import { parseDecimal } from "@gassi/domain";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -23,7 +24,7 @@ const grams = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 
 export function Catalog() {
   const theme = useTheme();
   const back = useBack();
-  const { api, refresh } = useGassi();
+  const { refresh } = useGassi();
   const { data, error, reload } = useServer((a) => Promise.all([a.exercises(), a.treatKinds()]));
   const { message, setMessage, run } = useWrite();
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -33,7 +34,7 @@ export function Catalog() {
     setMessage(null);
     setEditing(e);
   };
-  const change = async (call: () => Promise<unknown>) => {
+  const change = async (call: (api: Client) => Promise<unknown>) => {
     if (await run(call)) {
       setEditing(null);
       reload();
@@ -41,8 +42,7 @@ export function Catalog() {
     }
   };
   const save = (e: Editing) =>
-    void change(async () => {
-      if (!api) return;
+    void change(async (api) => {
       if (e.what === "exercise") await (e.item ? api.updateExercise({ id: e.item.id, name: e.name }) : api.addExercise({ name: e.name }));
       else {
         const t = { name: e.name, gramsPerPiece: parseDecimal(e.grams), fromDry: e.fromDry };
@@ -50,8 +50,8 @@ export function Catalog() {
       }
     });
   const remove = (e: Editing) =>
-    void change(async () => {
-      if (!api || !e.item) return;
+    void change(async (api) => {
+      if (!e.item) return;
       await (e.what === "exercise" ? api.updateExercise({ id: e.item.id, archived: true }) : api.updateTreatKind({ id: e.item.id, archived: true }));
     });
 

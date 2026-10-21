@@ -3,7 +3,7 @@
 // shell that opens without reception after the first visit. The server is shared: each test removes what it made.
 import { createClient } from "@gassi/api-client";
 import { formatCans } from "@gassi/domain";
-import { expect, test } from "@playwright/test";
+import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
 import { asHirsch } from "./sessions";
 import { signIn } from "./signed-in";
@@ -30,12 +30,13 @@ test("Gewicht: 12,4 kg logged shows in the list, on the curve and on Mehr", asyn
   await page.goto("/mehr");
   await page.getByRole("button", { name: /^Gewicht/ }).click();
   await page.getByLabel("Gewicht in kg").fill("12,4");
+  const logged = page.waitForResponse((r) => r.url().endsWith("/api/weight") && r.request().method() === "POST");
   await page.getByRole("button", { name: "Eintragen" }).click();
+  const { id } = (await (await logged).json()) as { id: number };
+  made.push(id);
 
   const client = createClient({ baseUrl: BASE_URL, token });
-  await expect.poll(async () => (await client.weights()).weights.find((w) => w.amountG === 12_400 && w.byName === "Hirsch")?.id).toBeDefined();
-  const mine = (await client.weights()).weights.filter((w) => w.amountG === 12_400).map((w) => w.id);
-  made.push(...mine);
+  expect((await client.entry({ id })).amountG).toBe(12_400);
   await expect(page.getByTestId("weight-list")).toContainText("12,4 kg");
   await expect(page.getByLabel("Gewicht in kg")).toHaveValue("");
   await expect(page.getByTestId("weight-curve")).toBeVisible();
@@ -48,16 +49,16 @@ test("Vorrat: 6 cans bought add to what is left", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });
   const unitG = (await client.stock()).wet.canSizeG ?? 400;
-  const since = new Date().toISOString();
   await page.goto("/mehr/vorrat");
   await page.getByRole("tab", { name: "Nass" }).click();
   await page.getByRole("tab", { name: "Eingekauft" }).click();
   await page.getByLabel("Dosen").fill("6");
   await page.getByLabel("Gramm pro Dose").fill(String(unitG));
+  const bought = page.waitForResponse((r) => r.url().endsWith("/api/stock/restock") && r.request().method() === "POST");
   await page.getByRole("button", { name: "Eintragen" }).click();
-
-  await expect.poll(async () => (await client.entries({ type: "restock" })).entries.find((e) => e.createdAt >= since)?.amountG).toBe(6 * unitG);
-  made.push((await client.entries({ type: "restock" })).entries.find((e) => e.createdAt >= since)!.id);
+  const { id } = (await (await bought).json()) as { id: number };
+  made.push(id);
+  expect((await client.entry({ id })).amountG).toBe(6 * unitG);
   const after = await client.stock();
   await expect(page.getByTestId("stock-wet")).toContainText(formatCans(after.wet.cans!));
   await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
@@ -67,16 +68,16 @@ test("Haushalt: an invite shows its link, its code and when it ends; Zurückzieh
   await signIn(page);
   await page.goto("/mehr/haushalt");
   await expect(page.getByTestId("members")).toContainText("Hirsch");
+  const created = page.waitForResponse((r) => r.url().endsWith("/api/invites") && r.request().method() === "POST");
   await page.getByRole("button", { name: "Person einladen" }).click();
+  const { id } = (await (await created).json()) as { id: number };
+  invites.push(id);
 
   const card = page.getByTestId("invite");
   await expect(card.getByTestId("invite-code")).toHaveText(/^[0-9A-Z]{4}-[0-9A-Z]{4}$/);
   await expect(card.getByTestId("invite-link")).toContainText(`${BASE_URL}/l/`);
   await expect(card).toContainText("gilt bis");
   const code = await card.getByTestId("invite-code").innerText();
-  const open = (await asHirsch().invites()).invites;
-  const id = Math.max(...open.map((i) => i.id));
-  invites.push(id);
   expect((await createClient({ baseUrl: BASE_URL }).linkInfo({ code })).kind).toBe("person");
 
   await card.getByRole("button", { name: "Zurückziehen" }).click();
@@ -97,6 +98,21 @@ test("Meine Geräte: Abmelden on this device removes it on the server and lands 
   await expect(createClient({ baseUrl: BASE_URL, token }).me()).rejects.toMatchObject({ status: 401 });
 });
 
+test("Abmelden here doesn't wait for a server that doesn't answer: after a few seconds this browser signs out anyway", async ({ page, context }) => {
+  await signIn(page);
+  await page.goto("/mehr/geraete");
+  await expect(page.getByTestId("device-current")).toBeVisible();
+  await context.route((url) => /^\/api\/devices\/\d+$/.test(url.pathname), () => {}); // the removal never answers
+  try {
+    await page.getByRole("button", { name: "Auf diesem Gerät abmelden" }).click();
+    await page.getByRole("button", { name: "Ja, abmelden" }).click();
+    await expect(page).toHaveURL(/\/anmelden$/, { timeout: 6000 });
+    expect(await page.evaluate(() => localStorage.getItem("gassi.device"))).toBeNull();
+  } finally {
+    await context.unrouteAll({ behavior: "ignoreErrors" });
+  }
+});
+
 test("the manifest is served with Gassi's name, dark colors and icons; the page links it with the Apple tags", async ({ request }) => {
   const res = await request.get("/manifest.json");
   expect(res.status()).toBe(200);
@@ -111,15 +127,24 @@ test("the manifest is served with Gassi's name, dark colors and icons; the page 
   }
 });
 
-test("after the first visit the app opens without reception; the API is never cached", async ({ page, context }) => {
+// Signed in, the app visited once, and the service worker in control with the shell kept.
+async function installed(page: Page) {
   await signIn(page);
   await page.goto("/");
   await expect(page.getByRole("tab", { name: "Start" })).toBeVisible();
-  // the service worker has cached the shell and controls the page
   await page.evaluate(async () => {
+    // listening first, so a controller arriving between the check and the listener isn't missed
+    const controlled = new Promise((r) => navigator.serviceWorker.addEventListener("controllerchange", r, { once: true }));
     await navigator.serviceWorker.ready;
-    if (!navigator.serviceWorker.controller) await new Promise((r) => navigator.serviceWorker.addEventListener("controllerchange", r, { once: true }));
+    if (!navigator.serviceWorker.controller) await controlled;
   });
+}
+
+// app pages and the shell, not the API, the bundles or files
+const appPage = (url: URL) => !/^\/(api|_expo|assets)\//.test(url.pathname) && !/\.[^/]*$/.test(url.pathname);
+
+test("after the first visit the app opens without reception; the API is never cached", async ({ page, context }) => {
+  await installed(page);
 
   await context.setOffline(true);
   try {
@@ -133,4 +158,18 @@ test("after the first visit the app opens without reception; the API is never ca
   const cached = await page.evaluate(async () => (await Promise.all((await caches.keys()).map(async (k) => (await (await caches.open(k)).keys()).map((r) => r.url)))).flat());
   expect(cached.length).toBeGreaterThan(0);
   expect(cached.filter((url) => new URL(url).pathname.startsWith("/api/"))).toEqual([]);
+});
+
+test("the installed app opens at once when the network hangs (one bar, a captive network)", async ({ page, context }: { page: Page; context: BrowserContext }) => {
+  await installed(page);
+  // every app page and the shell's refresh get no answer, ever
+  await context.route(appPage, () => {});
+  try {
+    await page.reload({ timeout: 5000 });
+    await expect(page.getByRole("tab", { name: "Start" })).toBeVisible({ timeout: 3000 });
+    await page.goto("/mehr", { timeout: 5000 });
+    await expect(page.getByRole("tab", { name: "Mehr" })).toHaveAttribute("aria-selected", "true", { timeout: 3000 });
+  } finally {
+    await context.unrouteAll({ behavior: "ignoreErrors" });
+  }
 });

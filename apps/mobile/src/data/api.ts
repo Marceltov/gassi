@@ -12,19 +12,28 @@ export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
 /** What a write that needs the server says when it isn't reachable. */
 export const OFFLINE = "Keine Verbindung – bitte später nochmal.";
 
-type Options = { fetch?: typeof fetch; onReached?: (reached: boolean) => void };
+/** How long a write that needs the server waits for its answer before it says OFFLINE (one bar, a captive network). */
+export const WRITE_TIMEOUT_MS = 10_000;
+
+/** `timeoutMs`: give up on a call that has no answer by then, as unreachable. */
+type Options = { fetch?: typeof fetch; onReached?: (reached: boolean) => void; timeoutMs?: number };
 
 // A proxy in front of a stopped server answers 502–504: as unreachable as no reception.
 const unreachable = (status: number) => status >= 502 && status <= 504;
 
-function wrap(fetchFn: typeof fetch, onReached: (reached: boolean) => void, onAnswer: (res: Response) => void): typeof fetch {
+function wrap(fetchFn: typeof fetch, onReached: (reached: boolean) => void, onAnswer: (res: Response) => void, timeoutMs?: number): typeof fetch {
   return async (input, init) => {
     let res: Response;
+    // a timer and an AbortController rather than AbortSignal.timeout, which not every runtime has
+    const abort = timeoutMs ? new AbortController() : null;
+    const timer = abort ? setTimeout(() => abort.abort(), timeoutMs) : null;
     try {
-      res = await fetchFn(input, init);
+      res = await fetchFn(input, abort ? { ...init, signal: abort.signal } : init);
     } catch {
       onReached(false);
       throw new ApiError(0, OFFLINE);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
     if (unreachable(res.status)) {
       onReached(false);
@@ -37,12 +46,12 @@ function wrap(fetchFn: typeof fetch, onReached: (reached: boolean) => void, onAn
 }
 
 /** The client for a signed-in device. */
-export function apiFor(device: Device, { fetch: fetchFn = (...a) => fetch(...a), onReached = () => {} }: Options = {}): Client {
+export function apiFor(device: Device, { fetch: fetchFn = (...a) => fetch(...a), onReached = () => {}, timeoutMs }: Options = {}): Client {
   const signOutOn401 = (res: Response) => {
     // only if this device is still the signed-in one: another tab may have signed in anew meanwhile
     if (res.status === 401 && loadDevice()?.token === device.token) forgetDevice();
   };
-  return createClient({ baseUrl: device.serverUrl, token: device.token, fetch: wrap(fetchFn, onReached, signOutOn401) });
+  return createClient({ baseUrl: device.serverUrl, token: device.token, fetch: wrap(fetchFn, onReached, signOutOn401, timeoutMs) });
 }
 
 /** Signs this device out here: forgets the token and what it showed, which brings up the sign-in. The queue of unsent

@@ -17,14 +17,13 @@ tooling
 **/playwright.config.ts
 .superpowers
 !scripts/web.mjs
-# Local builds of the Expo web app; the image exports its own.
+# Local builds of the Expo web app; the image exports its own. In public/ only the server's own files (the icons)
+# go in, as in .gitignore.
 apps/mobile/dist
 apps/mobile/.expo
-apps/server/public/.web-export
-apps/server/public/_expo
-apps/server/public/assets
-apps/server/public/favicon.ico
-apps/server/public/index.html
-apps/server/public/metadata.json
-apps/server/public/manifest.json
-apps/server/public/sw.js
+apps/server/public/*
+!apps/server/public/apple-icon.png
+!apps/server/public/icon-192.png
+!apps/server/public/icon-512.png
+!apps/server/public/icon-maskable-512.png
+!apps/server/public/icon.svg

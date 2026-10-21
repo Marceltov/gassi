@@ -9,7 +9,7 @@ import { AppState } from "react-native";
 import { loadDevice, subscribeDevice } from "./device";
 import { createGassiStore, type GassiState, type GassiStore } from "./store";
 
-export type Gassi = GassiState & { signedIn: boolean; api: Client | null; send(cmd: Command): void; refresh(): Promise<void> };
+export type Gassi = GassiState & { signedIn: boolean; api: Client | null; writeApi: Client | null; send(cmd: Command): void; refresh(): Promise<void> };
 
 const REFRESH_MS = 30_000;
 const signedOut: GassiState = { me: null, household: null, people: [], dogs: [], exercises: [], treatKinds: [], view: { walk: null, training: null }, pending: [], unsent: 0, online: true };
@@ -42,7 +42,7 @@ export function GassiProvider({ children }: { children: ReactNode }) {
   }, [store, busy]);
 
   const value = useMemo<Gassi>(
-    () => ({ ...state, signedIn: !!store, api: store?.api ?? null, send: (cmd) => store?.send(cmd), refresh: () => store?.refresh() ?? Promise.resolve() }),
+    () => ({ ...state, signedIn: !!store, api: store?.api ?? null, writeApi: store?.writeApi ?? null, send: (cmd) => store?.send(cmd), refresh: () => store?.refresh() ?? Promise.resolve() }),
     [state, store],
   );
   return <GassiContext.Provider value={value}>{children}</GassiContext.Provider>;

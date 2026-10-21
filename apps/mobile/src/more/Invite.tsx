@@ -4,7 +4,6 @@
 import type { Output } from "@gassi/api-client";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { useGassi } from "../data/GassiProvider";
 import { radius, useTheme } from "../theme";
 import { dayTime } from "../time";
 import { canCopy, copyText } from "../ui/copy";
@@ -19,19 +18,16 @@ const KIND_LABEL: Record<string, string> = { person: "Person", device: "Gerät",
 
 /** The invitation just made (or null), the open ones of `kind`, and how to make and take back one. */
 export function useInvites(kind: InviteKind) {
-  const { api } = useGassi();
   const { data, reload } = useServer((a) => a.invites());
   const { message, setMessage, run } = useWrite();
   const [shown, setShown] = useState<Created | null>(null);
   const create = () =>
-    void run(async () => {
-      if (!api) return;
+    void run(async (api) => {
       setShown(await api.createInvite({ kind }));
       reload();
     });
   const revoke = (id: number) =>
-    void run(async () => {
-      if (!api) return;
+    void run(async (api) => {
       await api.revokeInvite({ id });
       if (shown?.id === id) setShown(null);
       reload();

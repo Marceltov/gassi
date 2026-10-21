@@ -29,9 +29,9 @@ export const RESTOCK_MESSAGES: FieldMessages = {
   grams: "Wie viel Gramm hast du gekauft?",
 };
 
-/** What is there now, counted by hand: wet in cans (of the last can size bought), dry in grams. */
+/** What is there now, counted by hand: wet in cans (of the last can size bought; "2,5" or 2.5), dry in grams. */
 export const stockCountInput = z.discriminatedUnion("foodKind", [
-  z.object({ foodKind: z.literal("wet"), cans: z.coerce.number().min(0).max(1000) }),
+  z.object({ foodKind: z.literal("wet"), cans: z.preprocess(decimal, z.number().min(0).max(1000)) }),
   z.object({ foodKind: z.literal("dry"), grams: z.coerce.number().int().min(0).max(1_000_000) }),
 ]);
 export const STOCK_COUNT_MESSAGES: FieldMessages = {

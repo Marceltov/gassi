@@ -13,7 +13,8 @@ the same app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay
 ## Commands (from the repo root)
 
 - `npm test` (Vitest over all workspaces); one test: `npx vitest run <path> -t <name>`
-- `npm run test:e2e` (builds the server, then Playwright: the API through the typed client, the link page in Chromium)
+- `npm run test:e2e` (builds the app and the server, then Playwright: the API through the typed client, the link page
+  and the app's screens (`apps/server/e2e/app-*.spec.ts`) in Chromium)
 - `npm run typecheck`, `npm run lint`
 - `npm run dev -w @gassi/server` (needs `apps/server/.env.local`, see `apps/server/.env.example`)
 - The app in dev: `npm run web -w @gassi/mobile` (port 8081) against that server, with `CORS_ORIGIN=http://localhost:8081`

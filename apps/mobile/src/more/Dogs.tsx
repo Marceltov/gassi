@@ -1,5 +1,6 @@
 // Hunde: the household's dogs, archived ones below (their past entries stay; they aren't offered for new ones). A tap
 // opens a dog to rename it, give it another color, archive it or bring it back; Hund hinzufügen at the bottom.
+import type { Client } from "@gassi/api-client";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
@@ -21,7 +22,7 @@ type Editing = { dog: Dog | null; name: string; color: string };
 export function Dogs() {
   const theme = useTheme();
   const back = useBack();
-  const { api, refresh } = useGassi();
+  const { refresh } = useGassi();
   const { data, error, reload } = useServer((a) => a.dogs({ archived: "1" }));
   const { message, setMessage, run } = useWrite();
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -31,7 +32,7 @@ export function Dogs() {
     setMessage(null);
     setEditing({ dog, name: dog?.name ?? "", color: dog?.color ?? COLORS[dogs.length % COLORS.length] });
   };
-  const change = async (call: () => Promise<unknown>) => {
+  const change = async (call: (api: Client) => Promise<unknown>) => {
     if (await run(call)) {
       setEditing(null);
       reload();
@@ -39,12 +40,11 @@ export function Dogs() {
     }
   };
   const save = (e: Editing) =>
-    void change(async () => {
-      if (!api) return;
+    void change(async (api) => {
       if (e.dog) await api.updateDog({ id: e.dog.id, name: e.name, color: e.color });
       else await api.addDog({ name: e.name, color: e.color });
     });
-  const archive = (dog: Dog, archived: boolean) => void change(async () => api && (await api.updateDog({ id: dog.id, archived })));
+  const archive = (dog: Dog, archived: boolean) => void change((api) => api.updateDog({ id: dog.id, archived }));
 
   const rows = (list: Dog[]) => list.map((d) => <Row key={d.id} testID={`dog-${d.name}`} label={d.name} dot={d.color} onPress={() => open(d)} />);
   const active = dogs.filter((d) => !d.archived);

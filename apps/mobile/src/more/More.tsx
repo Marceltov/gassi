@@ -24,7 +24,9 @@ export function More() {
   const weightDog = newest && active.length > 1 ? `${dogs.find((d) => d.id === newest.dogIds[0])?.name ?? "Hund"} ` : "";
   const weight = newest ? `${weightDog}${formatKg(newest.amountG ?? 0)} · ${formatAgo(Date.parse(newest.at), now)}` : weights ? "noch keins" : undefined;
   const [wet, dry] = stock ? [stockParts(stock, "wet"), stockParts(stock, "dry")] : [null, null];
-  const food = stock ? [wet?.left, dry?.left && `${dry.left} trocken`].filter(Boolean).join(" · ") || "noch nichts eingetragen" : undefined;
+  // per kind what is left, "aufgebraucht" when it ran out; a kind never entered stays out
+  const kindLine = (s: typeof wet, name: string, suffix: string) => (!s ? null : s.empty ? `${name} aufgebraucht` : s.left && `${s.left}${suffix}`);
+  const food = stock ? [kindLine(wet, "Nass", ""), kindLine(dry, "Trocken", " trocken")].filter(Boolean).join(" · ") || "noch nichts eingetragen" : undefined;
   const others = people.filter((p) => p.id !== me?.id).map((p) => p.name);
   const go = (path: Href) => () => router.push(path);
 
