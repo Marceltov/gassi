@@ -43,7 +43,7 @@ Optional settings:
 | `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | Sign-in in the app and the web app through your own identity provider (authentik, Keycloak, …): all three or none. Then there is no setup link; the first sign-in sets the household up, new people come in through the provider, invites only add devices |
 | `DOG_NAME` | The first dog's name when setup doesn't ask (with OIDC: else "Mein Hund"; rename it in the app) |
 | `TZ` (default `Europe/Berlin`) | The household's time zone: days, weeks |
-| `DATA_DIR` (default `/data` in the image), `SECRET`, `LOG_LEVEL` | Where data lives; a fixed cookie key (else one is kept in `DATA_DIR`); log detail |
+| `DATA_DIR` (default `/data` in the image), `SECRET`, `LOG_LEVEL` | Where data lives; a fixed key for cookies and sign-in codes (else one is kept in `DATA_DIR`; changing it voids open codes); log detail |
 
 Updating from Gassi 0.2 (the web app): its database can't be migrated. The server refuses to start on it and says
 so; move `data/gassi.db`, `gassi.db-wal` and `gassi.db-shm` aside and start again to set up afresh.

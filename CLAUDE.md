@@ -48,8 +48,8 @@ labels, ports); they apply to that deployment folder, not to the app code here.
   with optional `endedAt`/`amountG`/`foodKind`/`note`. Walkers, pauses, exercises, treats and GPS tracks are child rows.
   "During a walk" is decided by time (ADR 0002). Taps are idempotent commands with client ids (ADR 0001).
 - **No redundancy:** domain rules exist once in `packages/domain`; the API exists once in the contract.
-- **Sign-in:** setup link (printed at first start), invite links, magic links (SMTP), optional OIDC; devices hold
-  tokens stored only as hashes (ADR 0004). Only `PUBLIC_URL` is required.
+- **Sign-in:** setup link (printed at first start), invite links, magic links (SMTP), each also as a typed code,
+  optional OIDC; devices hold tokens stored only as hashes (ADR 0004). Only `PUBLIC_URL` is required.
 - **UI (web app, Android app):** German, phone-first, dark mode; the web app is an installable PWA, the Android app
   has native look and feel.
 - **Deployment:** one container (`Dockerfile`, standalone server at `apps/server/server.js`); GitHub Actions pushes

@@ -1,4 +1,4 @@
-// How an entry reads in a list, the same in the app, the dashboard and the CSV.
+// How an entry reads in a list, the same in the apps.
 import type { ExerciseTotal } from "./exerciseTotals";
 import { type EntryType, FOOD_LABEL, type FoodKind, TYPE_LABEL } from "./entryTypes";
 
