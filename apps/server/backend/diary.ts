@@ -27,7 +27,13 @@ export type EntryView = Entry & {
   distanceM: number | null;
   route: Route | null;
   during: WalkDuring | null;
+  count: CountRow[] | null;
 };
+/** One can size of a wet count. */
+export type CountRow = { unitG: number; amountG: number };
+
+// A wet count is one stockcheck per can size at the same time: its rows are moved and deleted together.
+const isWetCount = (e: Entry) => e.type === "stockcheck" && e.foodKind === "wet";
 export type TreatCount = { treatKindId: number; count: number };
 
 
@@ -111,6 +117,10 @@ export class Diary {
     // the entry and its walkers change together or not at all
     const entry = await this.deps.db.transaction().execute(async (tx) => {
       const updated = await new EntryRepository(tx, this.deps.now).update(id, fields);
+      // the other sizes of a wet count go to the same time (else the count would set them to 0, or lose this one)
+      if (updated && before && isWetCount(before) && updated.at !== before.at) {
+        await tx.updateTable("entry").set({ at: updated.at, updated_at: this.deps.now().toISOString() }).where("type", "=", "stockcheck").where("food_kind", "=", "wet").where("at", "=", before.at).where("id", "!=", id).execute();
+      }
       if (updated && walkers) await replaceWalkers(tx, id, [...new Set(walkers)]);
       // a dog taken out of a training takes its repetitions along
       if (updated?.type === "training" && fields.dogIds) await tx.deleteFrom("training_exercise").where("entry_id", "=", id).where("dog_id", "not in", fields.dogIds).execute();
@@ -166,8 +176,13 @@ export class Diary {
     return entry ? this.view1(entry) : null;
   }
 
-  remove(id: number): Promise<boolean> {
-    return this.entries.remove(id);
+  /** Deletes the entry; a wet count's row takes the whole count along. */
+  async remove(id: number): Promise<boolean> {
+    const e = await this.entries.get(id);
+    if (!e) return false;
+    if (!isWetCount(e)) return this.entries.remove(id);
+    await this.deps.db.deleteFrom("entry").where("type", "=", "stockcheck").where("food_kind", "=", "wet").where("at", "=", e.at).execute();
+    return true;
   }
 
   /** The amount of the newest feeding of each kind, offered as the usual portion, and the can size of the newest wet
@@ -328,9 +343,19 @@ export class Diary {
     );
   }
 
+  /** The rows of the wet counts among `entries`, by their time, smallest can first. */
+  private async counts(entries: readonly Entry[]): Promise<Map<string, CountRow[]>> {
+    const ats = [...new Set(entries.filter(isWetCount).map((e) => e.at))];
+    if (!ats.length) return new Map();
+    const rows = await this.deps.db.selectFrom("entry").select(["at", "unit_g", "amount_g"]).where("type", "=", "stockcheck").where("food_kind", "=", "wet").where("at", "in", ats).orderBy("unit_g").execute();
+    const byAt = new Map<string, CountRow[]>();
+    for (const r of rows) byAt.set(r.at, [...(byAt.get(r.at) ?? []), { unitG: r.unit_g ?? 0, amountG: r.amount_g ?? 0 }]);
+    return byAt;
+  }
+
   private async views(entries: Entry[]): Promise<EntryView[]> {
     const { names } = this.deps;
-    const d = await this.details(entries);
+    const [d, counts] = await Promise.all([this.details(entries), this.counts(entries)]);
     const now = this.deps.now().toISOString();
     return entries.map((e) => {
       const isWalk = e.type === "walk";
@@ -349,6 +374,7 @@ export class Diary {
         distanceM: track?.metrics.distanceM ?? null,
         route: track ? simplify(track.points, ROUTE_POINTS) : null,
         during: isWalk ? (d.during.get(e.id) ?? null) : null,
+        count: isWetCount(e) ? (counts.get(e.at) ?? []) : null,
       };
     });
   }

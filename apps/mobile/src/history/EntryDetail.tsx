@@ -1,8 +1,9 @@
 // One entry from Verlauf, to be put right afterwards: its time (and end), the dogs, for a walk who went, for food the
 // amount and kind, for weight the weight, for a training its repetitions per exercise and dog and its treats, a note;
-// Speichern sends it all, Löschen asks first. Both need the server (the writes' client): they say so without
+// Speichern sends it all, Löschen asks first. A wet count (one row per can size) is one thing here: its sizes in one line,
+// its time moved and its rows deleted together. Both need the server (the writes' client): they say so without
 // reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
-import { clampPortion, dogRule, FOOD_MAX_G, formatKg, keepsOne, trainingSummaryLine, TYPE_LABEL } from "@gassi/domain";
+import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, trainingSummaryLine, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -19,6 +20,7 @@ import { Sheet } from "../ui/Sheet";
 import { AmountStepper, StepButton } from "../ui/Stepper";
 import { LAST_WALKER } from "../walk/lastOne";
 import { bumpRep, bumpTreat, editInput, type Entry, type Form, formOf, pickDog, trainingInput } from "./form";
+import { TIME_ZONE } from "../time";
 import { TimeField } from "./TimeField";
 
 const BUTTON: Partial<Record<Entry["type"], ButtonKind>> = { walk: "walk", food: "food", training: "training", pee: "pee", poop: "poop" };
@@ -99,7 +101,12 @@ export function EntryDetail({ id }: { id: number }) {
     <Screen
       top={
         <>
-          <Text style={[styles.title, { color: theme.ink }]}>{`${TYPE_ICON[entry.type]} ${TYPE_LABEL[entry.type]}`}</Text>
+          <Text style={[styles.title, { color: theme.ink }]}>{`${TYPE_ICON[entry.type]} ${entry.count ? countTitle(entry.at, TIME_ZONE) : TYPE_LABEL[entry.type]}`}</Text>
+          {entry.count ? (
+            <Text testID="count-line" style={[styles.countLine, { color: theme.ink }]}>
+              {countLine(entry.count)}
+            </Text>
+          ) : null}
           <Text style={[styles.small, { color: theme.muted }]}>{`eingetragen von ${entry.byName}`}</Text>
           <View style={styles.times}>
             <TimeField label={timed ? "Beginn" : "Zeit"} value={form.at} onChange={(at) => change({ at })} />
@@ -143,7 +150,7 @@ export function EntryDetail({ id }: { id: number }) {
           <Sheet open={asking} onClose={() => setAsking(false)}>
             <View testID="delete-sheet" style={styles.sheet}>
               <Text style={[styles.sheetTitle, { color: theme.ink }]}>Eintrag löschen?</Text>
-              <Text style={[styles.small, { color: theme.muted }]}>{`${TYPE_LABEL[entry.type]} – das lässt sich nicht rückgängig machen.`}</Text>
+              <Text style={[styles.small, { color: theme.muted }]}>{`${entry.count ? `Die ganze Zählung (${countLine(entry.count)})` : TYPE_LABEL[entry.type]} – das lässt sich nicht rückgängig machen.`}</Text>
               <BigButton kind="neutral" size="l" label="Ja, löschen" onPress={() => void remove(entry)} />
               <BigButton kind="neutral" size="m" label="Abbrechen" onPress={() => setAsking(false)} />
             </View>
@@ -246,6 +253,7 @@ function Counter({ sign, value, what, onStep }: { sign: string; value: number; w
 }
 
 const styles = StyleSheet.create({
+  countLine: { fontSize: 18, fontWeight: "700" },
   title: { fontSize: 22, fontWeight: "700" },
   small: { fontSize: 13 },
   message: { fontSize: 15, fontWeight: "600" },

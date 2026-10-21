@@ -1,7 +1,8 @@
 // Food amounts in words and the food sheet's starting values, for the stock screen and the food sheet.
 import { FOOD_MAX_G, FOOD_MIN_G } from "./commands";
 import { FOOD_KINDS, FOOD_SHORT, type FoodKind } from "./entryTypes";
-import type { CanStock, Stock } from "./stock";
+import { type CanStock, cansOf, type Stock } from "./stock";
+import { utcToLocal } from "./time";
 
 /** "11½", "½", "0": whole and half cans. */
 const halves = (cans: number): string => {
@@ -96,4 +97,13 @@ export function stockSummary(stock: Stock): string | null {
     return empty ? [`${FOOD_SHORT[k]}: aufgebraucht`] : left ? [`${FOOD_SHORT[k]}: ${sizes.length ? sizes.join(", ") : left}`] : [];
   });
   return parts.length ? parts.join(" · ") : null;
+}
+
+/** A wet count (its rows: grams per can size) in one line: "3 × 400 g, 1 × 800 g". */
+export const countLine = (rows: readonly { unitG: number; amountG: number }[]): string => rows.map((r) => formatCanCount({ unitG: r.unitG, cans: cansOf(r.amountG, r.unitG) })).join(", ");
+
+/** "Zählung vom 20.10., 10:05": a wet count, named by its time in `timeZone`. */
+export function countTitle(at: string, timeZone: string): string {
+  const local = utcToLocal(Date.parse(at), timeZone); // "2026-10-20T10:05"
+  return `Zählung vom ${local.slice(8, 10)}.${local.slice(5, 7)}., ${local.slice(11)}`;
 }

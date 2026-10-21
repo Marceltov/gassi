@@ -2,6 +2,7 @@
 import { type EntryType, FOOD_LABEL, type FoodKind, TYPE_LABEL } from "./entryTypes";
 import { exerciseRate, type ExerciseTotal, trainingParts } from "./exerciseTotals";
 import { formatCanCount } from "./food";
+import { cansOf } from "./stock";
 import { formatMinutes } from "./time";
 
 /** What happened during a walk: its pee and poop, and the exercises of the trainings on it. */
@@ -59,7 +60,7 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
     }
     case "stockcheck":
       // a wet count is one entry per can size, in whole and half cans
-      return plain([TYPE_LABEL.stockcheck, kind].filter(Boolean).join(" "), e.amountG === null ? "" : e.unitG ? formatCanCount({ unitG: e.unitG, cans: Math.floor((e.amountG / e.unitG) * 2) / 2 }) : grams(e.amountG));
+      return plain([TYPE_LABEL.stockcheck, kind].filter(Boolean).join(" "), e.amountG === null ? "" : e.unitG ? formatCanCount({ unitG: e.unitG, cans: cansOf(e.amountG, e.unitG) }) : grams(e.amountG));
     default:
       return plain(TYPE_LABEL[e.type], [duration, kind, e.amountG ? `${e.amountG} g` : ""].filter(Boolean).join(", "));
   }

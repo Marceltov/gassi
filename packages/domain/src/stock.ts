@@ -18,6 +18,12 @@ export type WetStock = KindStock & { sizes: CanStock[]; newestUnitG: number | nu
 export type Stock = { wet: WetStock; dry: KindStock };
 export type Treat = { at: string; grams: number };
 
+/** Grams lost to rounding ½ Dose (395 g → 198 g) that must not take a half can away. */
+const HALF_SLACK_G = 5;
+
+/** Whole and half cans in `grams` of cans of `unitG` grams, rounded down to ½, give or take a few grams. */
+export const cansOf = (grams: number, unitG: number): number => Math.max(0, Math.floor(((grams + HALF_SLACK_G) / unitG) * 2) / 2);
+
 const WINDOW_MS = 14 * 86_400_000;
 const DAY_MS = 86_400_000;
 
@@ -68,7 +74,7 @@ function wetStock(entries: readonly Entry[], now: number): WetStock {
     const counts = (e: Entry) => mine(e) && (checkAt ? e.at > checkAt : e.at >= from);
     const grams = sum(check.filter(mine)) + sum(restocks.filter(counts)) - sum(feedings.filter(counts));
     const left = Math.max(0, grams);
-    return { unitG, grams: left, cans: Math.floor((left / unitG) * 2) / 2, belowZero: grams < 0 };
+    return { unitG, grams: left, cans: cansOf(left, unitG), belowZero: grams < 0 };
   });
   const left = sum(sizes);
   const countStart = checkAt ?? restocks[0]?.at ?? sorted[0].at;

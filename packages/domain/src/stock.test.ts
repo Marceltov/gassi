@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { Entry } from "./entry";
 import { formatCans, formatWeight, parseDecimal } from "./food";
-import { computeStock } from "./stock";
+import { cansOf, computeStock } from "./stock";
 
 const NOW = Date.parse("2026-10-20T12:00:00Z");
 let id = 0;
@@ -57,6 +57,15 @@ describe("computeStock", () => {
   test("cans are rounded down to halves, per size", () => {
     expect(wetOf(stock([restockWet(day(3), 2, 400), feed(day(1), "wet", 150)]))).toEqual([[400, 1.5]]);
     expect(wetOf(stock([restockWet(day(3), 2, 400), feed(day(1), "wet", 250)]))).toEqual([[400, 1]]);
+  });
+
+  test("half cans of any size: a few grams lost to rounding a half don't take the half away", () => {
+    // ½ Dose of 395 g is 198 g, of 425 g it is 213 g
+    expect(wetOf(stock([restockWet(day(3), 2, 395), feedCan(day(1), 198, 395)]))).toEqual([[395, 1.5]]);
+    expect(wetOf(stock([restockWet(day(3), 2, 425), feedCan(day(2), 213, 425), feedCan(day(1), 213, 425)]))).toEqual([[425, 1]]);
+    expect(wetOf(stock([restockWet(day(3), 4, 395), ...[1, 2, 3, 4, 5].map((d) => feedCan(day(d * 0.1), 198, 395))]))).toEqual([[395, 1.5]]);
+    expect(cansOf(190, 395)).toBe(0); // well short of a half is no half
+    expect(cansOf(395 * 2, 395)).toBe(2);
   });
 
   test("dry treats count against dry food", () => {

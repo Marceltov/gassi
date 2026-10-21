@@ -122,6 +122,49 @@ describe("food and stock", () => {
   });
 });
 
+describe("a wet count is one thing", () => {
+  const twoSizes = async () => {
+    clock = new Date("2026-10-20T10:00:00Z");
+    const d = diary();
+    const { entries } = await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: 3 }, { unitG: 800, cans: 1 }] });
+    clock = new Date("2026-10-20T12:00:00Z");
+    return { d, entries };
+  };
+  const counts = async (d: ReturnType<typeof diary>) => (await d.stock()).wet.sizes.map((s) => [s.unitG, s.cans]);
+
+  test("its rows show the whole count", async () => {
+    const { d, entries } = await twoSizes();
+    expect((await d.get(entries[1].id))?.count).toEqual([{ unitG: 400, amountG: 1200 }, { unitG: 800, amountG: 800 }]);
+    expect((await d.get(entries[0].id))?.count).toHaveLength(2);
+  });
+
+  test("moving one row's time moves the whole count: the other size keeps its count", async () => {
+    const { d, entries } = await twoSizes();
+    await d.edit(entries[0].id, { at: "2026-10-20T09:00:00Z", amountG: 1200, foodKind: "wet", unitG: 400 });
+    expect((await d.get(entries[1].id))?.at).toBe("2026-10-20T09:00:00.000Z");
+    expect(await counts(d)).toEqual([[400, 3], [800, 1]]);
+    await d.edit(entries[1].id, { at: "2026-10-20T11:00:00Z", amountG: 800, foodKind: "wet", unitG: 800 });
+    expect(await counts(d)).toEqual([[400, 3], [800, 1]]);
+  });
+
+  test("deleting one row deletes the whole count", async () => {
+    const { d, entries } = await twoSizes();
+    expect(await d.remove(entries[0].id)).toBe(true);
+    expect(await d.get(entries[1].id)).toBeNull();
+    expect((await d.stock()).wet.grams).toBeNull();
+  });
+
+  test("other entries keep their own time and go alone", async () => {
+    clock = new Date("2026-10-20T10:00:00Z");
+    const d = diary();
+    const dry = (await d.correctStock(HIRSCH, { foodKind: "dry", amount: 500 })).entries[0];
+    const wet = (await d.correctStock(HIRSCH, { foodKind: "wet", sizes: [{ unitG: 400, cans: 1 }] })).entries[0];
+    expect((await d.get(dry.id))?.count).toBeNull();
+    await d.remove(dry.id);
+    expect(await d.get(wet.id)).not.toBeNull();
+  });
+});
+
 describe("weight", () => {
   test("is logged in kg with one decimal and stored in grams", async () => {
     expect(await diary().logWeight(HIRSCH, { kg: "12,4", at: "2026-10-03T08:00:00Z" })).toMatchObject({ type: "weight", amountG: 12_400, at: "2026-10-03T08:00:00.000Z" });

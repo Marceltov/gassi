@@ -75,6 +75,8 @@ export const entryViewSchema = z.object({
   route: routeSchema.nullable(),
   // a walk's pee, poop and the trainings' exercises during it, decided by time (ADR 0002); null for other entries
   during: z.object({ pees: z.number(), poops: z.number(), exercises: z.array(exerciseTotalSchema) }).nullable(),
+  // a wet count's can sizes (its rows at the same time, smallest can first), moved and deleted as one; null for others
+  count: z.array(z.object({ unitG: z.number(), amountG: z.number() })).nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
