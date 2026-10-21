@@ -29,7 +29,7 @@ test("a walk: duration with pause and who walked", () => {
 });
 
 test("a training: duration, exercises and treats", () => {
-  expect(text(entry({ type: "training", endedAt: "x", durationMin: 12, exercises: ["Rückruf", "Sitz"], treats: 6, byName: "Herzii" }))).toBe("Training, 12 Min.: Rückruf, Sitz, 6 Leckerlis von Herzii");
+  expect(text(entry({ type: "training", endedAt: "x", durationMin: 12, exercises: [{ name: "Rückruf", ok: 1, fail: 0 }, { name: "Sitz", ok: 2, fail: 1 }], treats: 6, byName: "Herzii" }))).toBe("Training, 12 Min.: Rückruf, Sitz, 6 Leckerlis von Herzii");
   expect(text(entry({ type: "training", endedAt: "x", durationMin: 5, treats: 1 }))).toBe("Training, 5 Min., 1 Leckerli von Hirsch");
 });
 

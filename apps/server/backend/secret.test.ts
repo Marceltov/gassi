@@ -1,8 +1,8 @@
-import { mkdtempSync, readFileSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "vitest";
-import { secret } from "./secret";
+import { linkCodeKey, secret } from "./secret";
 
 const dir = () => mkdtempSync(join(tmpdir(), "gassi-secret-"));
 
@@ -17,4 +17,13 @@ test("is created once in the data folder and reused", () => {
 
 test("SECRET from the environment wins", () => {
   expect(secret("s".repeat(32), dir())).toBe("s".repeat(32));
+});
+
+test("the link code key is derived once per secret and data folder, not per request", () => {
+  const d = dir();
+  const key = linkCodeKey(null, d);
+  rmSync(join(d, "secret")); // not read again
+  expect(linkCodeKey(null, d)).toBe(key);
+  expect(linkCodeKey("s".repeat(32), d)).not.toBe(key);
+  expect(linkCodeKey(null, dir())).not.toBe(key);
 });

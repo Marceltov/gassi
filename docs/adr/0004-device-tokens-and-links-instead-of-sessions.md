@@ -44,3 +44,9 @@ the same for phones, the watch and scripts, and a device can be signed out alone
   to keep that window small.
 * Bad, because the setup link is printed (it holds a token), so the server's stdout must be treated as sensitive
   until setup is done.
+
+## More Information
+
+2026-10-21: links also carry a short code to type (`XXXX-XXXX`, 40 bits) for an installed web app that can't be
+handed the link. It is used once, together with its link; the server keeps only its HMAC under a key derived from
+the server secret, since 40 bits are too few for a plain hash.

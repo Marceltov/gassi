@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import type { Command } from "./commands";
 import { project, type SessionsView } from "./sessionProjection";
 
@@ -26,23 +26,90 @@ test("a pending start shows a walk by me, a pending join adds me once", () => {
 
 test("a pending stop ends the walk and its training", () => {
   const training = project(walking, [c("05", { kind: "training.start", trainingKey: "t", walkKey: "w" })], HIRSCH);
-  expect(training.training).toEqual({ key: "t", startedAt: "2026-10-20T09:05:00.000Z", dogIds: [], walkKey: "w", exercises: [], treats: {} });
+  expect(training.training).toEqual({ key: "t", startedAt: "2026-10-20T09:05:00.000Z", dogIds: [], walkKey: "w", reps: [], treats: {} });
   expect(project(walking, [c("05", { kind: "training.start", trainingKey: "t", walkKey: "w" }), c("30", { kind: "walk.stop", walkKey: "w" })], HIRSCH)).toEqual({ walk: null, training: null });
 });
 
-test("pending exercise and treat taps show, treats never below 0, in time order", () => {
-  const home: SessionsView = { walk: null, training: { key: "t", startedAt: "2026-10-20T09:00:00.000Z", dogIds: [1], walkKey: null, exercises: [3], treats: { 7: 1 } } };
+test("pending treat taps show, treats never below 0, in time order", () => {
+  const home: SessionsView = { walk: null, training: { key: "t", startedAt: "2026-10-20T09:00:00.000Z", dogIds: [1], walkKey: null, reps: [], treats: { 7: 1 } } };
   const v = project(
     home,
-    [c("04", { kind: "training.treat", trainingKey: "t", treatKindId: 7, delta: -1 }), c("02", { kind: "training.exercise", trainingKey: "t", exerciseId: 3, on: false }), c("03", { kind: "training.exercise", trainingKey: "t", exerciseId: 5, on: true }), c("05", { kind: "training.treat", trainingKey: "t", treatKindId: 7, delta: -1 })],
+    [c("04", { kind: "training.treat", trainingKey: "t", treatKindId: 7, delta: -1 }), c("05", { kind: "training.treat", trainingKey: "t", treatKindId: 7, delta: -1 })],
     HIRSCH,
   );
-  expect(v.training).toMatchObject({ exercises: [5], treats: { 7: 0 } });
+  expect(v.training).toMatchObject({ treats: { 7: 0 } });
 });
 
 test("a pending start from this phone gives its key to the walk and training shown (a cached page may hold an old one)", () => {
-  const cached: SessionsView = { walk: { key: "old", startedAt: "2026-10-19T09:00:00.000Z", dogIds: [1], walkers: [HIRSCH], pauses: [], paused: false }, training: { key: "old-t", startedAt: "2026-10-19T09:05:00.000Z", dogIds: [1], walkKey: "old", exercises: [3], treats: {} } };
+  const cached: SessionsView = { walk: { key: "old", startedAt: "2026-10-19T09:00:00.000Z", dogIds: [1], walkers: [HIRSCH], pauses: [], paused: false }, training: { key: "old-t", startedAt: "2026-10-19T09:05:00.000Z", dogIds: [1], walkKey: "old", reps: [], treats: {} } };
   const v = project(cached, [c("00", { kind: "walk.start", walkKey: "new" }), c("01", { kind: "training.start", trainingKey: "new-t", walkKey: "new" })], HIRSCH);
   expect(v.walk!.key).toBe("new");
   expect(v.training!.key).toBe("new-t");
+});
+
+const repTraining: SessionsView = { walk: null, training: { key: "t", startedAt: "2026-10-20T09:00:00.000Z", dogIds: [1, 2], walkKey: null, reps: [], treats: {} } };
+const rep = (at: string, dogId: number, ok: boolean, delta: 1 | -1 = 1) => c(at, { kind: "training.rep", trainingKey: "t", exerciseId: 1, dogId, ok, delta });
+
+test("training.rep counts ok and fail per exercise and dog", () => {
+  const v = project(repTraining, [rep("01", 1, true), rep("02", 1, true), rep("03", 1, false), rep("04", 2, true)], HIRSCH);
+  expect(v.training!.reps).toEqual([
+    { exerciseId: 1, dogId: 1, ok: 2, fail: 1 },
+    { exerciseId: 1, dogId: 2, ok: 1, fail: 0 },
+  ]);
+});
+
+test("a rep with delta -1 never goes below zero", () => {
+  expect(project(repTraining, [rep("01", 1, true, -1)], HIRSCH).training!.reps).toEqual([{ exerciseId: 1, dogId: 1, ok: 0, fail: 0 }]);
+});
+
+test("a rep for a dog outside the training is left out", () => {
+  expect(project(repTraining, [rep("01", 3, true)], HIRSCH).training!.reps).toEqual([]);
+});
+
+test("with no dogs known yet (no active dogs passed) a rep is kept", () => {
+  const open: SessionsView = { walk: null, training: { ...repTraining.training!, dogIds: [] } };
+  expect(project(open, [rep("01", 3, true)], HIRSCH).training!.reps).toEqual([{ exerciseId: 1, dogId: 3, ok: 1, fail: 0 }]);
+});
+
+test("a pending walker is added once with the name from the people, and removed again, but never the last one", () => {
+  const people = [HIRSCH, HERZII];
+  const add = c("01", { kind: "walk.walker", walkKey: "w", personId: "bille", on: true });
+  expect(project(walking, [add, c("02", { kind: "walk.walker", walkKey: "w", personId: "bille", on: true })], HIRSCH, people).walk!.walkers).toEqual([HIRSCH, HERZII]);
+  expect(project(walking, [add, c("02", { kind: "walk.walker", walkKey: "w", personId: "marcel", on: false })], HIRSCH, people).walk!.walkers).toEqual([HERZII]);
+  expect(project(walking, [c("02", { kind: "walk.walker", walkKey: "w", personId: "marcel", on: false })], HIRSCH, people).walk!.walkers).toEqual([HIRSCH]);
+  expect(project(walking, [c("01", { kind: "walk.walker", walkKey: "w", personId: "unknown", on: true })], HIRSCH, people).walk!.walkers).toEqual([HIRSCH]);
+});
+
+test("a pending dog is added once and removed again, but never the last one", () => {
+  const add = c("01", { kind: "walk.dog", walkKey: "w", dogId: 2, on: true });
+  expect(project(walking, [add, c("02", { kind: "walk.dog", walkKey: "w", dogId: 2, on: true })], HIRSCH).walk!.dogIds).toEqual([1, 2]);
+  expect(project(walking, [add, c("02", { kind: "walk.dog", walkKey: "w", dogId: 1, on: false })], HIRSCH).walk!.dogIds).toEqual([2]);
+  expect(project(walking, [c("02", { kind: "walk.dog", walkKey: "w", dogId: 1, on: false })], HIRSCH).walk!.dogIds).toEqual([1]);
+});
+
+describe("the dogs of a pending start", () => {
+  const none: SessionsView = { walk: null, training: null };
+  const people = [HIRSCH];
+
+  test("a start without dogs takes every active dog, like the server", () => {
+    const v = project(none, [c("00", { kind: "walk.start", walkKey: "k" }), c("01", { kind: "training.start", trainingKey: "t", walkKey: "k" })], HIRSCH, people, [1, 2]);
+    expect(v.walk!.dogIds).toEqual([1, 2]);
+    expect(v.training!.dogIds).toEqual([1, 2]);
+  });
+
+  test("named dogs that are active are kept; none of them active, every active dog", () => {
+    expect(project(none, [c("00", { kind: "walk.start", walkKey: "k", dogIds: [2, 9] })], HIRSCH, people, [1, 2]).walk!.dogIds).toEqual([2]);
+    expect(project(none, [c("00", { kind: "training.start", trainingKey: "t", dogIds: [9] })], HIRSCH, people, [1, 2]).training!.dogIds).toEqual([1, 2]);
+  });
+
+  test("so dog taps and reps on a pending walk and training work offline", () => {
+    const v = project(none, [c("00", { kind: "walk.start", walkKey: "k" }), c("01", { kind: "walk.dog", walkKey: "k", dogId: 1, on: false }), c("02", { kind: "training.start", trainingKey: "t" }), rep("03", 3, true), rep("04", 2, true)], HIRSCH, people, [1, 2]);
+    expect(v.walk!.dogIds).toEqual([2]);
+    expect(v.training!.reps).toEqual([{ exerciseId: 1, dogId: 2, ok: 1, fail: 0 }]);
+  });
+
+  test("without the active dogs a start keeps the dogs it names", () => {
+    expect(project(none, [c("00", { kind: "walk.start", walkKey: "k", dogIds: [2] })], HIRSCH).walk!.dogIds).toEqual([2]);
+    expect(project(none, [c("00", { kind: "walk.start", walkKey: "k" })], HIRSCH).walk!.dogIds).toEqual([]);
+  });
 });

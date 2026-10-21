@@ -65,7 +65,7 @@ export function trackMetrics(points: readonly TrackPoint[]): TrackMetrics {
 
 /** Douglas-Peucker on a local flat projection: drops points closer than `toleranceM` to the line through their
  * neighbours, keeping the ends and the corners. For drawing; metrics use all points. */
-export function simplify(points: readonly TrackPoint[], toleranceM = 5): TrackPoint[] {
+export function trimTrack(points: readonly TrackPoint[], toleranceM = 5): TrackPoint[] {
   const ps = byTime(points);
   if (ps.length < 3) return ps;
   const lat0 = rad(ps[0].lat);
@@ -90,6 +90,14 @@ export function simplify(points: readonly TrackPoint[], toleranceM = 5): TrackPo
     }
   }
   return ps.filter((_, i) => keep[i]);
+}
+
+/** At most `max` (≥ 2) of the points as `[lat, lon]`, evenly spaced and with the first and last kept: a route small
+ * enough to send with every walk and draw as a thumbnail. `points` must be in time order. */
+export function simplify(points: readonly { lat: number; lon: number }[], max: number): [number, number][] {
+  const n = points.length;
+  const picked = n <= max ? points : Array.from({ length: max }, (_, i) => points[Math.round((i * (n - 1)) / (max - 1))]);
+  return picked.map((p) => [p.lat, p.lon]);
 }
 
 /** The track a walk shows: a watch's (the best GPS), else the longest. The index, or null without tracks. */

@@ -1,4 +1,5 @@
-// How an entry reads in a list, the same in the app, the dashboard and the CSV.
+// How an entry reads in a list, the same in the apps.
+import type { ExerciseTotal } from "./exerciseTotals";
 import { type EntryType, FOOD_LABEL, type FoodKind, TYPE_LABEL } from "./entryTypes";
 
 /** The fields of an entry that its description needs (the server's entry view has them all). */
@@ -12,7 +13,7 @@ export type DescribableEntry = {
   endedAt: string | null;
   walkers: string[];
   pauseMin: number | null;
-  exercises: string[];
+  exercises: ExerciseTotal[];
   treats: number | null;
   byName: string;
 };
@@ -35,7 +36,7 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
     case "training": {
       const treats = e.treats ? `${e.treats} ${e.treats === 1 ? "Leckerli" : "Leckerlis"}` : "";
       const head = e.clientKey && !e.endedAt ? "läuft" : duration;
-      const tail = [e.exercises.join(", "), treats].filter(Boolean).join(", ");
+      const tail = [e.exercises.map((x) => x.name).join(", "), treats].filter(Boolean).join(", ");
       return { title: TYPE_LABEL.training, extra: e.exercises.length ? `${head}: ${tail}` : [head, treats].filter(Boolean).join(", "), by };
     }
     case "weight":

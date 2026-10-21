@@ -44,6 +44,6 @@ describe("food, weight and the week over the API", () => {
     const { body } = await json("/api/week?w=2026-10-20", { token });
     expect(body.monday).toBe("2026-10-19");
     expect(body.days[1].bars).toEqual([{ type: "walk", startMin: 600, endMin: 640 }]);
-    expect(body.walkMinByPerson).toEqual([{ id: HIRSCH.id, name: "Hirsch", min: 40 }]);
+    expect(body.byPerson).toMatchObject([{ id: HIRSCH.id, name: "Hirsch", walks: 1, walkMin: 40, km: 0 }]);
   });
 });

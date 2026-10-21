@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { Command } from "@gassi/domain";
 import { Catalog } from "./catalog";
 import { freshDatabase } from "./db/testing";
+import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
 import { Sessions } from "./sessions";
 
@@ -62,7 +63,7 @@ describe("walks", () => {
     await s.apply(HERZII, [cmd(1, { kind: "walk.start", walkKey: "w2" }), cmd(5, { kind: "log", type: "pee", dogId: 1 })]); // queued without reception
     expect((await entries()).filter((e) => e.type === "walk")).toHaveLength(1);
     expect(await s.current()).toEqual({ walk: null, training: null });
-    expect(await s.summaryFor("w2")).toMatchObject({ totalMin: 40, walkers: [HIRSCH, HERZII], pee: 1 });
+    expect(await s.summaryFor("w2")).toMatchObject({ totalMin: 40, walkers: [HIRSCH, HERZII], pees: [{ at: at(5), dogId: 1 }] });
   });
 
   test("a start does not join a walk whose end was edited into the future", async () => {
@@ -163,7 +164,7 @@ describe("walks", () => {
     expect(await s.apply(HERZII, [pipi])).toEqual({ applied: [pipi.id], dropped: [] });
     const all = await entries();
     expect(all[0]).toMatchObject({ type: "pee", at: at(40), loggedBy: "bille" });
-    expect(await s.summary(all[1].id)).toMatchObject({ pee: 0 });
+    expect(await s.summary(all[1].id)).toMatchObject({ pees: [] });
   });
 
   test("applying a command id twice changes nothing", async () => {
@@ -189,7 +190,7 @@ describe("walks", () => {
     expect(await sessions().apply(HIRSCH, [stop])).toEqual({ applied: [], dropped: [stop.id] });
   });
 
-  test("summary counts pee/poop inside the walk's time only", async () => {
+  test("summary lists pee/poop inside the walk's time only, with times and dogs, oldest first", async () => {
     const s = sessions();
     await s.apply(HIRSCH, [
       cmd(0, { kind: "log", type: "pee", dogId: 1 }),
@@ -201,7 +202,7 @@ describe("walks", () => {
       cmd(31, { kind: "log", type: "poop", dogId: 1 }),
     ]);
     const walk = (await entries()).find((e) => e.type === "walk")!;
-    expect(await s.summary(walk.id)).toMatchObject({ pee: 2, poop: 1 });
+    expect(await s.summary(walk.id)).toMatchObject({ pees: [{ at: at(5), dogId: 1 }, { at: at(7), dogId: 1 }], poops: [{ at: at(6), dogId: 1 }] });
   });
 });
 
@@ -239,7 +240,7 @@ describe("trainings", () => {
   test("training at home has no walkKey", async () => {
     const s = sessions();
     await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t" })]);
-    expect((await s.current()).training).toEqual({ key: "t", startedAt: at(0), dogIds: [1], walkKey: null, exercises: [], treats: {} });
+    expect((await s.current()).training).toEqual({ key: "t", startedAt: at(0), dogIds: [1], walkKey: null, reps: [], treats: {} });
     await s.apply(HERZII, [cmd(12, { kind: "training.stop", trainingKey: "t" })]);
     expect(await s.current()).toEqual({ walk: null, training: null });
     expect((await entries())[0]).toMatchObject({ type: "training", durationMin: 12, loggedBy: "bille" });
@@ -251,23 +252,57 @@ describe("trainings", () => {
     expect((await s.current()).training).toMatchObject({ key: "t", walkKey: "w" });
   });
 
-  test("exercise toggles and treat counts never go below 0", async () => {
-    const c = new Catalog(db());
-    const sitz = await c.addExercise("Sitz");
-    const bleib = await c.addExercise("Bleib");
-    const kaese = await c.addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
+  test("treat counts never go below 0", async () => {
+    const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
     const s = sessions();
     await s.apply(HERZII, [
       cmd(0, { kind: "training.start", trainingKey: "t" }),
-      cmd(1, { kind: "training.exercise", trainingKey: "t", exerciseId: sitz.id, on: true }),
-      cmd(2, { kind: "training.exercise", trainingKey: "t", exerciseId: bleib.id, on: true }),
-      cmd(3, { kind: "training.exercise", trainingKey: "t", exerciseId: bleib.id, on: false }),
       cmd(4, { kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: 1 }),
       cmd(5, { kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: -1 }),
       cmd(6, { kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: -1 }),
       cmd(7, { kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: 1 }),
     ]);
-    expect((await s.current()).training).toMatchObject({ exercises: [sitz.id], treats: { [kaese.id]: 1 } });
+    expect((await s.current()).training).toMatchObject({ treats: { [kaese.id]: 1 } });
+  });
+
+  const rep = (t: number, exerciseId: number, dogId: number, ok: boolean, delta: 1 | -1 = 1) => cmd(t, { kind: "training.rep", trainingKey: "t", exerciseId, dogId, ok, delta });
+
+  test("reps are stored per exercise and dog and never go below 0", async () => {
+    const sitz = await new Catalog(db()).addExercise("Sitz");
+    const bruno = await db().insertInto("dog").values({ name: "Bruno", color: "#3a6fc0", archived: 0, created_at: "2026-01-01T00:00:00.000Z" }).returning("id").executeTakeFirstOrThrow();
+    const s = sessions();
+    await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t", dogIds: [1, bruno.id] }), rep(1, sitz.id, 1, true), rep(2, sitz.id, 1, true), rep(3, sitz.id, 1, false), rep(4, sitz.id, bruno.id, true), rep(5, sitz.id, bruno.id, false, -1)]);
+    expect((await s.current()).training!.reps).toEqual([
+      { exerciseId: sitz.id, dogId: 1, ok: 2, fail: 1 },
+      { exerciseId: sitz.id, dogId: bruno.id, ok: 1, fail: 0 },
+    ]);
+  });
+
+  test("a rep for a dog not in the training is dropped", async () => {
+    const sitz = await new Catalog(db()).addExercise("Sitz");
+    const s = sessions();
+    const bruno = await db().insertInto("dog").values({ name: "Bruno", color: "#3a6fc0", archived: 0, created_at: "2026-01-01T00:00:00.000Z" }).returning("id").executeTakeFirstOrThrow();
+    const [foreign, unknown] = [rep(1, sitz.id, bruno.id, true), rep(2, sitz.id, 999, true)];
+    const result = await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t", dogIds: [1] }), foreign, unknown]);
+    expect((await s.current()).training!.reps).toEqual([]);
+    expect(result.dropped).toEqual([foreign.id, unknown.id]);
+  });
+
+  test("a rep for an unknown exercise is dropped", async () => {
+    const s = sessions();
+    const unknown = rep(1, 999, 1, true);
+    const result = await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t" }), unknown]);
+    expect(result.dropped).toEqual([unknown.id]);
+    expect((await s.current()).training!.reps).toEqual([]);
+  });
+
+  test("resending the same rep command id changes nothing", async () => {
+    const sitz = await new Catalog(db()).addExercise("Sitz");
+    const s = sessions();
+    const r = rep(1, sitz.id, 1, true);
+    await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t" }), r]);
+    await s.apply(HERZII, [r]);
+    expect((await s.current()).training!.reps).toEqual([{ exerciseId: sitz.id, dogId: 1, ok: 1, fail: 0 }]);
   });
 
   test("a walk's summary lists its trainings with exercises and treats", async () => {
@@ -278,14 +313,16 @@ describe("trainings", () => {
     await s.apply(HIRSCH, [
       cmd(0, { kind: "walk.start", walkKey: "w" }),
       cmd(10, { kind: "training.start", trainingKey: "t", walkKey: "w" }),
-      cmd(11, { kind: "training.exercise", trainingKey: "t", exerciseId: sitz.id, on: true }),
+      rep(11, sitz.id, 1, true),
+      rep(11, sitz.id, 1, true),
+      rep(11, sitz.id, 1, false),
       cmd(12, { kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: 1 }),
       cmd(13, { kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: 1 }),
       cmd(16, { kind: "training.stop", trainingKey: "t" }),
       cmd(40, { kind: "walk.stop", walkKey: "w" }),
     ]);
     const walk = (await entries()).find((e) => e.type === "walk")!;
-    expect((await s.summary(walk.id)).trainings).toEqual([{ min: 6, exercises: ["Sitz"], treats: [{ name: "Käse", count: 2 }] }]);
+    expect((await s.summary(walk.id)).trainings).toEqual([{ min: 6, exercises: [{ name: "Sitz", ok: 2, fail: 1 }], treats: [{ name: "Käse", count: 2 }] }]);
   });
 
   test("a treat tap after the training ended is dropped", async () => {
@@ -294,5 +331,76 @@ describe("trainings", () => {
     await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t" }), cmd(10, { kind: "training.stop", trainingKey: "t" })]);
     const late = cmd(11, { kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: 1 });
     expect(await s.apply(HERZII, [late])).toEqual({ applied: [], dropped: [late.id] });
+  });
+});
+
+describe("food", () => {
+  test("a food command creates one food entry, also when sent twice", async () => {
+    const s = sessions();
+    const food = cmd(5, { kind: "food", amountG: 80, foodKind: "wet" });
+    await s.apply(HIRSCH, [food]);
+    expect(await s.apply(HIRSCH, [food])).toEqual({ applied: [food.id], dropped: [] });
+    const all = (await new EntryRepository(db()).list({ type: "food" }));
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ type: "food", at: at(5), amountG: 80, foodKind: "wet", loggedBy: "marcel" });
+    const active = (await new DogRepository(db()).activeIds()).sort();
+    expect([...all[0].dogIds].sort()).toEqual(active);
+  });
+});
+
+describe("changing walkers and dogs", () => {
+  const addDog = async (name: string, archived = false) =>
+    (await db().insertInto("dog").values({ name, color: "#3a6fc0", archived: archived ? 1 : 0, created_at: "2026-01-01T00:00:00.000Z" }).returning("id").executeTakeFirstOrThrow()).id;
+
+  test("any walker adds another household member and removes them again", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" })]);
+    const add = cmd(1, { kind: "walk.walker", walkKey: "w", personId: "bille", on: true });
+    expect(await s.apply(HIRSCH, [add])).toEqual({ applied: [add.id], dropped: [] });
+    expect(await s.apply(HIRSCH, [add])).toEqual({ applied: [add.id], dropped: [] }); // a resend is harmless
+    expect((await s.current()).walk!.walkers).toEqual([HIRSCH, HERZII]);
+    await s.apply(HERZII, [cmd(2, { kind: "walk.walker", walkKey: "w", personId: "marcel", on: false })]);
+    expect((await s.current()).walk!.walkers).toEqual([HERZII]);
+  });
+
+  test("the only walker cannot be removed, an unknown person cannot be added", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" })]);
+    const last = cmd(1, { kind: "walk.walker", walkKey: "w", personId: "marcel", on: false });
+    const unknown = cmd(2, { kind: "walk.walker", walkKey: "w", personId: "nobody", on: true });
+    expect(await s.apply(HIRSCH, [last, unknown])).toEqual({ applied: [], dropped: [last.id, unknown.id] });
+    expect((await s.current()).walk!.walkers).toEqual([HIRSCH]);
+  });
+
+  test("a dog is added and removed on a running walk; trainings stay as they are", async () => {
+    const bruno = await addDog("Bruno");
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w", dogIds: [1] }), cmd(1, { kind: "training.start", trainingKey: "t", walkKey: "w", dogIds: [1] })]);
+    await s.apply(HIRSCH, [cmd(2, { kind: "walk.dog", walkKey: "w", dogId: bruno, on: true }), cmd(3, { kind: "walk.dog", walkKey: "w", dogId: bruno, on: true })]);
+    expect((await s.current()).walk!.dogIds).toEqual([1, bruno]);
+    await s.apply(HIRSCH, [cmd(4, { kind: "walk.dog", walkKey: "w", dogId: 1, on: false })]);
+    const view = await s.current();
+    expect(view.walk!.dogIds).toEqual([bruno]);
+    expect(view.training!.dogIds).toEqual([1]);
+  });
+
+  test("the only dog cannot be removed, an archived or unknown dog cannot be added", async () => {
+    const old = await addDog("Alt", true);
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w", dogIds: [1] })]);
+    const last = cmd(1, { kind: "walk.dog", walkKey: "w", dogId: 1, on: false });
+    const archived = cmd(2, { kind: "walk.dog", walkKey: "w", dogId: old, on: true });
+    const unknown = cmd(3, { kind: "walk.dog", walkKey: "w", dogId: 999, on: true });
+    expect(await s.apply(HIRSCH, [last, archived, unknown])).toEqual({ applied: [], dropped: [last.id, archived.id, unknown.id] });
+    expect((await s.current()).walk!.dogIds).toEqual([1]);
+  });
+
+  test("a change at or after the end of the walk is dropped", async () => {
+    const bruno = await addDog("Bruno");
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w", dogIds: [1] }), cmd(30, { kind: "walk.stop", walkKey: "w" })]);
+    const walker = cmd(30, { kind: "walk.walker", walkKey: "w", personId: "bille", on: true });
+    const dog = cmd(31, { kind: "walk.dog", walkKey: "w", dogId: bruno, on: true });
+    expect(await s.apply(HIRSCH, [walker, dog])).toEqual({ applied: [], dropped: [walker.id, dog.id] });
   });
 });

@@ -1,11 +1,13 @@
 import { describe, expect, test } from "vitest";
 import { Devices } from "../auth/devices";
+import { Links, MAGIC_TTL } from "../auth/links";
 import { freshDatabase, HIRSCH } from "../db/testing";
 import { apiRouter, type ApiDeps } from "./api";
+import { TEST_CODE_KEY } from "./testing";
 
 const { db } = freshDatabase();
 const NOW = new Date("2026-10-20T10:00:00Z");
-const deps = (more: Partial<ApiDeps> = {}): ApiDeps => ({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", oidc: false, mailer: null, ...more });
+const deps = (more: Partial<ApiDeps> = {}): ApiDeps => ({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", codeKey: TEST_CODE_KEY, oidc: false, mailer: null, ...more });
 const call = (path: string, init: { method?: string; token?: string; body?: unknown } = {}, more: Partial<ApiDeps> = {}) =>
   apiRouter(deps(more))(
     new Request(`https://gassi.example${path}`, {
@@ -20,7 +22,7 @@ describe("invites over the API", () => {
   test("Hirsch invites a person; Herzii redeems the link and is in", async () => {
     const token = await hirschPhone();
     const invite = await (await call("/api/invites", { method: "POST", token, body: { kind: "person" } })).json();
-    expect(invite).toMatchObject({ url: expect.stringMatching(/^https:\/\/gassi\.example\/l\/[\w-]+$/), appLink: expect.stringMatching(/^gassi:\/\/join\?server=/) });
+    expect(invite).toMatchObject({ url: expect.stringMatching(/^https:\/\/gassi\.example\/l\/[\w-]+$/), appLink: expect.stringMatching(/^gassi:\/\/join\?server=/), code: expect.stringMatching(/^[0-9A-Z]{4}-[0-9A-Z]{4}$/) });
     const linkToken = invite.url.split("/l/")[1];
     const res = await call("/api/auth/redeem", { method: "POST", body: { token: linkToken, deviceKind: "phone", deviceName: "Pixel 7", personName: "Herzii" } });
     expect(res.status).toBe(200);
@@ -37,6 +39,47 @@ describe("invites over the API", () => {
     const again = await call("/api/auth/redeem", { method: "POST", body });
     expect(again.status).toBe(400);
     expect(await again.json()).toEqual({ error: "Dieser Link ist abgelaufen oder schon benutzt." });
+  });
+
+  test("a link's code, typed loosely, redeems it like its token", async () => {
+    const { code } = await new Links(db(), () => NOW, "https://gassi.example", TEST_CODE_KEY).create({ kind: "magic", personId: HIRSCH.id, ttlMs: MAGIC_TTL });
+    const res = await call("/api/auth/redeem", { method: "POST", body: { code: code.toLowerCase().replace("-", " "), deviceKind: "phone", deviceName: "iPhone" } });
+    expect(res.status).toBe(200);
+    expect((await res.json()).person.name).toBe("Hirsch");
+  });
+
+  test("an invite's code (only its hash is stored) redeems it", async () => {
+    const token = await hirschPhone();
+    const { code } = await (await call("/api/invites", { method: "POST", token, body: { kind: "device" } })).json();
+    const res = await call("/api/auth/redeem", { method: "POST", body: { code, deviceKind: "web", deviceName: "iPhone (Web)" } });
+    expect(res.status).toBe(200);
+    expect((await res.json()).person.name).toBe("Hirsch");
+  });
+
+  test("link info tells what an open link is for by token or code, without using it", async () => {
+    const links = new Links(db(), () => NOW, "https://gassi.example", TEST_CODE_KEY);
+    const person = await links.create({ kind: "person", createdBy: HIRSCH.id, ttlMs: MAGIC_TTL });
+    expect(await (await call(`/api/auth/link?token=${person.token}`)).json()).toEqual({ kind: "person" });
+    expect(await (await call(`/api/auth/link?code=${encodeURIComponent(person.code.toLowerCase().replace("-", " "))}`)).json()).toEqual({ kind: "person" });
+    const res = await call("/api/auth/redeem", { method: "POST", body: { code: person.code, deviceKind: "web", deviceName: "iPhone (Web)", personName: "Herzii" } });
+    expect(res.status).toBe(200); // still open after the lookups
+    const devices = await db().selectFrom("device").select("id").execute();
+    expect(devices).toHaveLength(1);
+    for (const q of [`token=${person.token}`, "code=ABCD-EFGH", "token=unknown"]) {
+      const used = await call(`/api/auth/link?${q}`);
+      expect(used.status).toBe(400);
+      expect(await used.json()).toEqual({ error: "Dieser Link ist abgelaufen oder schon benutzt." });
+    }
+    const both = await call(`/api/auth/link?token=t&code=ABCD-EFGH`);
+    expect(await both.json()).toEqual({ error: "Link oder Code fehlt." });
+  });
+
+  test("redeem takes exactly one of link and code", async () => {
+    for (const key of [{}, { token: "t", code: "ABCD-EFGH" }]) {
+      const res = await call("/api/auth/redeem", { method: "POST", body: { ...key, deviceKind: "phone", deviceName: "iPhone" } });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "Link oder Code fehlt." });
+    }
   });
 
   test("person invites are refused in OIDC mode", async () => {

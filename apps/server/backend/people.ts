@@ -51,6 +51,11 @@ export class PeopleRepository {
     return Number(r.n);
   }
 
+  /** The household, by name. */
+  async list(): Promise<Person[]> {
+    return this.db.selectFrom("person").select(["id", "name"]).orderBy("name").execute();
+  }
+
   async names(): Promise<Names> {
     const rows = await this.db.selectFrom("person").select(["id", "name"]).orderBy("name").execute();
     return new Map(rows.map((r) => [r.id, r.name]));

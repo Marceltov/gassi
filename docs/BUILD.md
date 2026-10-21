@@ -286,10 +286,32 @@ Built from a local spec and plan (brainstormed on 2026-10-20); the lasting decis
   Chromium; the image smoke test expects the setup link in the log.
 - **After the step's review:** the schema migration is named `0.3_schema` (0.2's was `001_schema`), and a database
   with migrations this version doesn't know stops the start with instructions (the homelab's 0.2 database must be
-  moved aside at the 0.3 deploy). OIDC is all three variables or none, app-only until the dashboard (the cookie
-  session, logout and `safeNext` are gone; failures end in `gassi://join?error=signin`); with OIDC no setup link is
+  moved aside at the 0.3 deploy). OIDC is all three variables or none and ends in a one-time device link (the cookie
+  session, logout and `safeNext` are gone; failures end in `?error=signin`, in the app or, since step 2a, the web
+  app); with OIDC no setup link is
   printed and the first sign-in creates the first dog (`DOG_NAME`, else "Mein Hund"); the last active dog can't be
   archived. Entry, restock, stock-count and weight inputs are domain schemas with German messages per field, checked
   by the client before sending, by the router and by the use cases. The pure session rules (`isOver`,
   `joinsEndedSession`, `startedTrainingEndsAt`, `resolveDogs`, `pausedWithin`) live in `packages/domain`. Magic links
   answer without waiting for the mail, at most one a minute per person.
+
+## 0.3, step 2a: the API for the apps (issue #14)
+
+- **Codes:** every link also has a code to type (`XXXX-XXXX`, Crockford base32, 40 bits, derived from the token),
+  for an installed web app that can't be handed the link. It redeems the link like its token, once, with the link.
+  The server keeps its HMAC under a key derived from `SECRET` (else the kept secret file); a new `SECRET` voids open
+  codes. Invites answer with their code (it can't be fetched later); `linkInfo` tells what an open link (token or
+  code) is for without using it, so the sign-in knows whether to ask for a name and dog.
+- **OIDC for the web app:** `/api/oidc/start?web=1` ends in `<PUBLIC_URL>/join?token=…` (or `?error=signin`),
+  `?app=1` in `gassi://join?…` as before. `/join` comes with the web app (step 2b).
+- **Commands:** `training.rep` counts ok/fail per exercise and dog; `food` logs a feeding as a command, so it queues
+  offline; `walk.walker` and `walk.dog` add or remove a person or dog on a running walk (never the last one). The
+  phone's projection takes the active dogs, so a pending start shows the dogs the server will pick (`resolveDogs`).
+- **Reading back:** `today` (newest walk, food, pee, poop), `people`; entries carry walker ids, distance and a
+  thumbnail route, and for trainings the reps per exercise and dog and the treats per kind; the walk summary lists
+  each pee and poop with time and dog; the person filter also finds walks the person went on.
+- **Editing afterwards:** `editEntry` replaces a walk's walkers (left out: unchanged; all other fields are sent
+  whole); `editTraining` replaces a training's reps and treats (treats already given keep their grams and dry flag);
+  a dog taken out of a training takes its reps along.
+- **Gone:** the CSV export. The Douglas-Peucker `simplify` is now `trimTrack`; `simplify` makes the thumbnail route.
+- **Data:** the schema changes are folded into `0.3_schema`, so the live 0.3 database is deleted at this deploy.

@@ -6,7 +6,7 @@ import type { EntryRow } from "../db/schema";
 export type EntryQuery = {
   dogId?: number; // only entries about this dog
   type?: Entry["type"];
-  loggedBy?: string;
+  by?: string; // only entries this person logged, or walks they went on
   since?: string; // inclusive, ISO
   until?: string; // exclusive, ISO
   overlapping?: boolean; // since/until also take walks and trainings that began earlier and were still on at `since`
@@ -100,7 +100,10 @@ export class EntryRepository {
       query = query.where((eb) => eb.exists(eb.selectFrom("entry_dog").select("entry_dog.entry_id").whereRef("entry_dog.entry_id", "=", "entry.id").where("entry_dog.dog_id", "=", dogId)));
     }
     if (q.type) query = query.where("type", "=", q.type);
-    if (q.loggedBy) query = query.where("logged_by", "=", q.loggedBy);
+    if (q.by) {
+      const by = q.by;
+      query = query.where((eb) => eb.or([eb("logged_by", "=", by), eb.exists(eb.selectFrom("walk_walker").select("walk_walker.entry_id").whereRef("walk_walker.entry_id", "=", "entry.id").where("walk_walker.person_id", "=", by))]));
+    }
     if (q.since && q.overlapping) {
       const since = q.since;
       // at or after `since`; or begun before and ended after it, or still running (started with a key, no end)

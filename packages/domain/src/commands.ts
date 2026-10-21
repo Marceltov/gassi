@@ -11,14 +11,19 @@ const base = { id: z.string().min(1).max(64), at: z.iso.datetime({ offset: true 
 export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("walk.start"), walkKey: key, dogIds }),
   z.object({ ...base, kind: z.literal("walk.join"), walkKey: key }),
+  // another member of the household joins or leaves the walk / a dog joins or leaves it (any walker's phone may send these)
+  z.object({ ...base, kind: z.literal("walk.walker"), walkKey: key, personId: z.string().min(1).max(64), on: z.boolean() }),
+  z.object({ ...base, kind: z.literal("walk.dog"), walkKey: key, dogId, on: z.boolean() }),
   z.object({ ...base, kind: z.literal("walk.pause"), walkKey: key }),
   z.object({ ...base, kind: z.literal("walk.resume"), walkKey: key }),
   z.object({ ...base, kind: z.literal("walk.stop"), walkKey: key }),
   z.object({ ...base, kind: z.literal("training.start"), trainingKey: key, walkKey: key.optional(), dogIds }),
   z.object({ ...base, kind: z.literal("training.stop"), trainingKey: key }),
-  z.object({ ...base, kind: z.literal("training.exercise"), trainingKey: key, exerciseId: z.number().int().positive(), on: z.boolean() }),
+  z.object({ ...base, kind: z.literal("training.rep"), trainingKey: key, exerciseId: z.number().int().positive(), dogId, ok: z.boolean(), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("training.treat"), trainingKey: key, treatKindId: z.number().int().positive(), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("log"), type: z.enum(["pee", "poop"]), dogId }),
+  // a feeding; the dogs left out, the server takes every active dog
+  z.object({ ...base, kind: z.literal("food"), dogIds, amountG: z.number().int().min(1).max(5000), foodKind: z.enum(["wet", "dry"]) }),
 ]);
 
 export type Command = z.output<typeof commandSchema>;
