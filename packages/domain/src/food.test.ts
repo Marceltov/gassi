@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { canChoices, clampPortion, countLine, formSizes, mergeSizes, countTitle, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
+import { canChoices, clampPortion, countLine, formSizes, mergeSizes, removeSize, countTitle, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
 import type { CanStock, Stock, WetStock } from "./stock";
 
 const can = (unitG: number, cans: number): CanStock => ({ unitG, grams: cans * unitG, cans, belowZero: false });
@@ -105,4 +105,12 @@ test("the stock screen's rows by their (maybe edited) sizes: counting, a known s
   expect(formSizes([10_000, 400], rows, false)).toEqual({ sizes: [{ unitG: 1000, cans: "2" }, { unitG: 400, cans: "3" }], unsized: 2 });
   expect(formSizes([400], [{ size: " 400 ", cans: "1" }, { size: "400", cans: "2" }], true).sizes).toEqual([{ unitG: 400, cans: "1" }, { unitG: 400, cans: "2" }]); // they add up in the input
   expect(formSizes([400], [{ size: "10001", cans: "1" }, { size: "0", cans: "1" }], false).unsized).toBe(2);
+});
+
+test("removing a can size is a count of the stock as it is, with that size at 0, and asks first while it has cans", () => {
+  const stock: Stock = { wet: wetStock([{ unitG: 400, grams: 1100, cans: 2.75, belowZero: false }, can(800, 0), can(395, 1.5)]), dry: { grams: null, daysLeft: null, belowZero: false } };
+  // the other sizes keep their exact grams, not the rounded cans
+  expect(removeSize(stock, 395)).toEqual({ sizes: [{ unitG: 400, cans: 2.75 }, { unitG: 800, cans: 0 }, { unitG: 395, cans: 0 }], ask: "395 g entfernen? 1½ Dosen werden ausgebucht." });
+  expect(removeSize(stock, 800).ask).toBeNull();
+  expect(removeSize({ ...stock, wet: wetStock([can(400, 1)]) }, 400).ask).toBe("400 g entfernen? 1 Dose wird ausgebucht.");
 });

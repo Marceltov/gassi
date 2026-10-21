@@ -136,38 +136,48 @@ test("Vorrat: a new row typed with a known size adds only what is typed to it, a
   expect(entries.find((e) => e.unitG === 400)?.amountG).toBe(Math.round((was + 0.5) * 400));
 });
 
-test("Vorrat: × takes a size away: buying only from this form, counting it to 0, which retires it", async ({ page }) => {
+test("Vorrat: × removes a size at once, in either mode; with cans left it asks first", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });
-  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9999, cans: 1 }] })).entries.map((e) => e.id)); // a mistake
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9999, cans: 1 }, { unitG: 3000, cans: 1 }] })).entries.map((e) => e.id)); // mistakes
+  made.push((await asHirsch().logEntry({ type: "food", foodKind: "wet", amountG: 3000, unitG: 3000 })).id); // 3000 g eaten down to 0
   await page.goto("/mehr/vorrat");
   await page.getByRole("tab", { name: "Nass" }).click();
   await page.getByRole("tab", { name: "Eingekauft" }).click();
-  await page.getByTestId("count-9999").getByRole("button", { name: "Dosengröße entfernen" }).click();
-  await expect(page.getByTestId("count-9999")).toHaveCount(0);
   await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
-  await page.getByTestId("count-new").getByRole("button", { name: "Dosengröße entfernen" }).click(); // a typed row too
+  await page.getByTestId("count-new").getByRole("button", { name: "Dosengröße entfernen" }).click(); // an unsaved row: just gone
   await expect(page.getByTestId("count-new")).toHaveCount(0);
+  await page.getByRole("button", { name: "1 Dose à 9999 g mehr" }).click(); // an unsaved edit in that row
 
-  await page.getByRole("tab", { name: "Nachgezählt" }).click(); // a new form: the size is back
-  await page.getByTestId("count-9999").getByRole("button", { name: "Dosengröße entfernen" }).click();
-  await expect(page.getByTestId("count-9999")).toHaveCount(0);
+  const asked = page.getByTestId("remove-size");
+  // with none left: removed without asking (first: any count retires the sizes it has at 0, see Ruling V)
+  const again = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
+  await page.getByTestId("count-3000").getByRole("button", { name: "Dosengröße entfernen" }).click();
+  made.push(...((await (await again).json()) as { entries: { id: number }[] }).entries.map((e) => e.id));
+  await expect(asked).toHaveCount(0);
+  await expect(page.getByTestId("count-3000")).toHaveCount(0);
+
+  // with cans left: asks, then removes; the unsaved edit in that row stayed until then
+  await expect(page.getByTestId("count-9999-value")).toHaveText("1 Dose");
   const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Eintragen" }).click();
-  const { entries } = (await (await counted).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
-  made.push(...entries.map((e) => e.id));
-  expect(entries.find((e) => e.unitG === 9999)?.amountG).toBe(0);
-  expect((await client.stock()).wet.sizes.some((x) => x.unitG === 9999)).toBe(false);
-  await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
-  await expect(page.getByTestId("stock-wet")).not.toContainText("9999");
+  await page.getByTestId("count-9999").getByRole("button", { name: "Dosengröße entfernen" }).click();
+  await expect(asked).toContainText("9999 g entfernen? 1 Dose wird ausgebucht.");
+  await asked.getByRole("button", { name: "Entfernen" }).click();
+  made.push(...((await (await counted).json()) as { entries: { id: number }[] }).entries.map((e) => e.id));
+  await expect(page.getByTestId("stock-message")).toHaveText("9999 g entfernt.");
   await expect(page.getByTestId("count-9999")).toHaveCount(0);
-  // and so it stays: after a reload neither the card nor the rows have it
+  expect((await client.stock()).wet.sizes.some((x) => x.unitG === 9999)).toBe(false);
+
+  // gone in both modes and on the card, also after a reload
   await page.reload();
   await page.getByRole("tab", { name: "Nass" }).click();
-  await page.getByRole("tab", { name: "Nachgezählt" }).click();
   await expect(page.getByTestId("stock-wet")).not.toContainText("…"); // the stock is in
   await expect(page.getByTestId("stock-wet")).not.toContainText("9999");
-  await expect(page.getByTestId("count-9999")).toHaveCount(0);
+  for (const mode of ["Eingekauft", "Nachgezählt"]) {
+    await page.getByRole("tab", { name: mode }).click();
+    await expect(page.getByTestId("count-9999")).toHaveCount(0);
+    await expect(page.getByTestId("count-3000")).toHaveCount(0);
+  }
 });
 
 test("Vorrat: every size can be corrected; counting, 10000 g corrected to 1000 g retires 10000 g", async ({ page }) => {

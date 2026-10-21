@@ -131,3 +131,13 @@ export function formSizes<C extends string | number>(known: readonly number[], r
   const gone = counting ? known.filter((u) => !sized.some((s) => s.unitG === u)).map((unitG) => ({ unitG, cans: "0" as const })) : [];
   return { sizes: [...sized, ...gone], unsized: rows.length - sized.length };
 }
+
+/** × on a can size (Ruling Y): a wet count of the stock as it is (each size's exact grams in cans), that size at 0, so
+ * the retire rule takes it away at once; and the question to ask first while it still has cans ("400 g entfernen? 3
+ * Dosen werden ausgebucht."), null when it has none. */
+export function removeSize(stock: Stock, unitG: number): { sizes: { unitG: number; cans: number }[]; ask: string | null } {
+  const sizes = stock.wet.sizes.map((s) => ({ unitG: s.unitG, cans: s.unitG === unitG ? 0 : s.grams / s.unitG }));
+  const cans = stock.wet.sizes.find((s) => s.unitG === unitG)?.cans ?? 0;
+  const ask = cans > 0 ? `${unitG} g entfernen? ${formatCans(cans)} ${cans > 0 && cans <= 1 ? "wird" : "werden"} ausgebucht.` : null;
+  return { sizes: sizes.some((s) => s.unitG === unitG) ? sizes : [...sizes, { unitG, cans: 0 }], ask };
+}
