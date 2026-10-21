@@ -9,10 +9,10 @@ import { useNow } from "../start/useNow";
 import { radius, useTheme } from "../theme";
 import { TIME_ZONE } from "../time";
 import { BigButton } from "../ui/BigButton";
+import { type Choice, ChoiceList } from "../ui/ChoiceList";
 import { TYPE_ICON } from "../ui/icons";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
-import { spoken } from "../ui/spoken";
 import { useLeaving } from "../ui/useLeaving";
 import { EntryRow } from "./EntryRow";
 import type { Entry, Filter } from "./form";
@@ -20,7 +20,6 @@ import { useHistory } from "./useHistory";
 
 type Choosing = "by" | "type" | "dog";
 const OSM_COPYRIGHT = "https://www.openstreetmap.org/copyright";
-type Option = { label: string; on: boolean; pick: () => void };
 
 export function History() {
   const router = useRouter();
@@ -44,13 +43,14 @@ export function History() {
     setFilter((f) => ({ ...f, ...change }));
     setChoosing(null);
   };
-  const options: Record<Choosing, Option[]> = {
-    by: [{ label: "Alle", on: !filter.by, pick: () => set({ by: undefined }) }, ...people.map((p) => ({ label: p.name, on: filter.by === p.id, pick: () => set({ by: p.id }) }))],
+  // "Alle" first, then each option; the chosen one is marked
+  const options: Record<Choosing, Choice[]> = {
+    by: [{ key: "", label: "Alle", on: !filter.by, onPress: () => set({ by: undefined }) }, ...people.map((p) => ({ key: p.id, label: p.name, on: filter.by === p.id, onPress: () => set({ by: p.id }) }))],
     type: [
-      { label: "Alles", on: !filter.type, pick: () => set({ type: undefined }) },
-      ...ENTRY_TYPES.map((t: EntryType) => ({ label: `${TYPE_ICON[t]} ${TYPE_LABEL[t]}`, on: filter.type === t, pick: () => set({ type: t }) })),
+      { key: "", label: "Alles", on: !filter.type, onPress: () => set({ type: undefined }) },
+      ...ENTRY_TYPES.map((t: EntryType) => ({ key: t, label: `${TYPE_ICON[t]} ${TYPE_LABEL[t]}`, on: filter.type === t, onPress: () => set({ type: t }) })),
     ],
-    dog: [{ label: "Alle", on: !filter.dog, pick: () => set({ dog: undefined }) }, ...active.map((d) => ({ label: d.name, on: filter.dog === d.id, pick: () => set({ dog: d.id }) }))],
+    dog: [{ key: "", label: "Alle", on: !filter.dog, onPress: () => set({ dog: undefined }) }, ...active.map((d) => ({ key: d.id, label: d.name, color: d.color, on: filter.dog === d.id, onPress: () => set({ dog: d.id }) }))],
   };
   const titles: Record<Choosing, string> = { by: "Wer?", type: "Was?", dog: "Welcher Hund?" };
   const chosen = {
@@ -97,20 +97,7 @@ export function History() {
             {choosing ? (
               <View testID="filter-sheet" style={styles.sheet}>
                 <Text style={[styles.sheetTitle, { color: theme.ink }]}>{titles[choosing]}</Text>
-                <View style={styles.options}>
-                  {options[choosing].map((o) => (
-                    <Pressable
-                      key={o.label}
-                      accessibilityRole="button"
-                      accessibilityLabel={spoken(o.label)}
-                      accessibilityState={{ selected: o.on }}
-                      onPress={o.pick}
-                      style={({ pressed }) => [styles.option, { backgroundColor: o.on ? theme.walk : theme.surface, opacity: pressed ? 0.7 : 1 }]}
-                    >
-                      <Text style={[styles.optionText, { color: o.on ? "#fff" : theme.ink }]}>{o.label}</Text>
-                    </Pressable>
-                  ))}
-                </View>
+                <ChoiceList choices={options[choosing]} />
               </View>
             ) : null}
           </Sheet>
@@ -146,7 +133,4 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 14, fontWeight: "600" },
   sheet: { gap: 10 },
   sheetTitle: { fontSize: 17, fontWeight: "700" },
-  options: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  option: { flexGrow: 1, flexBasis: "40%", minHeight: 52, borderRadius: radius.tile, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
-  optionText: { fontSize: 15, fontWeight: "700" },
 });

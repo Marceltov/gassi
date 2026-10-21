@@ -149,8 +149,7 @@ export function Walk() {
           <DogChoiceSheet
             open={choosing !== null}
             title={choosing ? `${LABEL[choosing]} – welcher Hund?` : ""}
-            kind={choosing ?? "pee"}
-            dogs={walkDogs.map((id) => ({ id, name: dogName(id) }))}
+            dogs={walkDogs.map((id) => ({ id, name: dogName(id), color: dogs.find((d) => d.id === id)?.color }))}
             onPick={(id) => choosing && log(choosing, id)}
             onClose={() => setChoosing(null)}
           />

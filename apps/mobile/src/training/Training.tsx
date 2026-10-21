@@ -12,6 +12,7 @@ import { trainingClock } from "../start/elapsed";
 import { useNow } from "../start/useNow";
 import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
+import { ChoiceList } from "../ui/ChoiceList";
 import { DogChoiceSheet } from "../ui/DogChoiceSheet";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
@@ -170,8 +171,7 @@ export function Training() {
           <DogChoiceSheet
             open={choosing !== null}
             title={choosing ? `${choosingExercise} ${choosing.ok ? "klappt" : "klappt nicht"}${choosing.undoDogs ? " rückgängig" : ""} – welcher Hund?` : ""}
-            kind={choosing?.ok === false ? "neutral" : "walk"}
-            dogs={(choosing?.undoDogs ?? dogIds).map((id) => ({ id, name: dogName(id) }))}
+            dogs={(choosing?.undoDogs ?? dogIds).map((id) => ({ id, name: dogName(id), color: dogs.find((d) => d.id === id)?.color }))}
             onPick={(id) => choosing && (choosing.undoDogs ? rep(choosing.exerciseId, id, choosing.ok, -1) : pick(choosing.exerciseId, choosing.ok, id))}
             onClose={() => setChoosing(null)}
           />
@@ -179,10 +179,7 @@ export function Training() {
             {naming === null ? (
               <View testID="exercise-picker" style={styles.gap}>
                 <Text style={[styles.title, { color: theme.ink }]}>Welche Übung?</Text>
-                {more.map((e) => (
-                  <BigButton key={e.id} kind="training" size="l" label={e.name} onPress={() => show(e.id)} />
-                ))}
-                <BigButton kind="neutral" size="m" label="Neue Übung …" onPress={() => setNaming("")} />
+                <ChoiceList choices={[...more.map((e) => ({ key: e.id, label: e.name, onPress: () => show(e.id) })), { key: "new", label: "Neue Übung …", onPress: () => setNaming("") }]} />
               </View>
             ) : (
               <View testID="exercise-new" style={styles.gap}>

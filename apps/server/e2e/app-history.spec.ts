@@ -117,6 +117,27 @@ test("filtered by Herzii, the walk she went on stays and Hirsch's feeding goes; 
   await expect(page.getByTestId("summary-pees")).toContainText("1×");
 });
 
+test("a filter's choices are one list: Alle first, every option as wide, the chosen one marked", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/verlauf");
+  await page.getByRole("button", { name: "Was: Alles" }).click();
+  const sheet = page.getByTestId("filter-sheet");
+  const options = sheet.getByRole("button");
+  await expect(options.first()).toHaveAccessibleName("Alles");
+  await expect(options.first()).toHaveAttribute("aria-pressed", "true");
+  await expect(options.first()).toContainText("✓");
+  const boxes = await Promise.all((await options.all()).map((o) => o.boundingBox()));
+  expect(new Set(boxes.map((b) => Math.round(b!.width))).size).toBe(1); // as wide as each other
+  expect(new Set(boxes.map((b) => Math.round(b!.x))).size).toBe(1); // one below the other
+  await sheet.getByRole("button", { name: "Futter", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Was: Futter" })).toBeVisible();
+  await page.getByRole("button", { name: "Was: Futter" }).click();
+  await expect(sheet.getByRole("button", { name: "Futter", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(sheet.getByRole("button", { name: "Alles", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await sheet.getByRole("button", { name: "Alles", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Was: Alles" })).toBeVisible();
+});
+
 test("from a walk's summary: its pee is deleted, its start moved, then the walk deleted, which leads to Verlauf", async ({ page }) => {
   const walk = await pastWalk(8);
   const pee = walk.pees[0];
