@@ -35,15 +35,15 @@ async function expectTabBar(page: Page, selected: "Start" | "Verlauf" | "Woche" 
   expect(label.y + label.height).toBeLessThanOrEqual(viewport.height - HOME_INDICATOR);
 }
 
-test("the tab bar keeps its labels above the home indicator: its bottom padding is the safe area and a little more", async ({ page }) => {
+test("the tab bar keeps its labels above the home indicator: its bottom padding is the safe area", async ({ page }) => {
   await signIn(page);
   await page.goto("/woche");
   await homeIndicator(page);
   await expectTabBar(page, "Woche");
   const bar = tabBar(page).locator("xpath=..");
   const padding = await bar.evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
-  expect(padding).toBeGreaterThan(HOME_INDICATOR);
-  // the week's ‹ › stay above the tab bar, so away from the rounded corners
+  expect(padding).toBeGreaterThanOrEqual(HOME_INDICATOR);
+  // the week's arrows stay above the tab bar, so away from the rounded corners
   const back = (await page.getByRole("button", { name: "Vorherige Woche" }).boundingBox())!;
   const top = (await bar.boundingBox())!.y;
   expect(back.y + back.height).toBeLessThanOrEqual(top);

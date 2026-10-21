@@ -35,7 +35,7 @@ const grams = (g: number) => (g >= 1000 && g % 100 === 0 ? formatKg(g).replace("
 
 /** How an entry reads in a list: "Gassi" + "52 Min. (8 Pause) · 3,1 km" + "Hirsch + Herzii", "Futter" +
  * "Nassfutter, 200 g" + "von Hirsch". `by` is who walked for walks with walkers, else "von <who logged it>"; `during`
- * is what happened on a walk ("💧 2 · 💩 1 · 🎯 Sitz 4/5"), else empty. A training's exercises read with their
+ * is what happened on a walk ("2× Pipi · 1× Poopoo · Sitz 4/5"), else empty. A training's exercises read with their
  * success: successes / repetitions. */
 export function describeEntry(e: DescribableEntry): { title: string; extra: string; by: string; during: string } {
   const kind = e.foodKind ? FOOD_LABEL[e.foodKind] : "";
@@ -47,7 +47,7 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
     case "walk": {
       const time = running ? "läuft" : [duration, e.pauseMin ? `(${e.pauseMin} Pause)` : ""].filter(Boolean).join(" ");
       const d = e.during;
-      const during = d ? [d.pees ? `💧 ${d.pees}` : "", d.poops ? `💩 ${d.poops}` : "", d.exercises.length ? `🎯 ${d.exercises.map(exerciseRate).join(" · ")}` : ""].filter(Boolean).join(" · ") : "";
+      const during = d ? [d.pees ? `${d.pees}× Pipi` : "", d.poops ? `${d.poops}× Poopoo` : "", ...d.exercises.map(exerciseRate)].filter(Boolean).join(" · ") : "";
       return { title: TYPE_LABEL.walk, extra: [time, e.distanceM ? formatDistance(e.distanceM) : ""].filter(Boolean).join(" · "), by, during };
     }
     case "training":

@@ -60,13 +60,13 @@ export function Start() {
           {view.walk ? (
             <BigButton kind="walk" label={`Runde läuft · ${walkClock(view.walk, now)}`} onPress={() => open("/runde")} />
           ) : (
-            <BigButton kind="walk" label="🐕 Gassi gehen" onPress={startWalk} />
+            <BigButton kind="walk" icon="walk" label="Gassi gehen" onPress={startWalk} />
           )}
-          <BigButton kind="food" size="l" label="🥣 Futter geben" onPress={() => setFoodOpen(true)} />
+          <BigButton kind="food" size="l" icon="food" label="Futter geben" onPress={() => setFoodOpen(true)} />
           {view.training ? (
             <BigButton kind="training" size="l" label="Training läuft" onPress={() => open("/training")} />
           ) : (
-            <BigButton kind="training" size="l" label="🎯 Training starten" onPress={startTraining} />
+            <BigButton kind="training" size="l" icon="training" label="Training starten" onPress={startTraining} />
           )}
           <FoodSheet open={foodOpen} onClose={() => setFoodOpen(false)} />
         </>

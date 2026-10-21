@@ -1,5 +1,5 @@
 // Woche: the week's totals per person, a 0–24 h strip per day (walks, feedings, trainings) and all its routes on one
-// map, on top; ‹ and › to the week before and after at the bottom for the thumb. A walk counts fully for each walker.
+// map, on top; arrows to the week before and after at the bottom for the thumb. A walk counts fully for each walker.
 import { addDays, formatMinutes, mondayOf, type PersonWeek, successRate, weekLabel } from "@gassi/domain";
 import { useState } from "react";
 import { useNow } from "../start/useNow";
@@ -73,13 +73,13 @@ export function Week() {
   const bottom = (
     <View style={styles.nav}>
       <View style={styles.arrow}>
-        <BigButton kind="neutral" size="l" label="‹" a11y="Vorherige Woche" onPress={() => setMonday(addDays(monday, -7))} />
+        <BigButton kind="neutral" size="l" icon="back" label="" a11y="Vorherige Woche" onPress={() => setMonday(addDays(monday, -7))} />
       </View>
       <Text testID="week-heading" style={[styles.heading, { color: theme.ink }]}>
         {weekLabel(monday)}
       </Text>
       <View style={styles.arrow}>
-        <BigButton kind="neutral" size="l" label="›" a11y="Nächste Woche" disabled={thisWeek} onPress={() => !thisWeek && setMonday(addDays(monday, 7))} />
+        <BigButton kind="neutral" size="l" icon="next" label="" a11y="Nächste Woche" disabled={thisWeek} onPress={() => !thisWeek && setMonday(addDays(monday, 7))} />
       </View>
     </View>
   );

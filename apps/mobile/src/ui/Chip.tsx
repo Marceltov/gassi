@@ -1,7 +1,8 @@
-// A small rounded label for a person, a dog or a can size, tappable: on (accent border and ✓) or off (outlined,
+// A small rounded label for a person, a dog or a can size, tappable: on (accent border and a check mark) or off (outlined,
 // muted); a dog's shows its color. `accent`: the color of the screen's kind (the food sheet's brown), else green.
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme";
+import { Icon } from "./Icon";
 
 type Props = { label: string; onPress?: () => void; on?: boolean; color?: string; a11y?: string; accent?: string };
 
@@ -21,7 +22,7 @@ export function Chip({ label, onPress, on = true, color, a11y, accent }: Props) 
       <Text style={[styles.label, { color: on ? theme.ink : theme.muted }]}>{label}</Text>
       {on ? (
         <View style={[styles.check, { backgroundColor: mark }]}>
-          <Text style={styles.checkText}>✓</Text>
+          <Icon name="check" size={13} color="#fff" />
         </View>
       ) : null}
     </Pressable>
@@ -33,5 +34,4 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   label: { fontSize: 14, fontWeight: "600" },
   check: { width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  checkText: { color: "#fff", fontSize: 11, fontWeight: "800" },
 });

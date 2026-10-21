@@ -1,4 +1,4 @@
-// One entry in Verlauf: the time, a small map for a tracked walk, what it was ("🐕 Gassi · 42 Min. · 3,1 km"), what
+// One entry in Verlauf: the time, a small map for a tracked walk, its icon and what it was ("Gassi · 42 Min. · 3,1 km"), what
 // happened on a walk or which dog, and who. Tapping opens it.
 import { describeEntry } from "@gassi/domain";
 import { useMemo } from "react";
@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { TrackMap } from "../map/TrackMap";
 import { radius, useTheme } from "../theme";
 import { hhmm } from "../time";
+import { Icon } from "../ui/Icon";
 import { TYPE_ICON } from "../ui/icons";
 import type { Entry } from "./form";
 
@@ -32,9 +33,10 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
           <TrackMap routes={routes} height={40} still />
         </View>
       ) : null}
+      <Icon name={TYPE_ICON[entry.type]} size={20} color={theme.muted} />
       <View style={styles.main}>
         <Text style={[styles.line, { color: theme.ink }]}>
-          <Text style={styles.title}>{`${TYPE_ICON[entry.type]} ${d.title}`}</Text>
+          <Text style={styles.title}>{d.title}</Text>
           {d.extra ? ` · ${d.extra}` : ""}
         </Text>
         {second ? (

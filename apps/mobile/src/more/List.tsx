@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { radius, useTheme } from "../theme";
+import { Icon, type IconName } from "../ui/Icon";
 
 export function Group({ title, children }: { title?: string; children: ReactNode }) {
   const theme = useTheme();
@@ -13,15 +14,16 @@ export function Group({ title, children }: { title?: string; children: ReactNode
   );
 }
 
-type RowProps = { label: string; value?: string; icon?: string; dot?: string; onPress?: () => void; testID?: string; muted?: boolean; right?: ReactNode };
+type RowProps = { label: string; value?: string; icon?: IconName; dot?: string; onPress?: () => void; testID?: string; muted?: boolean; right?: ReactNode };
 
 export function Row({ label, value, icon, dot, onPress, testID, muted, right }: RowProps) {
   const theme = useTheme();
   const content = (
     <>
       {dot ? <View style={[styles.dot, { backgroundColor: dot }]} /> : null}
+      {icon ? <Icon name={icon} size={20} color={theme.muted} /> : null}
       <Text style={[styles.label, { color: muted ? theme.muted : theme.ink }]} numberOfLines={1}>
-        {icon ? `${icon}  ${label}` : label}
+        {label}
       </Text>
       {value ? (
         <Text style={[styles.value, { color: theme.muted }]} numberOfLines={1}>
@@ -29,7 +31,7 @@ export function Row({ label, value, icon, dot, onPress, testID, muted, right }: 
         </Text>
       ) : null}
       {right}
-      {onPress ? <Text style={[styles.chevron, { color: theme.muted }]}>›</Text> : null}
+      {onPress ? <Icon name="next" size={20} color={theme.muted} /> : null}
     </>
   );
   const style = [styles.row, { borderBottomColor: theme.line }];
@@ -64,5 +66,4 @@ const styles = StyleSheet.create({
   dot: { width: 12, height: 12, borderRadius: 6 },
   label: { fontSize: 15, flexShrink: 1 },
   value: { flex: 1, fontSize: 13, textAlign: "right" },
-  chevron: { fontSize: 20, marginLeft: 2 },
 });

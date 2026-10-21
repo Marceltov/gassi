@@ -13,6 +13,7 @@ import { type ButtonKind, radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
 import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
+import { Icon, type IconName } from "../ui/Icon";
 import { TYPE_ICON } from "../ui/icons";
 import { Screen } from "../ui/Screen";
 import { Segments } from "../ui/Segments";
@@ -102,7 +103,10 @@ export function EntryDetail({ id }: { id: number }) {
     <Screen
       top={
         <>
-          <Text style={[styles.title, { color: theme.ink }]}>{`${TYPE_ICON[entry.type]} ${entry.count ? countTitle(entry.at, TIME_ZONE) : TYPE_LABEL[entry.type]}`}</Text>
+          <View style={styles.heading}>
+            <Icon name={TYPE_ICON[entry.type]} size={24} color={theme.muted} />
+            <Text style={[styles.title, { color: theme.ink }]}>{entry.count ? countTitle(entry.at, TIME_ZONE) : TYPE_LABEL[entry.type]}</Text>
+          </View>
           {entry.count ? (
             <Text testID="count-line" style={[styles.countLine, { color: theme.ink }]}>
               {countLine(entry.count)}
@@ -177,7 +181,7 @@ export function EntryDetail({ id }: { id: number }) {
 
 type Names = Pick<Gassi, "dogs" | "exercises" | "treatKinds">;
 
-// A training's repetitions per exercise (and dog, when several train) as ✓ and ✗ counts, more exercises from the
+// A training's repetitions per exercise (and dog, when several train) as counts of "klappt" and "klappt nicht", more exercises from the
 // household's list, and the treats per kind.
 function TrainingFields({ form, change, names }: { form: Form; change: (c: Partial<Form>) => void; names: Names }) {
   const theme = useTheme();
@@ -209,8 +213,8 @@ function TrainingFields({ form, change, names }: { form: Form; change: (c: Parti
               <Text style={[styles.repName, { color: theme.ink }]} numberOfLines={2}>
                 {label}
               </Text>
-              <Counter sign="✓" value={count(eid, did, "ok")} what={`${label} klappt`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "ok", d) })} />
-              <Counter sign="✗" value={count(eid, did, "fail")} what={`${label} klappt nicht`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "fail", d) })} />
+              <Counter sign="check" value={count(eid, did, "ok")} what={`${label} klappt`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "ok", d) })} />
+              <Counter sign="cross" value={count(eid, did, "fail")} what={`${label} klappt nicht`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "fail", d) })} />
             </View>
           );
         }),
@@ -225,7 +229,7 @@ function TrainingFields({ form, change, names }: { form: Form; change: (c: Parti
       {kinds.map((k) => (
         <View key={k.id} style={styles.repRow}>
           <Text style={[styles.repName, { color: theme.ink }]}>{k.name}</Text>
-          <Counter sign="" value={treatCount(k.id)} what={k.name} onStep={(d) => change({ treats: bumpTreat(form.treats, k.id, d) })} />
+          <Counter value={treatCount(k.id)} what={k.name} onStep={(d) => change({ treats: bumpTreat(form.treats, k.id, d) })} />
         </View>
       ))}
     </View>
@@ -242,12 +246,15 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Counter({ sign, value, what, onStep }: { sign: string; value: number; what: string; onStep: (d: 1 | -1) => void }) {
+function Counter({ sign, value, what, onStep }: { sign?: IconName; value: number; what: string; onStep: (d: 1 | -1) => void }) {
   const theme = useTheme();
   return (
     <View style={styles.counter}>
       <StepButton small label={`${what}: eins weniger`} sign="−" disabled={value === 0} onPress={() => onStep(-1)} />
-      <Text style={[styles.count, { color: theme.ink }]}>{`${sign}${sign ? " " : ""}${value}`}</Text>
+      <View style={styles.countBox}>
+        {sign ? <Icon name={sign} size={15} color={theme.muted} /> : null}
+        <Text style={[styles.count, { color: theme.ink }]}>{value}</Text>
+      </View>
       <StepButton small label={`${what}: eins mehr`} sign="+" disabled={false} onPress={() => onStep(1)} />
     </View>
   );
@@ -256,6 +263,7 @@ function Counter({ sign, value, what, onStep }: { sign: string; value: number; w
 const styles = StyleSheet.create({
   countLine: { fontSize: 18, fontWeight: "700" },
   title: { fontSize: 22, fontWeight: "700" },
+  heading: { flexDirection: "row", alignItems: "center", gap: 8 },
   small: { fontSize: 13 },
   message: { fontSize: 15, fontWeight: "600" },
   times: { flexDirection: "row", gap: 8 },
@@ -266,7 +274,8 @@ const styles = StyleSheet.create({
   repRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   repName: { flex: 1, fontSize: 15 },
   counter: { flexDirection: "row", alignItems: "center", gap: 4 },
-  count: { minWidth: 34, textAlign: "center", fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  countBox: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, minWidth: 44 },
+  count: { minWidth: 18, textAlign: "center", fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] },
   note: { borderRadius: 12, padding: 12, minHeight: 60, fontSize: 15 },
   sheet: { gap: 10 },
   sheetTitle: { fontSize: 17, fontWeight: "700" },

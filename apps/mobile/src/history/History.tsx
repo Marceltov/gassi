@@ -48,7 +48,7 @@ export function History() {
     by: [{ key: "", label: "Alle", on: !filter.by, onPress: () => set({ by: undefined }) }, ...people.map((p) => ({ key: p.id, label: p.name, on: filter.by === p.id, onPress: () => set({ by: p.id }) }))],
     type: [
       { key: "", label: "Alles", on: !filter.type, onPress: () => set({ type: undefined }) },
-      ...ENTRY_TYPES.map((t: EntryType) => ({ key: t, label: `${TYPE_ICON[t]} ${TYPE_LABEL[t]}`, on: filter.type === t, onPress: () => set({ type: t }) })),
+      ...ENTRY_TYPES.map((t: EntryType) => ({ key: t, label: TYPE_LABEL[t], icon: TYPE_ICON[t], on: filter.type === t, onPress: () => set({ type: t }) })),
     ],
     dog: [{ key: "", label: "Alle", on: !filter.dog, onPress: () => set({ dog: undefined }) }, ...active.map((d) => ({ key: d.id, label: d.name, color: d.color, on: filter.dog === d.id, onPress: () => set({ dog: d.id }) }))],
   };
