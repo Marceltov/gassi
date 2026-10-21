@@ -66,6 +66,7 @@ const implementations: Implementations<ApiDeps> = {
     const d = await diary(deps);
     return d.history(d.filter(input), input.offset ?? 0);
   },
+  entry: async ({ input, deps }) => (await (await diary(deps)).get(input.id)) ?? missing("Diesen Eintrag gibt es nicht."),
   logEntry: async ({ input, auth, deps }) => (await diary(deps)).log(auth.person, { at: deps.now().toISOString(), ...input }),
   editEntry: async ({ input: { id, ...fields }, deps }) => (await (await diary(deps)).edit(id, fields)) ?? missing("Diesen Eintrag gibt es nicht."),
   editTraining: async ({ input: { id, ...change }, deps }) => (await (await diary(deps)).editTraining(id, change)) ?? missing("Dieses Training gibt es nicht."),

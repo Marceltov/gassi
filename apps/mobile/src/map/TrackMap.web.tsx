@@ -1,5 +1,6 @@
 // Routes on an OpenStreetMap map (Leaflet), fitted to them: the walk summary's big map now, Verlauf's thumbnails and
-// the week's routes later. Each route is a list of [lat, lon]. Not draggable when `still` (a thumbnail in a list).
+// the week's routes later. Each route is a list of [lat, lon]. Not draggable when `still` (a thumbnail in a list),
+// and then without the attribution line, which would cover the whole thumbnail (the big maps carry it).
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useRef } from "react";
@@ -16,7 +17,7 @@ export function TrackMap({ routes, height, still = false }: TrackMapProps) {
   useEffect(() => {
     const drawn = routes.filter((r) => r.length > 0);
     if (!box.current || drawn.length === 0) return;
-    const map = L.map(box.current, { zoomControl: !still, dragging: !still, scrollWheelZoom: false, touchZoom: !still, doubleClickZoom: !still, keyboard: !still, boxZoom: !still, attributionControl: true });
+    const map = L.map(box.current, { zoomControl: !still, dragging: !still, scrollWheelZoom: false, touchZoom: !still, doubleClickZoom: !still, keyboard: !still, boxZoom: !still, attributionControl: !still });
     L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map);
     const lines = drawn.map((r) => L.polyline(r, { color: theme.walk, weight: 4 }).addTo(map));
     map.fitBounds(L.featureGroup(lines).getBounds(), { padding: [16, 16], maxZoom: 17 });

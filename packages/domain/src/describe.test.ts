@@ -21,16 +21,26 @@ const text = (e: DescribableEntry) => {
   return `${d.title}${d.extra ? `, ${d.extra}` : ""} ${d.by}`;
 };
 
-test("a walk: duration with pause and who walked", () => {
+test("a walk: duration with pause, distance and who walked", () => {
   expect(text(entry({ endedAt: "x", durationMin: 52, pauseMin: 8, walkers: ["Hirsch", "Herzii"] }))).toBe("Gassi, 52 Min. (8 Pause) Hirsch + Herzii");
+  expect(text(entry({ endedAt: "x", durationMin: 95, pauseMin: 0, distanceM: 3149, walkers: ["Hirsch"] }))).toBe("Gassi, 1 Std. 35 Min. · 3,1 km Hirsch");
   expect(text(entry({ endedAt: "x", durationMin: 30, pauseMin: 0, walkers: ["Hirsch"] }))).toBe("Gassi, 30 Min. Hirsch");
   expect(text(entry({ durationMin: 30 }))).toBe("Gassi, 30 Min. von Hirsch");
   expect(text(entry({ clientKey: "k", walkers: ["Hirsch"] }))).toBe("Gassi, läuft Hirsch");
 });
 
-test("a training: duration, exercises and treats", () => {
-  expect(text(entry({ type: "training", endedAt: "x", durationMin: 12, exercises: [{ name: "Rückruf", ok: 1, fail: 0 }, { name: "Sitz", ok: 2, fail: 1 }], treats: 6, byName: "Herzii" }))).toBe("Training, 12 Min.: Rückruf, Sitz, 6 Leckerlis von Herzii");
-  expect(text(entry({ type: "training", endedAt: "x", durationMin: 5, treats: 1 }))).toBe("Training, 5 Min., 1 Leckerli von Hirsch");
+test("what happened during a walk: pee, poop and the exercises with their success", () => {
+  const during = (d: DescribableEntry["during"]) => describeEntry(entry({ endedAt: "x", durationMin: 40, during: d })).during;
+  expect(during({ pees: 2, poops: 1, exercises: [{ name: "Sitz", ok: 4, fail: 1 }] })).toBe("💧 2 · 💩 1 · 🎯 Sitz 4/5");
+  expect(during({ pees: 0, poops: 1, exercises: [] })).toBe("💩 1");
+  expect(during({ pees: 0, poops: 0, exercises: [] })).toBe("");
+  expect(during(null)).toBe("");
+});
+
+test("a training: duration, exercises with successes / repetitions, and treats", () => {
+  expect(text(entry({ type: "training", endedAt: "x", durationMin: 12, exercises: [{ name: "Rückruf", ok: 1, fail: 0 }, { name: "Sitz", ok: 2, fail: 1 }], treats: 6, byName: "Herzii" }))).toBe("Training, 12 Min. · Rückruf 1/1 · Sitz 2/3 · 6 Leckerlis von Herzii");
+  expect(text(entry({ type: "training", endedAt: "x", durationMin: 5, treats: 1 }))).toBe("Training, 5 Min. · 1 Leckerli von Hirsch");
+  expect(text(entry({ type: "training", clientKey: "k", exercises: [{ name: "Sitz", ok: 1, fail: 0 }], treats: 0 }))).toBe("Training, läuft · Sitz 1/1 von Hirsch");
 });
 
 test("food, weight, restock and stock", () => {

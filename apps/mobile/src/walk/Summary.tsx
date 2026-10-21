@@ -1,6 +1,7 @@
 // A walk looked back on: after Zuhause, and from Verlauf. The map when there is a track, Dauer, Strecke, Pause, who
-// went (tap a person to change it), each Pipi/Poopoo with its time, the trainings, a note; Fertig leads back. Right
-// after Zuhause without reception it shows what this phone knows and says so; changes need the server.
+// went (tap a person to change it), each Pipi/Poopoo with its time, the trainings, a note, and a way to its detail
+// (time, end, dogs, delete); Fertig leads back. Right after Zuhause without reception it shows what this phone knows
+// and says so; changes need the server.
 import { formatDistance, formatMinutes, keepsOne, simplify } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
@@ -101,6 +102,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
           />
           {note !== null && note !== (shown.note ?? "") ? <BigButton kind="neutral" size="m" label="Notiz speichern" onPress={() => void saveNote(shown, note)} /> : null}
           {message ? <Text style={[styles.small, { color: theme.muted }]}>{message}</Text> : null}
+          {shown.id !== null && !local ? <BigButton kind="neutral" size="m" label="Zeit, Hunde, Löschen …" onPress={() => router.push(`/eintrag/${shown.id}`)} /> : null}
         </>
       }
       bottom={<BigButton kind="walk" size="l" label="Fertig" onPress={done} />}

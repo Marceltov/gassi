@@ -8,6 +8,7 @@ export * from "./entry";
 export * from "./entryTypes";
 export * from "./exerciseTotals";
 export * from "./food";
+export * from "./history";
 export * from "./inputs";
 export * from "./result";
 export * from "./sessionProjection";

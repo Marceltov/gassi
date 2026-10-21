@@ -73,6 +73,8 @@ export const entryViewSchema = z.object({
   treatCounts: z.array(z.object({ treatKindId: z.number(), count: z.number() })),
   distanceM: z.number().nullable(),
   route: routeSchema.nullable(),
+  // a walk's pee, poop and the trainings' exercises during it, decided by time (ADR 0002); null for other entries
+  during: z.object({ pees: z.number(), poops: z.number(), exercises: z.array(exerciseTotalSchema) }).nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -224,6 +226,7 @@ export const contract = {
     input: z.object({ type: z.string().optional(), by: z.string().optional(), day: z.string().optional(), dog: z.string().optional(), offset: z.coerce.number().int().min(0).optional() }),
     output: z.object({ entries: z.array(entryViewSchema), more: z.boolean() }),
   }),
+  entry: endpoint({ method: "GET", path: "/api/entries/:id", input: z.object({ id }), output: entryViewSchema }),
   logEntry: endpoint({ method: "POST", path: "/api/entries", input: entryCreateInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),
   // all fields are sent (a left-out note or amount becomes null), except walkers: left out, they stay as they are
   editEntry: endpoint({ method: "PATCH", path: "/api/entries/:id", input: entryEditInput, output: entryViewSchema, messages: ENTRY_MESSAGES }),

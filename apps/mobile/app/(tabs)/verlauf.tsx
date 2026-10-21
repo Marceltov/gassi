@@ -1,5 +1,5 @@
-import { Placeholder } from "@/components/Placeholder";
+import { History } from "@/src/history/History";
 
 export default function VerlaufScreen() {
-  return <Placeholder title="Verlauf" />;
+  return <History />;
 }

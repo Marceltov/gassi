@@ -3,7 +3,7 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
+import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
@@ -13,7 +13,7 @@ import { dryTreats } from "./stock";
 import { type ShownTrack, Tracks } from "./tracks";
 
 /** An entry as the screens show it: with the display name of whoever logged it, and for walks the walkers (names and
- * ids), minutes paused and the distance and a thumbnail route of the shown track, for trainings the exercises practised
+ * ids), minutes paused, the distance and a thumbnail route of the shown track and what happened during it, for trainings the exercises practised
  * and treats given, in total and as editTraining takes them (repetitions per exercise and dog, treats per kind). */
 export type EntryView = Entry & {
   byName: string;
@@ -26,6 +26,7 @@ export type EntryView = Entry & {
   treatCounts: TreatCount[];
   distanceM: number | null;
   route: Route | null;
+  during: WalkDuring | null;
 };
 export type TreatCount = { treatKindId: number; count: number };
 
@@ -39,6 +40,7 @@ type Details = {
   treats: Map<number, number>;
   treatCounts: Map<number, TreatCount[]>;
   tracks: Map<number, ShownTrack>;
+  during: Map<number, WalkDuring>;
 };
 
 /** The newest entry of the types the Start screen shows. */
@@ -158,6 +160,12 @@ export class Diary {
     return this.view1((await this.entries.get(id))!);
   }
 
+  /** One entry as the screens show it, or null if there is none. */
+  async get(id: number): Promise<EntryView | null> {
+    const entry = await this.entries.get(id);
+    return entry ? this.view1(entry) : null;
+  }
+
   remove(id: number): Promise<boolean> {
     return this.entries.remove(id);
   }
@@ -266,12 +274,13 @@ export class Diary {
     const { db } = this.deps;
     const ids = (type: EntryType) => entries.filter((e) => e.type === type).map((e) => e.id);
     const [walkIds, trainingIds] = [ids("walk"), ids("training")];
-    const [walkers, pauses, exercises, treats, tracks] = await Promise.all([
+    const [walkers, pauses, exercises, treats, tracks, during] = await Promise.all([
       walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "person_id"]).where("entry_id", "in", walkIds).orderBy(sql`rowid`).execute() : [],
       walkIds.length ? db.selectFrom("walk_pause").select(["entry_id", "started_at", "ended_at"]).where("entry_id", "in", walkIds).execute() : [],
       trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise_id", "dog_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute() : [],
       trainingIds.length ? db.selectFrom("training_treat").select(["entry_id", "treat_kind_id", "count"]).where("entry_id", "in", trainingIds).where("count", ">", 0).orderBy("treat_kind_id").execute() : [],
       new Tracks(db, this.deps.now).shown(walkIds),
+      this.during(entries.filter((e) => e.type === "walk")),
     ]);
     const group = <R extends { entry_id: number }, V>(rows: R[], value: (r: R) => V) => {
       const out = new Map<number, V[]>();
@@ -286,7 +295,33 @@ export class Diary {
       treats: new Map([...group(treats, (t) => t.count)].map(([id, counts]) => [id, counts.reduce((n, c) => n + c, 0)])),
       treatCounts: group(treats, (t) => ({ treatKindId: t.treat_kind_id, count: t.count })),
       tracks,
+      during,
     };
+  }
+
+  // What happened during each walk, decided by time as the walk summary does (ADR 0002): the pee and poop and the
+  // trainings begun from its start until its end (now, while it runs), read at once for the time all of them span.
+  private async during(walks: readonly Entry[]): Promise<Map<number, WalkDuring>> {
+    if (walks.length === 0) return new Map();
+    const now = this.deps.now().toISOString();
+    const endOf = (w: Entry) => w.endedAt ?? now;
+    const since = walks.reduce((min, w) => (w.at < min ? w.at : min), walks[0].at);
+    const until = walks.reduce((max, w) => (endOf(w) > max ? endOf(w) : max), endOf(walks[0]));
+    const inside = (await this.entries.list({ since, until })).filter((e) => e.type === "pee" || e.type === "poop" || e.type === "training");
+    const trainingIds = inside.filter((e) => e.type === "training").map((e) => e.id);
+    const reps = trainingIds.length
+      ? await this.deps.db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute()
+      : [];
+    return new Map(
+      walks.map((w) => {
+        const mine = inside.filter((e) => e.at >= w.at && e.at < endOf(w));
+        // oldest training first, as the summary lists them
+        const trainings = mine.filter((e) => e.type === "training").reverse();
+        const rows = trainings.flatMap((t) => reps.filter((r) => r.entry_id === t.id).map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count })));
+        const count = (type: EntryType) => mine.filter((e) => e.type === type).length;
+        return [w.id, { pees: count("pee"), poops: count("poop"), exercises: exerciseTotals(rows) }];
+      }),
+    );
   }
 
   private async views(entries: Entry[]): Promise<EntryView[]> {
@@ -309,6 +344,7 @@ export class Diary {
         treatCounts: d.treatCounts.get(e.id) ?? [],
         distanceM: track?.metrics.distanceM ?? null,
         route: track ? simplify(track.points, ROUTE_POINTS) : null,
+        during: isWalk ? (d.during.get(e.id) ?? null) : null,
       };
     });
   }

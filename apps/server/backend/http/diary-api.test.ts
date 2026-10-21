@@ -153,6 +153,8 @@ describe("editing afterwards over the API", () => {
     const { body: list } = await json("/api/entries", { token });
     const walk = list.entries.find((e: { type: string }) => e.type === "walk");
     const training = list.entries.find((e: { type: string }) => e.type === "training");
+    expect((await json(`/api/entries/${walk.id}`, { token })).body).toMatchObject({ id: walk.id, type: "walk", during: { pees: 0, poops: 0, exercises: [] } });
+    expect((await json("/api/entries/999", { token })).status).toBe(404);
     const fixed = await json(`/api/entries/${walk.id}`, { method: "PATCH", token, body: { at: walk.at, endedAt: walk.endedAt, walkers: [HERZII.id] } });
     expect(fixed.body).toMatchObject({ walkers: [HERZII.name], walkerIds: [HERZII.id] });
     const bad = await json(`/api/entries/${training.id}`, { method: "PATCH", token, body: { at: training.at, endedAt: training.endedAt, walkers: [HERZII.id] } });
