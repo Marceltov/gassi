@@ -143,6 +143,7 @@ const weekSchema = z.object({
   routes: z.array(z.object({ walkId: z.number(), route: routeSchema })),
   treats: z.number(),
 });
+const LINK_OR_CODE = "Link oder Code fehlt.";
 export const linkKinds = ["setup", "person", "device", "watch", "magic"] as const;
 const openLink = z.object({ id: z.number(), kind: z.enum(linkKinds), createdAt: z.string(), expiresAt: z.string() });
 
@@ -151,14 +152,19 @@ export const contract = {
     method: "POST",
     path: "/api/auth/redeem",
     auth: false,
-    input: z.object({
-      token: z.string().min(1).max(100),
-      deviceKind: z.enum(deviceKinds),
-      deviceName: z.string().trim().min(1).max(60),
-      personName: z.string().optional(),
-      dogName: z.string().optional(),
-    }),
+    // the link's token, or its code as typed into the app (XXXX-XXXX, loosely)
+    input: z
+      .object({
+        token: z.string().min(1).max(100).optional(),
+        code: z.string().min(1).max(20).optional(),
+        deviceKind: z.enum(deviceKinds),
+        deviceName: z.string().trim().min(1).max(60),
+        personName: z.string().optional(),
+        dogName: z.string().optional(),
+      })
+      .refine((i) => (i.token === undefined) !== (i.code === undefined), { message: LINK_OR_CODE, path: ["token"] }),
     output: z.object({ deviceToken: z.string(), person: personSchema, device: deviceSchema }),
+    messages: { token: LINK_OR_CODE, code: LINK_OR_CODE },
   }),
   magicLink: endpoint({
     method: "POST",

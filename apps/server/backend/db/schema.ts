@@ -45,6 +45,7 @@ export interface DeviceTable {
 export interface LinkTable {
   id: Generated<number>;
   token_hash: string;
+  code_hash: string | null; // the short code's hash (tokens.ts)
   kind: string; // setup | person | device | watch | magic
   person_id: string | null;
   created_by: string | null;

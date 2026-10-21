@@ -33,7 +33,7 @@ const missing = (what: string) => {
 const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl, deps.defaultDogName ?? null);
 
 const implementations: Implementations<ApiDeps> = {
-  redeem: async ({ input, deps }) => links(deps).redeem(input.token, input),
+  redeem: async ({ input, deps }) => links(deps).redeem(input.code !== undefined ? { code: input.code } : { token: input.token! }, input),
   magicLink: async ({ input, deps }) => {
     if (!deps.mailer) throw new InputError("E-Mail ist auf diesem Server nicht eingerichtet.");
     await sendMagicLink(deps.db, deps.now, deps.publicUrl, deps.mailer, input.email);

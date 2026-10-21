@@ -32,13 +32,15 @@ Gassi einrichten: https://gassi.example.org/l/…
 Open it on your phone: it opens the Gassi app (or shows a QR code for it), you enter your name and your dog's, and
 the server is set up. A new link is printed on each start until then. Everyone else joins through an invite link
 you create in the app and send them; each phone, the watch or a script gets its own device, which you can sign out.
+Each link's page (and a sign-in mail) also shows a short code: the web app installed on an iPhone's home screen
+doesn't share Safari's storage, so there you type the code instead of opening the link.
 
 Optional settings:
 
 | Variable | What for |
 |---|---|
 | `SMTP_URL` (`smtp://user:pass@host:587` or `smtps://…`), `MAIL_FROM` | Sign-in links by e-mail ("magic links") for people who saved an address |
-| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | Sign-in in the app through your own identity provider (authentik, Keycloak, …): all three or none. Then there is no setup link; the first sign-in sets the household up, new people come in through the provider, invites only add devices |
+| `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` | Sign-in in the app and the web app through your own identity provider (authentik, Keycloak, …): all three or none. Then there is no setup link; the first sign-in sets the household up, new people come in through the provider, invites only add devices |
 | `DOG_NAME` | The first dog's name when setup doesn't ask (with OIDC: else "Mein Hund"; rename it in the app) |
 | `TZ` (default `Europe/Berlin`) | The household's time zone: days, weeks |
 | `DATA_DIR` (default `/data` in the image), `SECRET`, `LOG_LEVEL` | Where data lives; a fixed cookie key (else one is kept in `DATA_DIR`); log detail |

@@ -2,15 +2,20 @@
 // invites for a new person or another device of the inviting person (a phone, the watch), and magic links sent by
 // e-mail. Each is used once, expires, and can be revoked by whoever made it. The server keeps only the token's hash.
 // A link points to a page on the household's own server (/l/<token>) that opens the app; nothing central is involved.
+// Each link also has a short code (tokens.ts) that redeems it the same way, for an app that can't be handed the link.
 import type { DB } from "../db/open";
 import { DogRepository, FIRST_DOG_COLOR } from "../dogs";
 import { InputError } from "../errors";
 import { PeopleRepository } from "../people";
 import { type DeviceInfo, type DeviceKind, Devices } from "./devices";
-import { hashToken, newToken } from "./tokens";
+import { codeFor, hashToken, newToken, normalizeCode } from "./tokens";
+
+export { codeFor, normalizeCode };
 
 export type LinkKind = "setup" | "person" | "device" | "watch" | "magic";
 export type OpenLink = { id: number; kind: LinkKind; createdAt: string; expiresAt: string };
+/** What redeems a link: its token, or its code as typed. */
+export type LinkKey = { token: string } | { code: string };
 export type Redeemed = { deviceToken: string; person: { id: string; name: string }; device: DeviceInfo };
 
 const DAY = 86_400_000;
@@ -23,6 +28,8 @@ const isKind = (k: string): k is LinkKind => ["setup", "person", "device", "watc
 
 /** gassi://join?server=…&token=…: what the landing page and the QR code hand to the app. */
 export const appLink = (publicUrl: string, token: string): string => `gassi://join?server=${encodeURIComponent(publicUrl)}&token=${encodeURIComponent(token)}`;
+/** /join?token=…: the same for the web app on the household's server. */
+export const webLink = (publicUrl: string, token: string): string => `${publicUrl}/join?token=${encodeURIComponent(token)}`;
 
 export class Links {
   constructor(
@@ -32,16 +39,17 @@ export class Links {
     private readonly defaultDogName: string | null = null, // DOG_NAME: the first dog's name when setup doesn't say
   ) {}
 
-  async create(l: { kind: LinkKind; personId?: string | null; createdBy?: string | null; ttlMs: number }): Promise<{ id: number; token: string; url: string; expiresAt: string }> {
+  async create(l: { kind: LinkKind; personId?: string | null; createdBy?: string | null; ttlMs: number }): Promise<{ id: number; token: string; code: string; url: string; expiresAt: string }> {
     const token = newToken();
+    const code = codeFor(token);
     const now = this.now();
     const expiresAt = new Date(now.getTime() + l.ttlMs).toISOString();
     const row = await this.db
       .insertInto("link")
-      .values({ token_hash: hashToken(token), kind: l.kind, person_id: l.personId ?? null, created_by: l.createdBy ?? null, created_at: now.toISOString(), expires_at: expiresAt })
+      .values({ token_hash: hashToken(token), code_hash: hashToken(normalizeCode(code)), kind: l.kind, person_id: l.personId ?? null, created_by: l.createdBy ?? null, created_at: now.toISOString(), expires_at: expiresAt })
       .returning("id")
       .executeTakeFirstOrThrow();
-    return { id: row.id, token, url: `${this.publicUrl}/l/${token}`, expiresAt };
+    return { id: row.id, token, code, url: `${this.publicUrl}/l/${token}`, expiresAt };
   }
 
   /** What a link is for and whether it still works, without using it (for the landing page). */
@@ -52,10 +60,11 @@ export class Links {
   }
 
   /** Uses the link: adds the person (and, for setup, the first dog) or the device, in one transaction. */
-  async redeem(token: string, d: { deviceKind: DeviceKind; deviceName: string; personName?: string; dogName?: string }): Promise<Redeemed> {
+  async redeem(key: LinkKey, d: { deviceKind: DeviceKind; deviceName: string; personName?: string; dogName?: string }): Promise<Redeemed> {
     return this.db.transaction().execute(async (tx) => {
       const now = this.now().toISOString();
-      const link = await tx.selectFrom("link").selectAll().where("token_hash", "=", hashToken(token)).executeTakeFirst();
+      const [column, hash] = "code" in key ? (["code_hash", hashToken(normalizeCode(key.code))] as const) : (["token_hash", hashToken(key.token)] as const);
+      const link = await tx.selectFrom("link").selectAll().where(column, "=", hash).executeTakeFirst();
       if (!link || link.used_at || link.revoked_at || link.expires_at <= now || !isKind(link.kind)) throw new InputError(USED);
       const people = new PeopleRepository(tx, this.now);
       let personId = link.person_id;

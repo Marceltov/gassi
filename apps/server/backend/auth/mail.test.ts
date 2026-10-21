@@ -21,9 +21,11 @@ test("a known address gets a mail with a 15-minute link that signs in that perso
   expect(sent[0]).toMatchObject({ to: "marcel@example.org", subject: "Dein Gassi-Link" });
   const token = /https:\/\/gassi\.example\/l\/([\w-]+)/.exec(sent[0].text)![1];
   expect(sent[0].text).toContain("15 Minuten");
+  const code = /gib diesen Code ein: ([0-9A-Z]{4}-[0-9A-Z]{4})/.exec(sent[0].text)![1];
   const links = new Links(db(), () => NOW, URL_);
   expect(await links.peek(token)).toEqual({ kind: "magic", valid: true });
-  expect((await links.redeem(token, { deviceKind: "phone", deviceName: "iPhone" })).person).toEqual(HIRSCH);
+  expect((await links.redeem({ code }, { deviceKind: "phone", deviceName: "iPhone" })).person).toEqual(HIRSCH);
+  await expect(links.redeem({ token }, { deviceKind: "phone", deviceName: "iPhone" })).rejects.toThrow("Dieser Link ist abgelaufen oder schon benutzt.");
   expect(await new Links(db(), () => new Date(NOW.getTime() + 15 * 60_000 + 1), URL_).peek(token)).toMatchObject({ valid: false });
 });
 

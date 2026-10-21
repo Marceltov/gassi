@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { Devices } from "../auth/devices";
+import { Links, MAGIC_TTL } from "../auth/links";
 import { freshDatabase, HIRSCH } from "../db/testing";
 import { apiRouter, type ApiDeps } from "./api";
 
@@ -37,6 +38,21 @@ describe("invites over the API", () => {
     const again = await call("/api/auth/redeem", { method: "POST", body });
     expect(again.status).toBe(400);
     expect(await again.json()).toEqual({ error: "Dieser Link ist abgelaufen oder schon benutzt." });
+  });
+
+  test("a link's code, typed loosely, redeems it like its token", async () => {
+    const { code } = await new Links(db(), () => NOW, "https://gassi.example").create({ kind: "magic", personId: HIRSCH.id, ttlMs: MAGIC_TTL });
+    const res = await call("/api/auth/redeem", { method: "POST", body: { code: code.toLowerCase().replace("-", " "), deviceKind: "phone", deviceName: "iPhone" } });
+    expect(res.status).toBe(200);
+    expect((await res.json()).person.name).toBe("Hirsch");
+  });
+
+  test("redeem takes exactly one of link and code", async () => {
+    for (const key of [{}, { token: "t", code: "ABCD-EFGH" }]) {
+      const res = await call("/api/auth/redeem", { method: "POST", body: { ...key, deviceKind: "phone", deviceName: "iPhone" } });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "Link oder Code fehlt." });
+    }
   });
 
   test("person invites are refused in OIDC mode", async () => {

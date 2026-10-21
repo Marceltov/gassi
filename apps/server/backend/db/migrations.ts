@@ -44,6 +44,7 @@ const migrations: Record<string, Migration> = {
         .createTable("link")
         .addColumn("id", "integer", (c) => c.primaryKey().autoIncrement())
         .addColumn("token_hash", "text", (c) => c.notNull().unique())
+        .addColumn("code_hash", "text", (c) => c.unique())
         .addColumn("kind", "text", (c) => c.notNull())
         .addColumn("person_id", "text", (c) => c.references("person.id").onDelete("cascade"))
         .addColumn("created_by", "text", (c) => c.references("person.id").onDelete("set null"))
