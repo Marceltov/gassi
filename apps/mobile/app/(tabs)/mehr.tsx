@@ -1,5 +1,5 @@
-import { Placeholder } from "@/components/Placeholder";
+import { More } from "@/src/more/More";
 
 export default function MehrScreen() {
-  return <Placeholder title="Mehr" />;
+  return <More />;
 }

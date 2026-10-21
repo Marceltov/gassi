@@ -32,6 +32,12 @@ function Screens() {
         <Stack.Screen name="runde/[id]" />
         <Stack.Screen name="eintrag/[id]" />
         <Stack.Screen name="training" />
+        <Stack.Screen name="mehr/gewicht" />
+        <Stack.Screen name="mehr/vorrat" />
+        <Stack.Screen name="mehr/hunde" />
+        <Stack.Screen name="mehr/katalog" />
+        <Stack.Screen name="mehr/haushalt" />
+        <Stack.Screen name="mehr/geraete" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn} redirectTo="/">
         <Stack.Screen name="anmelden" />

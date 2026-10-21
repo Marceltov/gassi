@@ -40,13 +40,17 @@ function wrap(fetchFn: typeof fetch, onReached: (reached: boolean) => void, onAn
 export function apiFor(device: Device, { fetch: fetchFn = (...a) => fetch(...a), onReached = () => {} }: Options = {}): Client {
   const signOutOn401 = (res: Response) => {
     // only if this device is still the signed-in one: another tab may have signed in anew meanwhile
-    if (res.status === 401 && loadDevice()?.token === device.token) {
-      clearSnapshot();
-      clearEnded();
-      clearDevice();
-    }
+    if (res.status === 401 && loadDevice()?.token === device.token) forgetDevice();
   };
   return createClient({ baseUrl: device.serverUrl, token: device.token, fetch: wrap(fetchFn, onReached, signOutOn401) });
+}
+
+/** Signs this device out here: forgets the token and what it showed, which brings up the sign-in. The queue of unsent
+ * taps stays (per person): it goes out when the same person signs in again. */
+export function forgetDevice(): void {
+  clearSnapshot();
+  clearEnded();
+  clearDevice();
 }
 
 /** The client before sign-in (links and codes). */

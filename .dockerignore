@@ -26,3 +26,5 @@ apps/server/public/assets
 apps/server/public/favicon.ico
 apps/server/public/index.html
 apps/server/public/metadata.json
+apps/server/public/manifest.json
+apps/server/public/sw.js

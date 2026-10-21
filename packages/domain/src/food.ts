@@ -46,15 +46,23 @@ export function quickPortions(recent: readonly Portion[], kind: FoodKind, canSiz
   return [...grams.slice(0, 4 - cans.length).map((amountG) => ({ label: `${amountG} g`, amountG })), ...cans];
 }
 
+/** The stock of a kind in parts: what is left ("9 Dosen", "1,2 kg"; null when it isn't known), for how long ("reicht
+ * etwa 12 Tage"; null without use to go by or when it ran out), and whether it ran out (or counts below zero). */
+export function stockParts(stock: Stock, kind: FoodKind): { left: string | null; lasts: string | null; empty: boolean } {
+  const s = kind === "wet" ? stock.wet : { ...stock.dry, cans: null };
+  const amount = s.cans ?? s.grams;
+  const empty = s.belowZero || amount === 0;
+  const left = amount === null ? null : s.cans !== null ? formatCans(s.cans) : formatWeight(s.grams ?? 0);
+  const days = s.daysLeft === null ? null : Math.round(s.daysLeft);
+  const lasts = s.daysLeft === null || empty ? null : s.daysLeft < 0.5 ? "reicht weniger als einen Tag" : `reicht etwa ${days} ${days === 1 ? "Tag" : "Tage"}`;
+  return { left, lasts, empty };
+}
+
 /** The stock of a kind in one line: "Vorrat: noch 9 Dosen · reicht etwa 12 Tage", "Vorrat aufgebraucht"; null when
  * it isn't known. */
 export function stockLine(stock: Stock, kind: FoodKind): string | null {
-  const s = kind === "wet" ? stock.wet : { ...stock.dry, cans: null };
-  const amount = s.cans ?? s.grams;
-  if (s.belowZero || amount === 0) return "Vorrat aufgebraucht";
-  if (amount === null) return null;
-  const left = s.cans !== null ? formatCans(s.cans) : formatWeight(s.grams ?? 0);
-  const days = s.daysLeft === null ? null : Math.round(s.daysLeft);
-  const lasts = s.daysLeft === null ? "" : s.daysLeft < 0.5 ? " · reicht weniger als einen Tag" : ` · reicht etwa ${days} ${days === 1 ? "Tag" : "Tage"}`;
-  return `Vorrat: noch ${left}${lasts}`;
+  const { left, lasts, empty } = stockParts(stock, kind);
+  if (empty) return "Vorrat aufgebraucht";
+  if (left === null) return null;
+  return `Vorrat: noch ${left}${lasts ? ` · ${lasts}` : ""}`;
 }
