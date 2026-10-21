@@ -10,7 +10,7 @@
 //   alias of the running walk, so its later taps land there. A start arriving after the stop joins the walk that was
 //   running at its time. Trainings do the same; a training started on a walk that has since ended ends with it.
 import { sql, type Kysely } from "kysely";
-import { type Command, type Entry, type ExerciseTotal, exerciseTotals, isOver, joinsEndedSession, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView } from "@gassi/domain";
+import { type Command, type Entry, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView } from "@gassi/domain";
 import type { DB } from "./db/open";
 import type { Schema } from "./db/schema";
 import { DogRepository } from "./dogs";
@@ -201,6 +201,10 @@ class Step {
         await this.create(c.type, c.at, null, [c.dogId]);
         return "applied";
       }
+      case "food":
+        // the same kind of entry the diary logs, so stock and the usual portion see it
+        await this.create("food", c.at, null, await this.dogsFor(c.dogIds), { amountG: c.amountG, foodKind: c.foodKind });
+        return "applied";
     }
   }
 
@@ -216,8 +220,8 @@ class Step {
     return resolveDogs(requested, await this.activeDogs());
   }
 
-  private create(type: Entry["type"], at: string, clientKey: string | null, dogIds: number[]): Promise<Entry> {
-    return this.entries.create({ type, at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: null, dogIds, loggedBy: this.user.id, clientKey });
+  private create(type: Entry["type"], at: string, clientKey: string | null, dogIds: number[], food?: { amountG: number; foodKind: FoodKind }): Promise<Entry> {
+    return this.entries.create({ type, at, endedAt: null, amountG: food?.amountG ?? null, foodKind: food?.foodKind ?? null, unitG: null, note: null, dogIds, loggedBy: this.user.id, clientKey });
   }
 
   // A start joins the walk/training that runs now, or the one that was running at the tap's time (a start queued without

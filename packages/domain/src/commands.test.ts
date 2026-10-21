@@ -10,3 +10,12 @@ test("pee and poop name their one dog; walks and trainings may name dogs", () =>
   expect(commandSchema.parse({ id: "3", at, kind: "walk.start", walkKey: "w" })).not.toHaveProperty("dogIds");
   expect(commandSchema.parse({ id: "4", at, kind: "training.start", trainingKey: "t", dogIds: [3] })).toMatchObject({ dogIds: [3] });
 });
+
+test("a food command needs a sensible amount and a kind of wet or dry", () => {
+  const food = { id: "1", at, kind: "food", amountG: 80, foodKind: "wet" };
+  expect(commandSchema.parse(food)).toMatchObject({ amountG: 80, foodKind: "wet" });
+  expect(commandSchema.parse(food)).not.toHaveProperty("dogIds");
+  expect(commandSchema.safeParse({ ...food, amountG: 0 }).success).toBe(false);
+  expect(commandSchema.safeParse({ ...food, amountG: 5001 }).success).toBe(false);
+  expect(commandSchema.safeParse({ ...food, foodKind: "raw" }).success).toBe(false);
+});

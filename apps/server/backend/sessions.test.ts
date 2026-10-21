@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { Command } from "@gassi/domain";
 import { Catalog } from "./catalog";
 import { freshDatabase } from "./db/testing";
+import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
 import { Sessions } from "./sessions";
 
@@ -330,5 +331,19 @@ describe("trainings", () => {
     await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t" }), cmd(10, { kind: "training.stop", trainingKey: "t" })]);
     const late = cmd(11, { kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: 1 });
     expect(await s.apply(HERZII, [late])).toEqual({ applied: [], dropped: [late.id] });
+  });
+});
+
+describe("food", () => {
+  test("a food command creates one food entry, also when sent twice", async () => {
+    const s = sessions();
+    const food = cmd(5, { kind: "food", amountG: 80, foodKind: "wet" });
+    await s.apply(HIRSCH, [food]);
+    expect(await s.apply(HIRSCH, [food])).toEqual({ applied: [food.id], dropped: [] });
+    const all = (await new EntryRepository(db()).list({ type: "food" }));
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ type: "food", at: at(5), amountG: 80, foodKind: "wet", loggedBy: "marcel" });
+    const active = (await new DogRepository(db()).activeIds()).sort();
+    expect([...all[0].dogIds].sort()).toEqual(active);
   });
 });

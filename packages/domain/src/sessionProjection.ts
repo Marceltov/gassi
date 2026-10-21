@@ -49,6 +49,7 @@ function step(v: SessionsView, c: Command, user: Person): SessionsView {
       return { ...v, training: { ...training, treats: { ...training.treats, [c.treatKindId]: count } } };
     }
     case "log":
+    case "food":
       return v;
   }
 }
