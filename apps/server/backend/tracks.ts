@@ -33,11 +33,6 @@ export class Tracks {
     });
   }
 
-  /** The distance of the shown track of each walk in `entryIds` that has one (for the CSV). */
-  async distances(entryIds: readonly number[]): Promise<Map<number, number>> {
-    return new Map([...(await this.shown(entryIds))].map(([id, t]) => [id, t.metrics.distanceM]));
-  }
-
   /** The track the walk shows, with its metrics and a simplified line for drawing; null without tracks. */
   async forWalk(entryId: number): Promise<ShownTrack | null> {
     return (await this.shown([entryId])).get(entryId) ?? null;

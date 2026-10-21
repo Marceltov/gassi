@@ -18,5 +18,13 @@ export function secret(fromEnv: string | null, dataDir: string): string {
   }
 }
 
+// Asked for on every request: derived once per SECRET and data folder, not read from the file each time.
+const codeKeys = new Map<string, string>();
+
 /** The key for the hashes of link codes (tokens.ts), derived from the secret so the cookie key isn't reused as it is. */
-export const linkCodeKey = (fromEnv: string | null, dataDir: string): string => createHmac("sha256", secret(fromEnv, dataDir)).update("link-code").digest("hex");
+export function linkCodeKey(fromEnv: string | null, dataDir: string): string {
+  const id = JSON.stringify([fromEnv, dataDir]);
+  let key = codeKeys.get(id);
+  if (key === undefined) codeKeys.set(id, (key = createHmac("sha256", secret(fromEnv, dataDir)).update("link-code").digest("hex")));
+  return key;
+}

@@ -86,10 +86,3 @@ export type NewEntryInput = z.output<typeof newEntryInput>;
 export type NewEntry = Omit<NewEntryInput, "dogIds"> & { dogIds: number[]; loggedBy: string; clientKey?: string | null };
 
 export const durationOf = (e: { at: string; endedAt: string | null }) => minutesBetween(e.at, e.endedAt);
-
-/** The newest entry of each type in `entries`. */
-export function latestByType(entries: readonly Entry[]): Partial<Record<EntryType, Entry>> {
-  const latest: Partial<Record<EntryType, Entry>> = {};
-  for (const e of entries) if (!latest[e.type] || latest[e.type]!.at < e.at) latest[e.type] = e;
-  return latest;
-}

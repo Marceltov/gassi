@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { dayBounds, type Entry, latestByType, type NewEntry } from "@gassi/domain";
+import { dayBounds, type Entry, type NewEntry } from "@gassi/domain";
 import { freshDatabase } from "../db/testing";
 import { openDatabase } from "../db/open";
 import { EntryRepository } from "./repository";
@@ -104,12 +104,4 @@ describe("EntryRepository", () => {
     expect(await repo().remove(e.id)).toBe(false);
     expect(await repo().get(e.id)).toBeUndefined();
   });
-});
-
-test("latestByType picks the newest entry of each type", async () => {
-  const r = repo();
-  const early = await r.create(entryAt("2026-10-20T07:00:00.000Z"));
-  const late = await r.create(entryAt("2026-10-20T09:00:00.000Z", { loggedBy: "bille" }));
-  const food = await r.create(entryAt("2026-10-20T08:00:00.000Z", { type: "food" }));
-  expect(latestByType([early, late, food])).toEqual({ walk: late, food });
 });
