@@ -4,7 +4,9 @@
 // in the app they stay in the tab they were opened from; a deep link or a reload has no tab to stay in and opens them
 // in the group that sorts first, which is why Verlauf's is "(chronik)" (before "(mehr)" and "(start)").
 // Tapping the tab that is shown goes back to its first screen (each stack has an anchor, so also after a deep link):
-// that is the way back, the screens have no Zurück of their own.
+// that is the way back, the screens have no Zurück of their own. Leaving a tab resets its stack too
+// (popToTopOnBlur), so a tab always opens at its top page; a running walk is not lost, it lives in the projection and
+// Start's Gassi tile reads "Runde läuft".
 // The bar keeps clear of the home indicator and the rounded corners: its labels sit right above the safe area, as in
 // the iPhone's own apps (49 pt plus the safe area).
 import { Tabs } from "expo-router";
@@ -28,6 +30,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        popToTopOnBlur: true,
         tabBarActiveTintColor: theme.ink,
         tabBarInactiveTintColor: theme.muted,
         tabBarStyle: {
