@@ -1,7 +1,8 @@
 // The implementations of the API contract, each a thin call into a use case.
 import { Devices } from "../auth/devices";
-import { appLink, INVITE_TTL, type LinkKey, Links } from "../auth/links";
+import { appLink, INVITE_TTL, type LinkKey, Links, WrongLink } from "../auth/links";
 import { type Mailer, sendMagicLink } from "../auth/mail";
+import type { Throttle } from "../auth/throttle";
 import { InputError } from "../errors";
 import { Catalog } from "../catalog";
 import { Diary } from "../diary";
@@ -10,13 +11,15 @@ import { PeopleRepository } from "../people";
 import { Sessions } from "../sessions";
 import { Tracks } from "../tracks";
 import type { DB } from "../db/open";
-import { type Implementations, NotFound, router } from "./router";
+import { type Implementations, NotFound, router, TooMany } from "./router";
 
 export type ApiDeps = {
   db: DB;
   now: () => Date;
   publicUrl: string;
   codeKey: string; // keys the link codes' hashes (secret.ts linkCodeKey)
+  codeThrottle: Throttle; // wrong sign-in codes, kept across requests
+  client: string; // who asks (throttle.ts clientOf)
   oidc: boolean;
   mailer: Mailer | null;
   timeZone?: string; // default Europe/Berlin
@@ -33,10 +36,23 @@ const missing = (what: string) => {
 
 const linkKey = (i: { token?: string; code?: string }): LinkKey => (i.code !== undefined ? { code: i.code } : { token: i.token! });
 const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl, deps.codeKey, deps.defaultDogName ?? null);
+const TOO_MANY = "Zu viele falsche Codes. Bitte in ein paar Minuten nochmal.";
+// A code can be guessed, a link's token can't: wrong codes count, and too many of them wait before the next is looked up.
+async function byCode<T>(deps: ApiDeps, key: LinkKey, look: (key: LinkKey) => Promise<T>): Promise<T> {
+  if (!("code" in key)) return look(key);
+  const now = deps.now().getTime();
+  if (deps.codeThrottle.blocked(deps.client, now)) throw new TooMany(TOO_MANY);
+  try {
+    return await look(key);
+  } catch (e) {
+    if (e instanceof WrongLink) deps.codeThrottle.failed(deps.client, now);
+    throw e;
+  }
+}
 
 const implementations: Implementations<ApiDeps> = {
-  redeem: async ({ input, deps }) => links(deps).redeem(linkKey(input), input),
-  linkInfo: async ({ input, deps }) => links(deps).info(linkKey(input)),
+  redeem: async ({ input, deps }) => byCode(deps, linkKey(input), (key) => links(deps).redeem(key, input)),
+  linkInfo: async ({ input, deps }) => byCode(deps, linkKey(input), (key) => links(deps).info(key)),
   options: async ({ deps }) => ({ oidc: deps.oidc, mail: deps.mailer !== null }),
   magicLink: async ({ input, deps }) => {
     if (!deps.mailer) throw new InputError("E-Mail ist auf diesem Server nicht eingerichtet.");

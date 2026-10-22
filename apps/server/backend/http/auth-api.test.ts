@@ -1,13 +1,14 @@
 import { describe, expect, test } from "vitest";
 import { Devices } from "../auth/devices";
 import { Links, MAGIC_TTL } from "../auth/links";
+import { Throttle } from "../auth/throttle";
 import { freshDatabase, HIRSCH } from "../db/testing";
 import { apiRouter, type ApiDeps } from "./api";
 import { TEST_CODE_KEY } from "./testing";
 
 const { db } = freshDatabase();
 const NOW = new Date("2026-10-20T10:00:00Z");
-const deps = (more: Partial<ApiDeps> = {}): ApiDeps => ({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", codeKey: TEST_CODE_KEY, oidc: false, mailer: null, ...more });
+const deps = (more: Partial<ApiDeps> = {}): ApiDeps => ({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", codeKey: TEST_CODE_KEY, codeThrottle: new Throttle(), client: "test", oidc: false, mailer: null, ...more });
 const call = (path: string, init: { method?: string; token?: string; body?: unknown } = {}, more: Partial<ApiDeps> = {}) =>
   apiRouter(deps(more))(
     new Request(`https://gassi.example${path}`, {
@@ -72,6 +73,21 @@ describe("invites over the API", () => {
     }
     const both = await call(`/api/auth/link?token=t&code=ABCD-EFGH`);
     expect(await both.json()).toEqual({ error: "Link oder Code fehlt." });
+  });
+
+  test("after ten wrong codes a client waits, even with the right code; a link's token and other clients go on", async () => {
+    const codeThrottle = new Throttle();
+    const links = new Links(db(), () => NOW, "https://gassi.example", TEST_CODE_KEY);
+    const device = { deviceKind: "phone", deviceName: "iPhone" };
+    const [byCode, byToken] = [await links.create({ kind: "magic", personId: HIRSCH.id, ttlMs: MAGIC_TTL }), await links.create({ kind: "magic", personId: HIRSCH.id, ttlMs: MAGIC_TTL })];
+    const redeem = (body: object, client = "guesser") => call("/api/auth/redeem", { method: "POST", body: { ...body, ...device } }, { codeThrottle, client });
+    for (let i = 0; i < 10; i++) expect((await redeem({ code: `WRNG-${String(i).padStart(4, "0")}` })).status).toBe(400);
+    const blocked = await redeem({ code: byCode.code });
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: "Zu viele falsche Codes. Bitte in ein paar Minuten nochmal." });
+    expect((await call(`/api/auth/link?code=${byCode.code}`, {}, { codeThrottle, client: "guesser" })).status).toBe(429);
+    expect((await redeem({ token: byToken.token })).status).toBe(200);
+    expect((await redeem({ code: byCode.code }, "someone else")).status).toBe(200);
   });
 
   test("redeem takes exactly one of link and code", async () => {

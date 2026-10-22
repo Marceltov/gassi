@@ -1,4 +1,4 @@
-// Mehr: the data first (Gewicht, Vorrat), then the settings (Hunde; Übungen und Leckerli; Haushalt; Meine Geräte) and
+// Mehr: the data first (Gewicht, Vorrat), then the settings (Hunde, Übungen, Leckerli; Haushalt; Meine Geräte) and
 // the Garmin watch, which comes later. Each row says in short what is behind it; without reception the rows that need
 // the server stay without that line. Then the link to the source code, which the AGPL asks a server to offer its users,
 // and last Abmelden on this device (asked first). Its screens have no Zurück: the tab bar stays, and the Mehr tab leads back here.
@@ -14,6 +14,9 @@ import { Group, Row } from "./List";
 import { SignOutSheet } from "./SignOut";
 import { useServer } from "./useServer";
 
+// "1 Übung", "5 Übungen", "keine"
+const count = (n: number, one: string, many: string) => (n === 0 ? "keine" : `${n} ${n === 1 ? one : many}`);
+
 // A modified Gassi run for others points this at its own source.
 const SOURCE = "https://github.com/Marceltov/gassi";
 
@@ -22,8 +25,8 @@ export function More() {
   const router = useRouter();
   const now = useNow(60_000);
   const { people, dogs, me } = useGassi();
-  const { data } = useServer((api) => Promise.all([api.weights(), api.stock(), api.devices()]));
-  const [weights, stock, devices] = data ?? [null, null, null];
+  const { data } = useServer((api) => Promise.all([api.weights(), api.stock(), api.devices(), api.exercises(), api.treatKinds()]));
+  const [weights, stock, devices, exercises, treats] = data ?? [null, null, null, null, null];
 
   const active = dogs.filter((d) => !d.archived);
   const newest = weights?.weights[0];
@@ -45,7 +48,8 @@ export function More() {
           </Group>
           <Group>
             <Row testID="more-Hunde" icon="dog" tone="walk" label="Hunde" value={active.map((d) => d.name).join(", ")} onPress={go("/mehr/hunde")} />
-            <Row testID="more-Katalog" icon="training" tone="training" label="Übungen und Leckerli" value="Listen bearbeiten" onPress={go("/mehr/katalog")} />
+            <Row testID="more-Uebungen" icon="training" tone="training" label="Übungen" value={exercises ? count(exercises.exercises.length, "Übung", "Übungen") : undefined} onPress={go("/mehr/uebungen")} />
+            <Row testID="more-Leckerli" icon="treat" tone="treat" label="Leckerli" value={treats ? count(treats.treatKinds.length, "Sorte", "Sorten") : undefined} onPress={go("/mehr/leckerli")} />
           </Group>
           <Group>
             <Row testID="more-Haushalt" icon="people" tone="household" label="Haushalt" value={[me?.name, ...others].filter(Boolean).join(", ") + " · einladen"} onPress={go("/mehr/haushalt")} />

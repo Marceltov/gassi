@@ -24,6 +24,13 @@ export const INVITE_TTL = 7 * DAY;
 export const MAGIC_TTL = 15 * 60_000;
 
 const USED = "Dieser Link ist abgelaufen oder schon benutzt.";
+
+/** A link or code that names no usable link: unknown, used, revoked or expired (one message for all). */
+export class WrongLink extends InputError {
+  constructor() {
+    super(USED);
+  }
+}
 const isKind = (k: string): k is LinkKind => ["setup", "person", "device", "watch", "magic"].includes(k);
 
 /** gassi://join?server=…&token=…: what the landing page and the QR code hand to the app. */
@@ -90,11 +97,11 @@ export class Links {
     });
   }
 
-  // The link `key` names if it can still be used, else the same InputError for unknown, used, revoked and expired.
+  // The link `key` names if it can still be used, else WrongLink for unknown, used, revoked and expired alike.
   private async usable(db: DB, key: LinkKey) {
     const [column, hash] = "code" in key ? (["code_hash", hashCode(this.codeKey, key.code)] as const) : (["token_hash", hashToken(key.token)] as const);
     const link = await db.selectFrom("link").selectAll().where(column, "=", hash).executeTakeFirst();
-    if (!link || link.used_at || link.revoked_at || link.expires_at <= this.now().toISOString() || !isKind(link.kind)) throw new InputError(USED);
+    if (!link || link.used_at || link.revoked_at || link.expires_at <= this.now().toISOString() || !isKind(link.kind)) throw new WrongLink();
     return { ...link, kind: link.kind };
   }
 

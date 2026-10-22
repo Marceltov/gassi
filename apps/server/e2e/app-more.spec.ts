@@ -1,8 +1,8 @@
-// Mehr: Gewicht and Vorrat (data) on top, then the settings: Hunde, Übungen und Leckerli, Haushalt (invites), Meine
+// Mehr: Gewicht and Vorrat (data) on top, then the settings: Hunde, Übungen, Leckerli, Haushalt (invites), Meine
 // Geräte (sign out), the Garmin placeholder. And the installable web app: its manifest, the Apple tags, and the app
 // shell that opens without reception after the first visit. The server is shared: each test removes what it made.
 import { createClient } from "@gassi/api-client";
-import { formatCanCount } from "@gassi/domain";
+import { formatCanCount, localToUtc, utcToLocal } from "@gassi/domain";
 import { type BrowserContext, expect, type Locator, type Page, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
 import { asHirsch } from "./sessions";
@@ -25,7 +25,7 @@ test.afterEach(async () => {
 test("Mehr lists Gewicht and Vorrat first, then the settings, and the Garmin watch for later, the source code, Abmelden last; no export", async ({ page }) => {
   await signIn(page);
   await page.goto("/mehr");
-  const rows = ["Gewicht", "Vorrat", "Hunde", "Übungen und Leckerli", "Haushalt", "Meine Geräte", "Quellcode", "Abmelden"];
+  const rows = ["Gewicht", "Vorrat", "Hunde", "Übungen", "Leckerli", "Haushalt", "Meine Geräte", "Quellcode", "Abmelden"];
   for (const name of rows) await expect(page.getByRole("button", { name: new RegExp(`^${name}`) })).toBeVisible();
   await expect(page.getByTestId("more-Garmin-Uhr")).toContainText("kommt später");
   await expect(page.getByText(/Export/)).toHaveCount(0);
@@ -52,6 +52,50 @@ test("Gewicht: 12,4 kg logged shows in the list, on the curve and on Mehr", asyn
   await expect(page.getByTestId("more-Gewicht")).toContainText("12,4 kg · gerade eben");
 });
 
+test("Übungen and Leckerli are two entries in Mehr, each a list of its own with how many", async ({ page }) => {
+  const client = asHirsch();
+  const name = `Bleib ${Date.now()}`;
+  await signIn(page);
+  await page.goto("/mehr");
+  const exercises = (await client.exercises()).exercises.length;
+  const treats = (await client.treatKinds()).treatKinds.length;
+  await expect(page.getByTestId("more-Uebungen")).toContainText(exercises === 1 ? "1 Übung" : exercises ? `${exercises} Übungen` : "keine");
+  await expect(page.getByTestId("more-Leckerli")).toContainText(treats === 1 ? "1 Sorte" : treats ? `${treats} Sorten` : "keine");
+
+  await page.getByTestId("more-Uebungen").click();
+  await expect(page).toHaveURL(`${BASE_URL}/mehr/uebungen`);
+  await expect(page.getByRole("button", { name: "Leckerli dazu" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Übung dazu" }).click();
+  await page.getByTestId("catalog-sheet").getByLabel("Name").fill(name);
+  await page.getByTestId("catalog-sheet").getByRole("button", { name: "Hinzufügen" }).click();
+  await expect(page.getByRole("button", { name: new RegExp(`^${name}`) })).toBeVisible();
+  const added = (await client.exercises()).exercises.find((e) => e.name === name)!;
+  await client.updateExercise({ id: added.id, archived: true });
+
+  await page.getByRole("tab", { name: "Mehr" }).click();
+  await page.getByTestId("more-Leckerli").click();
+  await expect(page).toHaveURL(`${BASE_URL}/mehr/leckerli`);
+  await expect(page.getByRole("button", { name: "Übung dazu" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Leckerli dazu" })).toBeVisible();
+});
+
+test("Gewicht: a weight from a vet visit ten days ago is logged for that day, and the date goes back to now", async ({ page }) => {
+  const token = await signIn(page);
+  await page.goto("/mehr/gewicht");
+  const day = utcToLocal(Date.now() - 10 * 86_400_000, "Europe/Berlin").slice(0, 10);
+  await page.getByLabel("Gewogen am").fill(`${day}T09:30`);
+  await page.getByLabel("Gewicht in kg").fill("11,9");
+  const logged = page.waitForResponse((r) => r.url().endsWith("/api/weight") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Eintragen" }).click();
+  const { id } = (await (await logged).json()) as { id: number };
+  made.push(id);
+
+  const entry = await createClient({ baseUrl: BASE_URL, token }).entry({ id });
+  expect(entry.at).toBe(new Date(localToUtc(`${day}T09:30`, "Europe/Berlin")).toISOString());
+  await expect(page.getByLabel("Gewicht in kg")).toHaveValue("");
+  await expect(page.getByLabel("Gewogen am")).not.toHaveValue(`${day}T09:30`);
+});
+
 test("Vorrat: cans bought are entered per size in rows, a new size in a row of its own; one Eintragen records each", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });
@@ -65,10 +109,13 @@ test("Vorrat: cans bought are entered per size in rows, a new size in a row of i
   await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
   await page.getByTestId("count-new").getByLabel("Dosengröße in Gramm").fill("1234");
   await page.getByRole("button", { name: "1 Dose à 1234 g mehr" }).click();
-  // a new row left without grams isn't recorded
+  // a row without grams holds up Eintragen until it is taken away with ×
   await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
   await page.getByRole("button", { name: "1 Dose neuer Größe mehr" }).click();
-  await expect(page.getByTestId("stock-unsized")).toHaveText("Eine Zeile ohne Dosengröße wird nicht eingetragen.");
+  await expect(page.getByTestId("stock-unsized")).toHaveText("Eine Zeile hat keine Dosengröße: Gramm eintragen oder mit × entfernen.");
+  await expect(page.getByRole("button", { name: "Eintragen" })).toBeDisabled();
+  await page.getByTestId("count-new").getByRole("button", { name: "Dosengröße entfernen" }).click();
+  await expect(page.getByTestId("stock-unsized")).toHaveCount(0);
   await expect(page.getByTestId("count-1234-value")).toHaveText("1 Dose");
   const bought = page.waitForResponse((r) => r.url().endsWith("/api/stock/restock") && r.request().method() === "POST");
   await page.getByRole("button", { name: "Eintragen" }).click();
@@ -362,4 +409,36 @@ test("the installed app opens at once when the network hangs (one bar, a captive
   } finally {
     await context.unrouteAll({ behavior: "ignoreErrors" });
   }
+});
+
+test("a sheet that opens with its field focused closes with Escape from that field and gives the focus back to the button that opened it", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/mehr/hunde");
+  const add = page.getByRole("button", { name: "Hund hinzufügen" });
+  await add.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("sheet-overlay").getByLabel("Name")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("sheet-overlay")).toHaveCount(0);
+  await expect(add).toBeFocused();
+});
+
+test("Vorrat: quick + taps each count; a count reads out with its value; clearing a size's grams holds up Eintragen", async ({ page }) => {
+  await signIn(page);
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 777, cans: 1 }] })).entries.map((e) => e.id));
+  await page.goto("/mehr/vorrat");
+  await page.getByRole("tab", { name: "Nass" }).click();
+  await page.getByRole("tab", { name: "Nachgezählt" }).click();
+  const row = page.getByTestId("count-777");
+  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveAccessibleName("Anzahl Dosen à 777 g, 1");
+  // four taps faster than the screen renders
+  await row.getByRole("button", { name: "½ Dose à 777 g mehr" }).evaluate((b: HTMLElement) => {
+    for (let i = 0; i < 4; i++) b.click();
+  });
+  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText("3");
+
+  await typeIn(row.getByLabel("Dosengröße in Gramm"), "");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("stock-unsized")).toHaveText("Eine Zeile hat keine Dosengröße: Gramm eintragen oder mit × entfernen.");
+  await expect(page.getByRole("button", { name: "Eintragen" })).toBeDisabled();
 });

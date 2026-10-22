@@ -1,20 +1,23 @@
-// One fact on the Start screen: what, when, and who; read out as one ("Draußen: vor 2 Std., Hirsch"). Lightly tinted in
-// its kind's color (the gradient at low opacity over the surface) with its icon in a colored dot: calmer than the
-// action tiles below.
-import { StyleSheet, Text, View } from "react-native";
+// One fact on the Start screen: what, when, and who. Lightly tinted in its kind's color (the gradient at low opacity
+// over the surface) with its icon in a colored dot: calmer than the action tiles below. A tap opens Verlauf filtered to
+// its kind; read out as that with the fact ("Pipi im Verlauf zeigen, vor 2 Std., Hirsch").
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { alpha, radius, type TileKind, useTheme } from "../theme";
 import { Icon, type IconName } from "./Icon";
 
-export function Tile({ label, value, by, kind, icon }: { label: string; value: string; by?: string; kind: TileKind; icon: IconName }) {
+type Props = { label: string; value: string; by?: string; kind: TileKind; icon: IconName; a11y: string; onPress: () => void };
+
+export function Tile({ label, value, by, kind, icon, a11y, onPress }: Props) {
   const theme = useTheme();
   const [light, dark] = theme.gradients[kind];
   const [from, to] = theme.tint;
   return (
-    <View
+    <Pressable
       testID={`tile-${label}`}
-      accessible
-      accessibilityLabel={`${label}: ${value}${by ? `, ${by}` : ""}`}
-      style={[styles.tile, { backgroundColor: theme.surface, backgroundImage: `linear-gradient(135deg, ${alpha(light, from)}, ${alpha(dark, to)})` }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${a11y}, ${value}${by ? `, ${by}` : ""}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.tile, { backgroundColor: theme.surface, backgroundImage: `linear-gradient(135deg, ${alpha(light, from)}, ${alpha(dark, to)})`, opacity: pressed ? 0.7 : 1 }]}
     >
       <View importantForAccessibility="no-hide-descendants">
         <View style={styles.head}>
@@ -26,7 +29,7 @@ export function Tile({ label, value, by, kind, icon }: { label: string; value: s
         <Text style={[styles.value, { color: theme.ink }]}>{value}</Text>
         {by ? <Text style={[styles.small, { color: theme.muted }]}>{by}</Text> : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 

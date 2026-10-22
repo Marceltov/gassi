@@ -37,8 +37,7 @@ test("Pipi with one dog logs at once; without reception Poopoo and Zuhause show 
     await expect(taps).toContainText("Poopoo");
     await page.getByRole("button", { name: "Zuhause" }).click();
     await expect(page).toHaveURL(new RegExp(`/runde/${key}$`));
-    await expect(page.getByTestId("summary-pees")).toContainText("1×");
-    await expect(page.getByTestId("summary-poops")).toContainText("1×");
+    await expect(page.getByTestId("summary-counts")).toHaveText("1× Pipi · 1× Poopoo");
     await expect(page.getByText("Noch nicht gesendet")).toBeVisible();
     // a note typed without reception stays typed until it can be saved
     await page.getByPlaceholder("Notiz").fill("Matschig am Bach");
@@ -48,8 +47,7 @@ test("Pipi with one dog logs at once; without reception Poopoo and Zuhause show 
 
     await context.setOffline(false);
     await expect(page.getByText("Noch nicht gesendet")).toBeHidden();
-    await expect(page.getByTestId("summary-pees")).toContainText("1×");
-    await expect(page.getByTestId("summary-poops")).toContainText("1×");
+    await expect(page.getByTestId("summary-counts")).toHaveText("1× Pipi · 1× Poopoo");
     const walk = await client.walkByKey({ key });
     expect(walk.summary.endedAt).not.toBeNull();
     expect([walk.summary.pees.length, walk.summary.poops.length]).toEqual([1, 1]);

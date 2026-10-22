@@ -11,6 +11,14 @@ import { radius, space, useTheme } from "../theme";
 import { useEdges } from "./edges";
 import { useCloseOnBlur } from "./useCloseOnBlur";
 
+// What last had the focus outside any sheet: what a closing sheet gives it back to. Kept as focus moves, because a
+// field inside with autoFocus ("Neuer Hund") takes the focus before the sheet's effect could look.
+let outside: HTMLElement | null = null;
+if (typeof document !== "undefined")
+  document.addEventListener("focusin", (event) => {
+    if (event.target instanceof HTMLElement && !event.target.closest('[role="dialog"]')) outside = event.target;
+  });
+
 export function Sheet({ open, onClose, label, children }: { open: boolean; onClose: () => void; label?: string; children?: ReactNode }) {
   const theme = useTheme();
   const panel = useRef<HTMLElement | null>(null);
@@ -19,19 +27,23 @@ export function Sheet({ open, onClose, label, children }: { open: boolean; onClo
   useCloseOnBlur(open, onClose);
   useEffect(() => {
     if (!open) return;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    // after the portal is in the page: the first button inside (the backdrop is outside the panel)
-    const frame = requestAnimationFrame(() => panel.current?.querySelector<HTMLElement>('[role="button"], button, input, textarea')?.focus());
+    const back = outside;
+    // after the portal is in the page: the first button inside (the backdrop is outside the panel), unless a field
+    // there took the focus itself
+    const frame = requestAnimationFrame(() => {
+      if (!panel.current?.contains(document.activeElement)) panel.current?.querySelector<HTMLElement>('[role="button"], button, input, textarea')?.focus();
+    });
     return () => {
       cancelAnimationFrame(frame);
-      if (opener?.isConnected) opener.focus();
+      if (back?.isConnected) back.focus();
     };
   }, [open]);
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // in the capture phase: a text field (react-native-web) stops every key from bubbling, Escape too
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [open, onClose]);
   if (!open) return null;
   return createPortal(
