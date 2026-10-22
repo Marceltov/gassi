@@ -1,9 +1,10 @@
 // Verlauf: who went when, fed how much, trained what and how well. The entries newest first under their day on top;
 // the filters (who, what, which dog) at the bottom for the thumb. A walk opens its summary, anything else its detail.
-// What is shown lives in the URL (/verlauf?type=pee), so a Start tile, a link or a reload can open it filtered.
+// What is shown lives in the URL (/verlauf?type=pee), so a Start tile, a link or a reload can open it filtered. A tap
+// on the Verlauf tab clears every filter.
 import { byDay, ENTRY_TYPES, type EntryType, TYPE_LABEL } from "@gassi/domain";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { useNow } from "../start/useNow";
@@ -29,6 +30,16 @@ export function History() {
   const param = useLocalSearchParams<{ type?: string }>().type;
   const type = ENTRY_TYPES.find((t) => t === param);
   const [rest, setRest] = useState<Omit<Filter, "type">>({});
+  // the tab bar's press on Verlauf (the tabs are this stack's parent): everything again
+  const navigation = useNavigation();
+  useEffect(
+    () =>
+      navigation.getParent()?.addListener("tabPress" as never, () => {
+        setRest({});
+        navigation.setParams({ type: undefined } as never); // its own params: the press may come from another tab
+      }),
+    [navigation],
+  );
   const filter: Filter = { ...rest, type };
   const [choosing, setChoosing] = useState<Choosing | null>(null);
   const { entries, more, loadingMore, error, loadMore } = useHistory(filter);

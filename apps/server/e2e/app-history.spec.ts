@@ -145,7 +145,7 @@ test("a filter's choices are one list: Alle first, every option as wide, the cho
   await expect(page.getByRole("button", { name: "Was: Alles" })).toBeVisible();
 });
 
-test("a Start tile opens Verlauf filtered to its type, which a reload keeps and Alles clears", async ({ page }) => {
+test("a Start tile opens Verlauf filtered to its type, which a reload keeps, Alles clears and a tap on the Verlauf tab clears with every other filter", async ({ page }) => {
   const dog = await firstDog();
   const pee = await asHirsch().logEntry({ type: "pee", dogIds: [dog.id] });
   const food = await asHirsch().logEntry({ type: "food", foodKind: "dry", amountG: 40 });
@@ -173,6 +173,16 @@ test("a Start tile opens Verlauf filtered to its type, which a reload keeps and 
   await expect(page).toHaveURL(`${BASE_URL}/verlauf?type=food`);
   await expect(page.getByRole("button", { name: "Was: Futter" })).toBeVisible();
   await expect(page.getByTestId(`entry-${pee.id}`)).toHaveCount(0);
+
+  // a tap on the Verlauf tab clears every filter
+  await page.getByRole("button", { name: "Wer: Alle" }).click();
+  await page.getByTestId("filter-sheet").getByRole("button", { name: "Hirsch" }).click();
+  await expect(page.getByRole("button", { name: "Wer: Hirsch" })).toBeVisible();
+  await page.getByRole("tab", { name: "Verlauf" }).click();
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
+  await expect(page.getByRole("button", { name: "Was: Alles" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Wer: Alle" })).toBeVisible();
+  await expect(page.getByTestId(`entry-${pee.id}`)).toBeVisible();
 });
 
 test("from a walk's summary: its pee is deleted, its start moved, then the walk deleted, which leads to Verlauf", async ({ page }) => {
