@@ -70,15 +70,22 @@ export function Stock() {
       saveHidden(personId, next);
     } else setRemoved([...removed, key]);
   };
-  const rows = [
+  const initial = [
     ...offered.map((u) => ({ key: `k${u}`, size: String(u), cans: decimalText(mode === "count" ? (stock?.wet.sizes.find((s) => s.unitG === u)?.cans ?? 0) : 0) })),
     ...Array.from({ length: extras }, (_, i) => ({ key: `x${i}`, size: "", cans: "0" })),
-  ]
-    .filter((r) => !removed.includes(r.key))
-    .map((r) => ({ ...r, ...edits[r.key] }));
-  const edit = (key: string, change: { size?: string; cans?: string }) => setEdits({ ...edits, [key]: { ...edits[key], ...change } });
+  ].filter((r) => !removed.includes(r.key));
+  const rows = initial.map((r) => ({ ...r, ...edits[r.key] }));
+  // from the edits as they are when React applies them, so quick taps in a row each count
+  const edit = (key: string, change: { size?: string; cans?: string }) => setEdits((e) => ({ ...e, [key]: { ...e[key], ...change } }));
+  const stepCans = (key: string, d: number) =>
+    setEdits((e) => {
+      const from = parseDecimal(e[key]?.cans ?? initial.find((r) => r.key === key)?.cans ?? "0") || 0;
+      return { ...e, [key]: { ...e[key], cans: decimalText(Math.min(MAX_CANS, Math.max(0, from + d))) } };
+    });
   // what Eintragen sends (Ruling X, in the domain): rows by their sizes; counting, a known size in no row is 0
   const { sizes, unsized } = formSizes(known, rows, mode === "count");
+  // counting, a known size whose grams were cleared is in no row any more, so Eintragen sets it to 0 (retires it): say so
+  const cleared = mode === "count" ? known.filter((u) => rows.some((r) => r.key === `k${u}` && !parseCanSize(r.size)) && !rows.some((r) => parseCanSize(r.size) === u)) : [];
 
   // a message is about what was entered, and the rows are for one mode: both go when the form changes
   const reset = () => {
@@ -144,7 +151,7 @@ export function Stock() {
         const unitG = parseCanSize(r.size);
         const n = parseDecimal(r.cans) || 0;
         const name = unitG ? `à ${unitG} g` : "neuer Größe";
-        const change = (d: number) => edit(r.key, { cans: decimalText(Math.min(MAX_CANS, Math.max(0, n + d))) });
+        const change = (d: number) => stepCans(r.key, d);
         const step = mode === "count" ? 0.5 : 1; // counted: halves (an opened can); bought: whole cans
         const what = mode === "count" ? "½ Dose" : "1 Dose";
         // a known size's row keeps its id while its size is edited; an added one is named by the size typed
@@ -184,6 +191,11 @@ export function Stock() {
       {unsized ? (
         <Text testID="stock-unsized" style={[styles.small, { color: theme.muted }]}>
           {unsized === 1 ? "Eine Zeile ohne Dosengröße wird nicht eingetragen." : `${unsized} Zeilen ohne Dosengröße werden nicht eingetragen.`}
+        </Text>
+      ) : null}
+      {cleared.length ? (
+        <Text testID="stock-cleared" style={[styles.small, { color: theme.muted }]}>
+          {`Ohne Dosengröße gilt ${cleared.map((u) => `à ${u} g`).join(", ")} beim Eintragen als leer.`}
         </Text>
       ) : null}
       <BigButton kind="neutral" size="m" label="+ Dosengröße" a11y="Dosengröße hinzufügen" onPress={() => setExtras(extras + 1)} />

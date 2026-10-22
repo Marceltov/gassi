@@ -1,6 +1,6 @@
 // A value that reads as plain text and turns into a field when tapped (on the web a click; a double click too);
-// Enter or leaving the field ends editing. `label` names it for the screen reader in both states; `width` keeps both
-// states the same size, so the row doesn't move.
+// Enter or leaving the field ends editing. `label` names it for the screen reader in both states (as text with its value:
+// "Anzahl Dosen à 400 g, 2,5"); `width` keeps both states the same size, so the row doesn't move.
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle } from "react-native";
 import { useTheme } from "../theme";
@@ -28,7 +28,7 @@ export function TapToEdit({ label, value, onChange, placeholder = "…", startEd
       />
     );
   return (
-    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} onPress={() => setEditing(true)} hitSlop={6} style={{ width }}>
+    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={`${label}, ${value || "leer"}`} onPress={() => setEditing(true)} hitSlop={6} style={{ width }}>
       <Text style={[styles.text, style, { color: value ? theme.ink : theme.muted }, warn ? { textDecorationLine: "underline", textDecorationColor: theme.pee } : null]}>{value || placeholder}</Text>
     </Pressable>
   );
