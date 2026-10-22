@@ -10,7 +10,7 @@ import { useGassi } from "../data/GassiProvider";
 import { useNow } from "../start/useNow";
 import { useTheme } from "../theme";
 import { TIME_ZONE } from "../time";
-import { BigButton, sizes } from "../ui/BigButton";
+import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
@@ -134,9 +134,9 @@ export function Weight() {
         <>
           {message && !day ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
           <View style={styles.today}>
-            <Field label="Gewicht heute in kg" height={sizes.m.height} value={kg} onChangeText={setKg} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" onSubmitEditing={() => kg.trim() && saveToday()} />
+            <Field label="Gewicht heute in kg" value={kg} onChangeText={setKg} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" onSubmitEditing={() => kg.trim() && saveToday()} />
             <View style={styles.enter}>
-              <BigButton kind="walk" size="m" icon="check" label="Eintragen" disabled={!kg.trim()} onPress={saveToday} />
+              <BigButton kind="walk" size="s" icon="check" label="Eintragen" disabled={!kg.trim()} onPress={saveToday} />
             </View>
           </View>
         </>

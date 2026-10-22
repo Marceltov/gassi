@@ -69,6 +69,8 @@ export type TileKind = keyof typeof gradients;
 
 export const radius = { button: 20, tile: 12, sheet: 24, bigTile: 22 };
 export const space = { gutter: 14, gap: 8 };
+/** The height of a text field, and of the small button that sits beside one. */
+export const FIELD_HEIGHT = 44;
 
 /** Follows the system; dark when the system says nothing. */
 export function useTheme(): Palette {
