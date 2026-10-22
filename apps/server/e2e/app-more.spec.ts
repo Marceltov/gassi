@@ -22,10 +22,10 @@ test.afterEach(async () => {
   for (const id of invites.splice(0)) await asHirsch().revokeInvite({ id }).catch(() => undefined);
 });
 
-test("Mehr lists Gewicht and Vorrat first, then the settings, and the Garmin watch for later; no export", async ({ page }) => {
+test("Mehr lists Gewicht and Vorrat first, then the settings, and the Garmin watch for later, the source code; no export", async ({ page }) => {
   await signIn(page);
   await page.goto("/mehr");
-  const rows = ["Gewicht", "Vorrat", "Hunde", "Übungen und Leckerli", "Haushalt", "Meine Geräte"];
+  const rows = ["Gewicht", "Vorrat", "Hunde", "Übungen und Leckerli", "Haushalt", "Meine Geräte", "Quellcode"];
   for (const name of rows) await expect(page.getByRole("button", { name: new RegExp(`^${name}`) })).toBeVisible();
   await expect(page.getByTestId("more-Garmin-Uhr")).toContainText("kommt später");
   await expect(page.getByText(/Export/)).toHaveCount(0);

@@ -1,15 +1,18 @@
 // Mehr: the data first (Gewicht, Vorrat), then the settings (Hunde; Übungen und Leckerli; Haushalt; Meine Geräte) and
 // the Garmin watch, which comes later. Each row says in short what is behind it; without reception the rows that need
-// the server stay without that line. Its screens have no Zurück: the tab bar stays, and the Mehr tab leads back here.
+// the server stay without that line. Last, the link to the source code, which the AGPL asks a server to offer its users. Its screens have no Zurück: the tab bar stays, and the Mehr tab leads back here.
 import { formatAgo, formatKg, stockSummary } from "@gassi/domain";
 import { type Href, useRouter } from "expo-router";
-import { StyleSheet, Text } from "react-native";
+import { Linking, StyleSheet, Text } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { useNow } from "../start/useNow";
 import { useTheme } from "../theme";
 import { Screen } from "../ui/Screen";
 import { Group, Row } from "./List";
 import { useServer } from "./useServer";
+
+// A modified Gassi run for others points this at its own source.
+const SOURCE = "https://github.com/Marceltov/gassi";
 
 export function More() {
   const theme = useTheme();
@@ -44,6 +47,9 @@ export function More() {
             <Row testID="more-Haushalt" icon="people" tone="household" label="Haushalt" value={[me?.name, ...others].filter(Boolean).join(", ") + " · einladen"} onPress={go("/mehr/haushalt")} />
             <Row testID="more-Geraete" icon="phone" tone="device" label="Meine Geräte" value={devices ? `${devices.devices.length} angemeldet` : undefined} onPress={go("/mehr/geraete")} />
             <Row testID="more-Garmin-Uhr" icon="watch" tone="garmin" label="Garmin-Uhr" value="kommt später" muted />
+          </Group>
+          <Group>
+            <Row testID="more-Quellcode" icon="code" label="Quellcode" value="AGPL-3.0 · GitHub" onPress={() => void Linking.openURL(SOURCE)} />
           </Group>
         </>
       }
