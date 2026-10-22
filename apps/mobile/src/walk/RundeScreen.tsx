@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { Summary } from "./Summary";
 
-// /runde/<id>: a walk's summary, the one screen behind both route files (Start's and Verlauf's)
+// A walk's summary, the one screen behind /runde/<id or walk key> (Start) and /verlauf/runde/<id>
 export function RundeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   return <Summary key={id} idOrKey={id} />;

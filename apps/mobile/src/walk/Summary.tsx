@@ -17,6 +17,7 @@ import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
 import { Icon } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
+import { useTabPath } from "../ui/tabPath";
 import { LAST_WALKER } from "./lastOne";
 import { countLine, trainingLine, type WalkItem, walkItems } from "./lines";
 import type { Shown } from "./taps";
@@ -27,6 +28,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
   const theme = useTheme();
   const { writeApi, people, dogs } = useGassi();
   const { shown, track, local, error, reload } = useWalkSummary(idOrKey);
+  const tabPath = useTabPath();
   const [message, setMessage] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null); // null: as the server has it
   const routes = useMemo(() => (track ? [simplify(track.points, 500)] : []), [track]);
@@ -106,7 +108,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
           />
           {note !== null && note !== (shown.note ?? "") ? <BigButton kind="neutral" size="m" label="Notiz speichern" onPress={() => void saveNote(shown, note)} /> : null}
           {message ? <Text style={[styles.small, { color: theme.muted }]}>{message}</Text> : null}
-          {shown.id !== null && !local ? <BigButton kind="neutral" size="m" label="Zeit, Hunde, Löschen …" onPress={() => router.push(`/eintrag/${shown.id}`)} /> : null}
+          {shown.id !== null && !local ? <BigButton kind="neutral" size="m" label="Zeit, Hunde, Löschen …" onPress={() => router.push(tabPath(`/eintrag/${shown.id}`))} /> : null}
         </>
       }
       bottom={<BigButton kind="walk" size="l" icon="check" label="Fertig" onPress={done} />}
@@ -147,7 +149,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
         testID={i.kind === "tap" ? `summary-mark-${id}` : `summary-training-${id}`}
         accessibilityRole="button"
         accessibilityLabel={`${hhmm(i.at)} ${text} ändern`}
-        onPress={() => router.push(`/eintrag/${id}`)}
+        onPress={() => router.push(tabPath(`/eintrag/${id}`))}
         style={({ pressed }) => [styles.mark, { backgroundColor: theme.neutral, opacity: pressed ? 0.7 : 1 }]}
       >
         {content}

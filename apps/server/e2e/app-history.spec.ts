@@ -29,7 +29,7 @@ test("a feeding's grams are changed in its detail (not without reception), and t
   await expect(row).toContainText("Hirsch");
 
   await row.click();
-  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${food.id}`);
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${food.id}`);
   await expect(page.getByTestId("edit-amount")).toHaveText("123 g");
   await page.getByRole("button", { name: "10 g mehr" }).click();
   await expect(page.getByTestId("edit-amount")).toHaveText("133 g");
@@ -37,7 +37,7 @@ test("a feeding's grams are changed in its detail (not without reception), and t
   await context.setOffline(true);
   await page.getByRole("button", { name: "Speichern" }).click();
   await expect(page.getByText("Keine Verbindung – bitte später nochmal.")).toBeVisible();
-  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${food.id}`);
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${food.id}`);
   await context.setOffline(false);
 
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -55,7 +55,7 @@ test("a pee is deleted after asking, and is gone from the list", async ({ page }
   const row = page.getByTestId(`entry-${pee.id}`);
   await expect(row).toContainText("Pipi");
   await row.click();
-  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${pee.id}`);
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${pee.id}`);
 
   await page.getByRole("button", { name: "Löschen", exact: true }).click();
   const ask = page.getByTestId("delete-sheet");
@@ -114,7 +114,7 @@ test("filtered by Herzii, the walk she went on stays and Hirsch's feeding goes; 
   await expect(walkRow).toContainText("Hirsch + Herzii");
 
   await walkRow.click();
-  await expect(page).toHaveURL(`${BASE_URL}/runde/${walk.id}`);
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf/runde/${walk.id}`);
   await expect(page.getByTestId("summary-counts")).toHaveText("1× Pipi");
   // opened from Verlauf, the summary stays on Verlauf's tab, and Fertig goes back to the filtered list
   await expect(page.getByRole("tab", { name: "Verlauf" })).toHaveAttribute("aria-selected", "true");
@@ -189,28 +189,28 @@ test("from a walk's summary: its pee is deleted, its start moved, then the walk 
   const walk = await pastWalk(8);
   const pee = walk.pees[0];
   await signIn(page);
-  await page.goto(`/runde/${walk.id}`);
+  await page.goto(`/verlauf/runde/${walk.id}`);
   await expect(page.getByTestId("summary-counts")).toHaveText("1× Pipi");
 
   await page.getByTestId(`summary-mark-${pee.id}`).click();
-  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${pee.id}`);
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${pee.id}`);
   await page.getByRole("button", { name: "Löschen", exact: true }).click();
   await page.getByTestId("delete-sheet").getByRole("button", { name: "Ja, löschen" }).click();
-  await expect(page).toHaveURL(`${BASE_URL}/runde/${walk.id}`);
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf/runde/${walk.id}`);
   await expect(page.getByTestId("summary-counts")).toHaveText("Noch nichts");
 
   // ten minutes earlier, typed as this phone's local time (the page runs in Europe/Berlin)
   const earlier = utcToLocal(Date.parse(walk.startedAt) - 10 * 60_000, "Europe/Berlin");
   await page.getByRole("button", { name: "Zeit, Hunde, Löschen …" }).click();
-  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${walk.id}`);
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${walk.id}`);
   await page.getByLabel("Beginn").fill(earlier);
   await page.getByRole("button", { name: "Speichern" }).click();
-  await expect(page).toHaveURL(`${BASE_URL}/runde/${walk.id}`);
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf/runde/${walk.id}`);
   await expect(page.getByText(`Runde ${earlier.slice(11)}–`)).toBeVisible();
   await expect(page.getByText("38 Min.")).toBeVisible();
 
   await page.getByRole("button", { name: "Zeit, Hunde, Löschen …" }).click();
-  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${walk.id}`);
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${walk.id}`);
   await page.getByRole("button", { name: "Löschen", exact: true }).click();
   await page.getByTestId("delete-sheet").getByRole("button", { name: "Ja, löschen" }).click();
   await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
@@ -241,7 +241,7 @@ test("a training reads Sitz 2/3 in the list; its repetitions are changed in its 
   const row = page.getByTestId(`entry-${training.id}`);
   await expect(row).toContainText("Sitz 2/3");
   await row.click();
-  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${training.id}`);
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${training.id}`);
   await page.getByRole("button", { name: "Sitz klappt: eins mehr" }).click();
   await expect(page.getByTestId("edit-training-summary")).toHaveText("Sitz 3/4");
   await page.getByRole("button", { name: "Speichern" }).click();
@@ -269,11 +269,11 @@ test("a walk's summary counts what happened, lists it by time, and a training op
   made.push(walk.id, walk.pees[0].id, walk.poops[0].id, walk.trainings[0].id);
 
   await signIn(page);
-  await page.goto(`/runde/${walk.id}`);
+  await page.goto(`/verlauf/runde/${walk.id}`);
   await expect(page.getByTestId("summary-counts")).toHaveText("1× Pipi · 1× Poopoo · 1 Training");
   const ids = [`summary-mark-${walk.pees[0].id}`, `summary-training-${walk.trainings[0].id}`, `summary-mark-${walk.poops[0].id}`];
   const tops = await Promise.all(ids.map(async (id) => (await page.getByTestId(id).boundingBox())!.y));
   expect(tops).toEqual([...tops].sort((a, b) => a - b)); // by time
   await page.getByTestId(`summary-training-${walk.trainings[0].id}`).click();
-  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${walk.trainings[0].id}`);
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${walk.trainings[0].id}`);
 });
