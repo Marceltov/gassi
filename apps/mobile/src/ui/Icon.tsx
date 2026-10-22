@@ -34,6 +34,7 @@ const SYMBOLS = {
   treat: sym("gift.fill", "pet_supplies"),
   code: sym("chevron.left.forwardslash.chevron.right", "code"),
   signIn: sym("arrow.right.circle.fill", "login"),
+  signOut: sym("rectangle.portrait.and.arrow.right", "logout"),
 };
 
 export type IconName = keyof typeof SYMBOLS | "poop";

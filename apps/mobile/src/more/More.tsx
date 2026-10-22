@@ -1,14 +1,17 @@
 // Mehr: the data first (Gewicht, Vorrat), then the settings (Hunde; Übungen und Leckerli; Haushalt; Meine Geräte) and
 // the Garmin watch, which comes later. Each row says in short what is behind it; without reception the rows that need
-// the server stay without that line. Last, the link to the source code, which the AGPL asks a server to offer its users. Its screens have no Zurück: the tab bar stays, and the Mehr tab leads back here.
+// the server stay without that line. Then the link to the source code, which the AGPL asks a server to offer its users,
+// and last Abmelden on this device (asked first). Its screens have no Zurück: the tab bar stays, and the Mehr tab leads back here.
 import { formatAgo, formatKg, stockSummary } from "@gassi/domain";
 import { type Href, useRouter } from "expo-router";
+import { useState } from "react";
 import { Linking, StyleSheet, Text } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { useNow } from "../start/useNow";
 import { useTheme } from "../theme";
 import { Screen } from "../ui/Screen";
 import { Group, Row } from "./List";
+import { SignOutSheet } from "./SignOut";
 import { useServer } from "./useServer";
 
 // A modified Gassi run for others points this at its own source.
@@ -29,6 +32,7 @@ export function More() {
   const food = stock ? (stockSummary(stock) ?? "noch nichts eingetragen") : undefined;
   const others = people.filter((p) => p.id !== me?.id).map((p) => p.name);
   const go = (path: Href) => () => router.push(path);
+  const [signingOut, setSigningOut] = useState(false);
 
   return (
     <Screen
@@ -51,6 +55,10 @@ export function More() {
           <Group>
             <Row testID="more-Quellcode" icon="code" label="Quellcode" value="AGPL-3.0 · GitHub" onPress={() => void Linking.openURL(SOURCE)} />
           </Group>
+          <Group>
+            <Row testID="more-Abmelden" icon="signOut" label="Abmelden" value={me ? `${me.name} auf diesem Gerät` : undefined} onPress={() => setSigningOut(true)} />
+          </Group>
+          <SignOutSheet open={signingOut} onClose={() => setSigningOut(false)} />
         </>
       }
     />

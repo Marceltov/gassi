@@ -22,10 +22,10 @@ test.afterEach(async () => {
   for (const id of invites.splice(0)) await asHirsch().revokeInvite({ id }).catch(() => undefined);
 });
 
-test("Mehr lists Gewicht and Vorrat first, then the settings, and the Garmin watch for later, the source code; no export", async ({ page }) => {
+test("Mehr lists Gewicht and Vorrat first, then the settings, and the Garmin watch for later, the source code, Abmelden last; no export", async ({ page }) => {
   await signIn(page);
   await page.goto("/mehr");
-  const rows = ["Gewicht", "Vorrat", "Hunde", "Übungen und Leckerli", "Haushalt", "Meine Geräte", "Quellcode"];
+  const rows = ["Gewicht", "Vorrat", "Hunde", "Übungen und Leckerli", "Haushalt", "Meine Geräte", "Quellcode", "Abmelden"];
   for (const name of rows) await expect(page.getByRole("button", { name: new RegExp(`^${name}`) })).toBeVisible();
   await expect(page.getByTestId("more-Garmin-Uhr")).toContainText("kommt später");
   await expect(page.getByText(/Export/)).toHaveCount(0);
@@ -272,6 +272,19 @@ test("Meine Geräte: Abmelden on this device removes it on the server and lands 
   await expect(page).toHaveURL(/\/anmelden$/);
   await expect(page.getByRole("button", { name: "Anmelden" })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("gassi.device"))).toBeNull();
+  await expect(createClient({ baseUrl: BASE_URL, token }).me()).rejects.toMatchObject({ status: 401 });
+});
+
+test("Abmelden, the last row in Mehr, asks and then signs this device out", async ({ page }) => {
+  const token = await signIn(page);
+  await page.goto("/mehr");
+  await expect(page.getByTestId("more-Abmelden")).toContainText("auf diesem Gerät");
+  await page.getByTestId("more-Abmelden").click();
+  await page.getByTestId("signout-sheet").getByRole("button", { name: "Abbrechen" }).click();
+  await expect(page).toHaveURL(`${BASE_URL}/mehr`);
+  await page.getByTestId("more-Abmelden").click();
+  await page.getByRole("button", { name: "Ja, abmelden" }).click();
+  await expect(page).toHaveURL(/\/anmelden$/);
   await expect(createClient({ baseUrl: BASE_URL, token }).me()).rejects.toMatchObject({ status: 401 });
 });
 
