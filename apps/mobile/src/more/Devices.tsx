@@ -41,10 +41,14 @@ export function Devices() {
     });
   return (
     <Screen
-      top={
+      head={
         <>
           <Text style={[styles.title, { color: theme.ink }]}>Meine Geräte</Text>
           {error && !data ? <Text style={[styles.small, { color: theme.muted }]}>{error}</Text> : null}
+        </>
+      }
+      top={
+        <>
           {devices.length ? (
             <Group>
               {devices.map((d) => (
@@ -67,8 +71,8 @@ export function Devices() {
             <View testID="remove-device-sheet" style={styles.sheet}>
               <Text style={[styles.sheetTitle, { color: theme.ink }]}>{`${asking?.name ?? ""} abmelden?`}</Text>
               <Text style={[styles.small, { color: theme.muted }]}>Das Gerät braucht danach einen neuen Link oder Code.</Text>
-              <BigButton kind="neutral" size="l" label="Ja, abmelden" onPress={() => asking && remove(asking)} />
-              <BigButton kind="neutral" size="m" label="Abbrechen" onPress={() => setAsking(null)} />
+              <BigButton kind="neutral" size="m" label="Ja, abmelden" onPress={() => asking && remove(asking)} />
+              <BigButton kind="neutral" size="s" label="Abbrechen" onPress={() => setAsking(null)} />
             </View>
           </Sheet>
         </>
@@ -76,8 +80,8 @@ export function Devices() {
       bottom={
         <>
           {message ?? invites.message ? <Text style={[styles.message, { color: theme.ink }]}>{message ?? invites.message}</Text> : null}
-          <BigButton kind="walk" size="l" icon="add" label="Gerät hinzufügen" onPress={invites.create} />
-          <BigButton kind="neutral" size="m" label="Hier abmelden" a11y="Auf diesem Gerät abmelden" onPress={() => setAskingHere(true)} />
+          <BigButton kind="walk" size="m" icon="add" label="Gerät hinzufügen" onPress={invites.create} />
+          <BigButton kind="neutral" size="s" label="Hier abmelden" a11y="Auf diesem Gerät abmelden" onPress={() => setAskingHere(true)} />
         </>
       }
     />

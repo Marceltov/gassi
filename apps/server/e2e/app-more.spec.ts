@@ -5,6 +5,7 @@ import { createClient } from "@gassi/api-client";
 import { formatCanCount, localToUtc, utcToLocal } from "@gassi/domain";
 import { type BrowserContext, expect, type Locator, type Page, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
+import { expectFits } from "./fit";
 import { asHirsch } from "./sessions";
 import { signIn } from "./signed-in";
 
@@ -93,6 +94,15 @@ test("Gewicht: a day last month is added, changed and deleted from the calendar;
 
   await page.getByRole("button", { name: "Monat danach" }).click();
   await expect(month).toHaveText(thisMonth!);
+});
+
+test("Vorrat: the fields typed into are 16 px, so an iPhone doesn't zoom into them", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/mehr/vorrat");
+  await page.getByRole("tab", { name: "Nass" }).click();
+  await page.getByRole("tab", { name: "Eingekauft" }).click();
+  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
+  await expect(page.getByTestId("count-new").getByLabel("Dosengröße in Gramm")).toHaveCSS("font-size", "16px");
 });
 
 test("Vorrat: cans bought are entered per size in rows, a new size in a row of its own; one Eintragen records each", async ({ page }) => {
@@ -442,14 +452,28 @@ test("Vorrat: quick + taps each count; a count reads out with its value; clearin
   await expect(page.getByRole("button", { name: "Eintragen" })).toBeDisabled();
 });
 
-test("Gewicht never scrolls: from a small phone to a big one, the curve and the calendar take the height there is", async ({ page }) => {
+test("Mehr and its screens fit a small and a big phone: the title and the buttons below stay, only the content between scrolls", async ({ page }) => {
   await signIn(page);
-  for (const [width, height] of [[360, 640], [430, 932]] as const) {
-    await page.setViewportSize({ width, height });
-    await page.goto("/mehr/gewicht");
-    await expect(page.getByTestId("month-calendar")).toBeVisible();
-    const scrolling = await page.evaluate(() => [...document.querySelectorAll("*")].filter((e) => e.scrollHeight > e.clientHeight + 1 && ["auto", "scroll"].includes(getComputedStyle(e).overflowY)).length);
-    expect(scrolling, `${width}×${height}`).toBe(0);
-    await expect(page.getByRole("button", { name: "Eintragen", exact: true })).toBeInViewport();
+  await expectFits(page, "/mehr", "Abmelden");
+  await expectFits(page, "/mehr/gewicht", "Gewicht heute in kg");
+  for (const [path, title] of [["hunde", "Hunde"], ["uebungen", "Übungen"], ["leckerli", "Leckerli"], ["haushalt", "Haushalt"], ["geraete", "Meine Geräte"]]) {
+    await expectFits(page, `/mehr/${path}`, title);
+  }
+});
+
+test("a long list scrolls under its title: the title and the button below stay on screen", async ({ page }) => {
+  const api = asHirsch();
+  const added: { id: number }[] = [];
+  for (let i = 1; i <= 14; i++) added.push(await api.addExercise({ name: `Fit ${i}` }));
+  try {
+    await signIn(page);
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.goto("/mehr/uebungen");
+    await page.getByText("Fit 14").scrollIntoViewIfNeeded();
+    await expect(page.getByText("Fit 14")).toBeInViewport();
+    await expect(page.getByText("Übungen", { exact: true }).last()).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Übung dazu" })).toBeInViewport();
+  } finally {
+    for (const x of added) await api.updateExercise({ id: x.id, archived: true });
   }
 });

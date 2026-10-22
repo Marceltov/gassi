@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   counter: { flexDirection: "row", alignItems: "center", gap: 4 },
   countBox: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, minWidth: 44 },
   count: { minWidth: 18, textAlign: "center", fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  note: { borderRadius: 12, padding: 12, minHeight: 60, fontSize: 15 },
+  note: { borderRadius: 12, padding: 12, minHeight: 60, fontSize: 16 },
   sheet: { gap: 10 },
   sheetTitle: { fontSize: 17, fontWeight: "700" },
 });

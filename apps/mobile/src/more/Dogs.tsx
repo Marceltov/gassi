@@ -50,10 +50,14 @@ export function Dogs() {
 
   return (
     <Screen
-      top={
+      head={
         <>
           <Text style={[styles.title, { color: theme.ink }]}>Hunde</Text>
           {error && !data ? <Text style={[styles.small, { color: theme.muted }]}>{error}</Text> : null}
+        </>
+      }
+      top={
+        <>
           {active.length ? <Group>{rows(active)}</Group> : null}
           {archived.length ? <Group title="Archiviert">{rows(archived)}</Group> : null}
           <Sheet open={!!editing} onClose={() => setEditing(null)} label={editing ? (editing.dog ? editing.dog.name : "Neuer Hund") : undefined}>
@@ -74,11 +78,11 @@ export function Dogs() {
                   ))}
                 </View>
                 {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-                <BigButton kind="walk" size="l" icon={editing.dog ? "check" : "add"} label={editing.dog ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />
+                <BigButton kind="walk" size="m" icon={editing.dog ? "check" : "add"} label={editing.dog ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />
                 {editing.dog ? (
-                  <BigButton kind="neutral" size="m" label={editing.dog.archived ? "Zurückholen" : "Archivieren"} onPress={() => editing.dog && archive(editing.dog, !editing.dog.archived)} />
+                  <BigButton kind="neutral" size="s" label={editing.dog.archived ? "Zurückholen" : "Archivieren"} onPress={() => editing.dog && archive(editing.dog, !editing.dog.archived)} />
                 ) : null}
-                <BigButton kind="neutral" size="m" label="Abbrechen" onPress={() => setEditing(null)} />
+                <BigButton kind="neutral" size="s" label="Abbrechen" onPress={() => setEditing(null)} />
               </View>
             ) : null}
           </Sheet>
@@ -86,7 +90,7 @@ export function Dogs() {
       }
       bottom={
         <>
-          <BigButton kind="walk" size="l" icon="add" label="Hund hinzufügen" onPress={() => open(null)} />
+          <BigButton kind="walk" size="m" icon="add" label="Hund hinzufügen" onPress={() => open(null)} />
         </>
       }
     />
