@@ -3,7 +3,7 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput } from "@gassi/domain";
+import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput, kgToGrams } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
@@ -229,7 +229,7 @@ export class Diary {
   /** A dog's weight in kg (one decimal), stored as grams; the time defaults to now. */
   async logWeight(user: Person, input: unknown): Promise<EntryView> {
     const r = parse(weightInput, input, WEIGHT_MESSAGES);
-    const amountG = Math.round(r.kg * 10) * 100;
+    const amountG = kgToGrams(r.kg)!; // the schema checked the range
     const at = r.at ?? this.deps.now().toISOString();
     return this.view1(await this.entries.create({ type: "weight", at, endedAt: null, amountG, foodKind: null, unitG: null, note: null, dogIds: await this.dogsFor("weight", r.dogIds), loggedBy: user.id }));
   }

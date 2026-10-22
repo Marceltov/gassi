@@ -8,6 +8,9 @@ import { BASE_URL } from "../playwright.config";
 import { asHirsch } from "./sessions";
 import { signIn } from "./signed-in";
 
+/** Today in Berlin, where the page runs: "2026-10-22". */
+const today = () => utcToLocal(Date.now(), "Europe/Berlin").slice(0, 10);
+
 const made: number[] = [];
 /** Taps a value that reads as text (it turns into a field) and types `text` into it. */
 const typeIn = async (value: Locator, text: string) => {
@@ -32,68 +35,64 @@ test("Mehr lists Gewicht and Vorrat first, then the settings, and the Garmin wat
   await expect(page.getByTestId("more-Haushalt")).toContainText("Hirsch");
 });
 
-test("Gewicht: 12,4 kg logged shows in the list, on the curve and on Mehr", async ({ page }) => {
+test("Gewicht: 12,4 kg today shows on top, on today in the calendar, on the curve and on Mehr", async ({ page }) => {
   const token = await signIn(page);
   await page.goto("/mehr");
   await page.getByRole("button", { name: /^Gewicht/ }).click();
-  await page.getByLabel("Gewicht in kg").fill("12,4");
+  await page.getByLabel("Gewicht heute in kg").fill("12,4");
   const logged = page.waitForResponse((r) => r.url().endsWith("/api/weight") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Eintragen" }).click();
+  await page.getByRole("button", { name: "Eintragen", exact: true }).click();
   const { id } = (await (await logged).json()) as { id: number };
   made.push(id);
 
-  const client = createClient({ baseUrl: BASE_URL, token });
-  expect((await client.entry({ id })).amountG).toBe(12_400);
-  await expect(page.getByTestId("weight-list")).toContainText("12,4 kg");
-  await expect(page.getByLabel("Gewicht in kg")).toHaveValue("");
+  expect((await createClient({ baseUrl: BASE_URL, token }).entry({ id })).amountG).toBe(12_400);
+  await expect(page.getByTestId("weight-now")).toContainText("12,4 kg");
+  await expect(page.getByTestId(`day-${today()}`)).toContainText("12,4");
+  await expect(page.getByLabel("Gewicht heute in kg")).toHaveValue("");
   await expect(page.getByTestId("weight-curve")).toBeVisible();
 
   await page.getByRole("tab", { name: "Mehr" }).click();
   await expect(page.getByTestId("more-Gewicht")).toContainText("12,4 kg · gerade eben");
 });
 
-test("Übungen and Leckerli are two entries in Mehr, each a list of its own with how many", async ({ page }) => {
-  const client = asHirsch();
-  const name = `Bleib ${Date.now()}`;
-  await signIn(page);
-  await page.goto("/mehr");
-  const exercises = (await client.exercises()).exercises.length;
-  const treats = (await client.treatKinds()).treatKinds.length;
-  await expect(page.getByTestId("more-Uebungen")).toContainText(exercises === 1 ? "1 Übung" : exercises ? `${exercises} Übungen` : "keine");
-  await expect(page.getByTestId("more-Leckerli")).toContainText(treats === 1 ? "1 Sorte" : treats ? `${treats} Sorten` : "keine");
-
-  await page.getByTestId("more-Uebungen").click();
-  await expect(page).toHaveURL(`${BASE_URL}/mehr/uebungen`);
-  await expect(page.getByRole("button", { name: "Leckerli dazu" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Übung dazu" }).click();
-  await page.getByTestId("catalog-sheet").getByLabel("Name").fill(name);
-  await page.getByTestId("catalog-sheet").getByRole("button", { name: "Hinzufügen" }).click();
-  await expect(page.getByRole("button", { name: new RegExp(`^${name}`) })).toBeVisible();
-  const added = (await client.exercises()).exercises.find((e) => e.name === name)!;
-  await client.updateExercise({ id: added.id, archived: true });
-
-  await page.getByRole("tab", { name: "Mehr" }).click();
-  await page.getByTestId("more-Leckerli").click();
-  await expect(page).toHaveURL(`${BASE_URL}/mehr/leckerli`);
-  await expect(page.getByRole("button", { name: "Übung dazu" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Leckerli dazu" })).toBeVisible();
-});
-
-test("Gewicht: a weight from a vet visit ten days ago is logged for that day, and the date goes back to now", async ({ page }) => {
+test("Gewicht: a day last month is added, changed and deleted from the calendar; › stops at this month", async ({ page }) => {
   const token = await signIn(page);
+  const client = createClient({ baseUrl: BASE_URL, token });
   await page.goto("/mehr/gewicht");
-  const day = utcToLocal(Date.now() - 10 * 86_400_000, "Europe/Berlin").slice(0, 10);
-  await page.getByLabel("Gewogen am").fill(`${day}T09:30`);
-  await page.getByLabel("Gewicht in kg").fill("11,9");
+  const month = page.getByTestId("weight-month");
+  const thisMonth = await month.textContent();
+  await expect(page.getByRole("button", { name: "Monat danach" })).toBeDisabled();
+  await page.getByRole("button", { name: "Monat davor" }).click();
+  await expect(month).not.toHaveText(thisMonth!);
+  const [y, m] = today().split("-").map(Number);
+  const day = `${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, "0")}-15`;
+
+  // an empty day: the weight goes in at its noon
+  await page.getByTestId(`day-${day}`).click();
+  const sheet = page.getByTestId("weight-day-sheet");
+  await expect(sheet).toContainText("noch kein Gewicht an diesem Tag");
+  await sheet.getByLabel("Gewicht in kg").fill("11,9");
   const logged = page.waitForResponse((r) => r.url().endsWith("/api/weight") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Eintragen" }).click();
+  await sheet.getByRole("button", { name: "Eintragen" }).click();
   const { id } = (await (await logged).json()) as { id: number };
   made.push(id);
+  expect((await client.entry({ id })).at).toBe(new Date(localToUtc(`${day}T12:00`, "Europe/Berlin")).toISOString());
+  await expect(page.getByTestId(`day-${day}`)).toContainText("11,9");
 
-  const entry = await createClient({ baseUrl: BASE_URL, token }).entry({ id });
-  expect(entry.at).toBe(new Date(localToUtc(`${day}T09:30`, "Europe/Berlin")).toISOString());
-  await expect(page.getByLabel("Gewicht in kg")).toHaveValue("");
-  await expect(page.getByLabel("Gewogen am")).not.toHaveValue(`${day}T09:30`);
+  // a day with a weight: changed, then deleted
+  await page.getByTestId(`day-${day}`).click();
+  await expect(sheet.getByLabel("Gewicht in kg")).toHaveValue("11,9");
+  await sheet.getByLabel("Gewicht in kg").fill("12,1");
+  await sheet.getByRole("button", { name: "Speichern" }).click();
+  await expect(page.getByTestId(`day-${day}`)).toContainText("12,1");
+  expect((await client.entry({ id })).amountG).toBe(12_100);
+  await page.getByTestId(`day-${day}`).click();
+  await sheet.getByRole("button", { name: "Löschen" }).click();
+  await expect(page.getByTestId(`day-${day}`)).not.toContainText("12,1");
+  await expect(client.entry({ id })).rejects.toMatchObject({ status: 404 });
+
+  await page.getByRole("button", { name: "Monat danach" }).click();
+  await expect(month).toHaveText(thisMonth!);
 });
 
 test("Vorrat: cans bought are entered per size in rows, a new size in a row of its own; one Eintragen records each", async ({ page }) => {

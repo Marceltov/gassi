@@ -1,44 +1,83 @@
-// Gewicht: the chosen dog's curve and its weights (newest first, a tap opens one to change or delete it) on top; the
-// new weight in kg, when it was weighed (now unless changed, e.g. a vet visit last week) and Eintragen at the bottom.
-// With several dogs, chips choose the dog.
-import { dayHeading, formatKg } from "@gassi/domain";
-import { useRouter } from "expo-router";
+// Gewicht: the chosen dog's latest weight and how it changed on top, then one month at a time (‹ ›, never past this
+// month): the curve of its weights and a calendar with each day's weight. A tap on a past day or today opens a sheet to
+// add that day's weight, or to change or delete it. At the bottom today's weight and Eintragen. With several dogs,
+// chips choose the dog.
+import type { Output } from "@gassi/api-client";
+import { addMonths, dayHeading, dayOf, formatKg, kgToGrams, monthLabel, monthOf, noonOf, WEIGHT_MESSAGES, weightChange, weightsByDay } from "@gassi/domain";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
+import { useNow } from "../start/useNow";
 import { useTheme } from "../theme";
 import { TIME_ZONE } from "../time";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
 import { Field } from "../ui/Field";
-import { TimeField } from "../history/TimeField";
 import { Screen } from "../ui/Screen";
+import { Sheet } from "../ui/Sheet";
 import { Curve } from "./Curve";
-import { Group, Row } from "./List";
+import { MonthCalendar } from "./MonthCalendar";
 import { useServer } from "./useServer";
 import { useWrite } from "./useWrite";
 
+type Weight = Output<"weights">["weights"][number];
+/** The day opened from the calendar: its weight if it has one, and the kg as typed. */
+type Day = { date: string; weight: Weight | undefined; kg: string };
+
+// "7,0" under a day's number
+const shortKg = (g: number | null) => formatKg(g ?? 0).replace(" kg", "");
+
 export function Weight() {
   const theme = useTheme();
-  const router = useRouter();
   const { dogs } = useGassi();
+  const now = useNow(60_000);
   const active = dogs.filter((d) => !d.archived);
   const [chosen, setChosen] = useState<number | null>(null);
   const dogId = chosen ?? active[0]?.id ?? null;
+  const thisMonth = monthOf(now, TIME_ZONE);
+  const [month, setMonth] = useState(thisMonth);
   const [kg, setKg] = useState("");
-  const [at, setAt] = useState<string | null>(null); // null: now
+  const [day, setDay] = useState<Day | null>(null);
   const { data, error, reload } = useServer((a) => a.weights());
-  const { message, run } = useWrite();
+  const { message, setMessage, run } = useWrite();
 
   const mine = (data?.weights ?? []).filter((w) => dogId === null || w.dogIds.includes(dogId));
-  const points = mine.map((w) => ({ at: Date.parse(w.at), kg: (w.amountG ?? 0) / 1000 }));
-  const save = () =>
+  const byDay = weightsByDay(mine, TIME_ZONE);
+  const inMonth = mine.filter((w) => monthOf(Date.parse(w.at), TIME_ZONE) === month);
+  const points = inMonth.map((w) => ({ at: Date.parse(w.at), kg: (w.amountG ?? 0) / 1000 }));
+  const change = weightChange(mine, TIME_ZONE);
+  const dogIds = dogId !== null ? { dogIds: [dogId] } : {};
+
+  const saveToday = () =>
     void run(async (api) => {
-      await api.logWeight({ kg, ...(at !== null ? { at } : {}), ...(dogId !== null ? { dogIds: [dogId] } : {}) });
+      await api.logWeight({ kg, ...dogIds });
       setKg("");
-      setAt(null);
       reload();
     }, "Eingetragen.");
+  const openDay = (date: string) => {
+    const weight = byDay.get(date);
+    setMessage(null);
+    setDay({ date, weight, kg: weight ? shortKg(weight.amountG) : "" });
+  };
+  const saveDay = (d: Day) => {
+    const amountG = kgToGrams(d.kg);
+    if (amountG === null) return setMessage(WEIGHT_MESSAGES.kg);
+    const w = d.weight;
+    void run(async (api) => {
+      if (!w) await api.logWeight({ kg: d.kg, at: noonOf(d.date, TIME_ZONE), ...dogIds });
+      else await api.editEntry({ id: w.id, at: w.at, endedAt: null, dogIds: w.dogIds, amountG, foodKind: null, unitG: null, note: w.note });
+      setDay(null);
+      reload();
+    });
+  };
+  const deleteDay = (d: Day) =>
+    void run(async (api) => {
+      if (d.weight) await api.deleteEntry({ id: d.weight.id });
+      setDay(null);
+      reload();
+    });
+  const today = dayOf(now, TIME_ZONE);
+  const dayTitle = (date: string) => dayHeading(Date.parse(noonOf(date, TIME_ZONE)), TIME_ZONE);
 
   return (
     <Screen
@@ -53,28 +92,49 @@ export function Weight() {
             </View>
           ) : null}
           {error && !data ? <Text style={[styles.small, { color: theme.muted }]}>{error}</Text> : null}
-          {data && mine.length === 0 ? <Text style={[styles.small, { color: theme.muted }]}>Noch kein Gewicht eingetragen.</Text> : null}
           {mine.length ? (
-            <>
-              <Text style={[styles.now, { color: theme.ink }]}>{formatKg(mine[0].amountG ?? 0)}</Text>
-              <Curve points={points} height={120} />
-              <View testID="weight-list">
-                <Group>
-                  {mine.map((w) => (
-                    <Row key={w.id} label={dayHeading(Date.parse(w.at), TIME_ZONE)} value={`${formatKg(w.amountG ?? 0)} · ${w.byName}`} onPress={() => router.push(`/mehr/eintrag/${w.id}`)} />
-                  ))}
-                </Group>
-              </View>
-            </>
+            <Text testID="weight-now" style={[styles.now, { color: theme.ink }]}>
+              {formatKg(mine[0].amountG ?? 0)}
+              {change ? <Text style={[styles.small, { color: theme.muted }]}>{`  ${change}`}</Text> : null}
+            </Text>
+          ) : data ? (
+            <Text style={[styles.small, { color: theme.muted }]}>Noch kein Gewicht eingetragen.</Text>
           ) : null}
+          <View style={styles.nav}>
+            <View style={styles.arrow}>
+              <BigButton kind="neutral" size="m" label="‹" a11y="Monat davor" onPress={() => setMonth(addMonths(month, -1))} />
+            </View>
+            <Text testID="weight-month" style={[styles.heading, { color: theme.ink }]}>
+              {monthLabel(month)}
+            </Text>
+            <View style={styles.arrow}>
+              <BigButton kind="neutral" size="m" label="›" a11y="Monat danach" disabled={month >= thisMonth} onPress={() => setMonth(addMonths(month, 1))} />
+            </View>
+          </View>
+          {points.length ? <Curve points={points} height={110} /> : <Text style={[styles.small, { color: theme.muted }]}>Kein Gewicht in diesem Monat.</Text>}
+          <MonthCalendar month={month} today={today} tone={theme.weight} label={dayTitle} valueOf={(date) => (byDay.has(date) ? shortKg(byDay.get(date)!.amountG) : null)} onPress={openDay} />
+          <Sheet open={day !== null} onClose={() => setDay(null)} label={day ? dayTitle(day.date) : undefined}>
+            {day ? (
+              <View testID="weight-day-sheet" style={styles.sheet}>
+                <Text style={[styles.sheetTitle, { color: theme.ink }]}>{dayTitle(day.date)}</Text>
+                <Text style={[styles.small, { color: theme.muted }]}>
+                  {[active.length > 1 ? active.find((d) => d.id === dogId)?.name : null, day.weight ? `eingetragen von ${day.weight.byName}` : "noch kein Gewicht an diesem Tag"].filter(Boolean).join(" · ")}
+                </Text>
+                <Field label="Gewicht in kg" value={day.kg} onChangeText={(v) => setDay({ ...day, kg: v })} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" autoFocus={!day.weight} onSubmitEditing={() => day.kg.trim() && saveDay(day)} />
+                {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
+                <BigButton kind="walk" size="l" icon="check" label={day.weight ? "Speichern" : "Eintragen"} disabled={!day.kg.trim()} onPress={() => saveDay(day)} />
+                {day.weight ? <BigButton kind="neutral" size="m" label="Löschen" onPress={() => deleteDay(day)} /> : null}
+                <BigButton kind="neutral" size="m" label="Abbrechen" onPress={() => setDay(null)} />
+              </View>
+            ) : null}
+          </Sheet>
         </>
       }
       bottom={
         <>
-          {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-          <TimeField label="Gewogen am" value={at ?? new Date().toISOString()} onChange={setAt} />
-          <Field label="Gewicht in kg" value={kg} onChangeText={setKg} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" onSubmitEditing={() => kg.trim() && save()} />
-          <BigButton kind="walk" size="l" icon="check" label="Eintragen" disabled={!kg.trim()} onPress={save} />
+          {message && !day ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
+          <Field label="Gewicht heute in kg" value={kg} onChangeText={setKg} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" onSubmitEditing={() => kg.trim() && saveToday()} />
+          <BigButton kind="walk" size="l" icon="check" label="Eintragen" disabled={!kg.trim()} onPress={saveToday} />
         </>
       }
       topMin={170}
@@ -84,8 +144,13 @@ export function Weight() {
 
 const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "700" },
-  small: { fontSize: 13 },
+  small: { fontSize: 13, fontWeight: "400" },
   now: { fontSize: 30, fontWeight: "700" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   message: { fontSize: 15, fontWeight: "600" },
+  nav: { flexDirection: "row", alignItems: "center", gap: 8 },
+  arrow: { width: 64 },
+  heading: { flex: 1, textAlign: "center", fontSize: 17, fontWeight: "700" },
+  sheet: { gap: 10 },
+  sheetTitle: { fontSize: 17, fontWeight: "700" },
 });

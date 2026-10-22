@@ -1,7 +1,7 @@
 // The four tabs: Start, Verlauf, Woche, Mehr. Each but Woche is a stack, so its screens keep the tab bar: Start has
 // the walk, its summary and the training; Verlauf (the group "(chronik)") an entry and a walk's summary; Mehr its
-// screens and a weight's entry. Each screen has one address under its tab (/verlauf/eintrag/5, /eintrag/5 on Start,
-// /mehr/eintrag/5), so a link or a reload opens it in that tab (src/ui/tabPath.ts).
+// screens. Each screen has one address under its tab (/verlauf/eintrag/5, /eintrag/5 on Start), so a link or a reload
+// opens it in that tab (src/ui/tabPath.ts).
 // Tapping the tab that is shown goes back to its first screen (each stack has an anchor, so also after a deep link):
 // that is the way back, the screens have no Zurück of their own. Leaving a tab resets its stack too
 // (popToTopOnBlur), so a tab always opens at its top page; a running walk is not lost, it lives in the projection and
