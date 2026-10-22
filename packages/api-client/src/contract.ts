@@ -125,7 +125,7 @@ export const walkSummarySchema = z.object({
   pauseMin: z.number(),
   pauseCount: z.number(),
   walkers: z.array(personSchema),
-  trainings: z.array(z.object({ min: z.number(), exercises: z.array(exerciseTotalSchema), treats: z.array(z.object({ name: z.string(), count: z.number() })) })),
+  trainings: z.array(z.object({ id: z.number(), startedAt: z.string(), min: z.number(), exercises: z.array(exerciseTotalSchema), treats: z.array(z.object({ name: z.string(), count: z.number() })) })),
   // the walk's pee and poop entries (their ids, to open one), oldest first
   pees: z.array(markSchema),
   poops: z.array(markSchema),

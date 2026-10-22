@@ -20,7 +20,7 @@ import { Sheet } from "../ui/Sheet";
 import { useLeaving } from "../ui/useLeaving";
 import { saveEnded } from "./ended";
 import { LAST_DOG, LAST_WALKER } from "./lastOne";
-import { trainingLine } from "./lines";
+import { trainingLine, walkItems } from "./lines";
 import { useWalkTaps } from "./useWalkTaps";
 
 type Kind = "pee" | "poop";
@@ -113,19 +113,21 @@ export function Walk() {
           {walkDogs.length === 0 ? <Text style={[styles.since, { color: theme.muted }]}>Kein Hund dabei – „+“ nimmt einen mit.</Text> : null}
           <View testID="walk-taps" style={[styles.log, { backgroundColor: theme.surface }]}>
             {taps.length === 0 && trainings.length === 0 && !runningTraining ? <Text style={[styles.line, { color: theme.muted }]}>Noch nichts</Text> : null}
-            {taps.map((t) => (
-              <View key={`${t.type}${t.at}${t.dogId}`} style={styles.item}>
-                <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(t.at)}</Text>
-                <Icon name={t.type} size={17} color={theme[t.type]} />
-                <Text style={[styles.line, { color: theme.ink }]}>{`${LABEL[t.type]}${several ? ` · ${dogName(t.dogId)}` : ""}`}</Text>
-              </View>
-            ))}
-            {trainings.map((t, i) => (
-              <View key={`t${i}`} style={styles.item}>
-                <Icon name="training" size={17} color={theme.training} />
-                <Text style={[styles.line, styles.shrink, { color: theme.ink }]}>{trainingLine(t)}</Text>
-              </View>
-            ))}
+            {walkItems(taps, trainings).map((item, i) =>
+              item.kind === "tap" ? (
+                <View key={`${item.tap.type}${item.at}${item.tap.dogId}`} style={styles.item}>
+                  <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(item.at)}</Text>
+                  <Icon name={item.tap.type} size={17} color={theme[item.tap.type]} />
+                  <Text style={[styles.line, { color: theme.ink }]}>{`${LABEL[item.tap.type]}${several ? ` · ${dogName(item.tap.dogId)}` : ""}`}</Text>
+                </View>
+              ) : (
+                <View key={`t${i}`} style={styles.item}>
+                  <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(item.at)}</Text>
+                  <Icon name="training" size={17} color={theme.training} />
+                  <Text style={[styles.line, styles.shrink, { color: theme.ink }]}>{trainingLine(item.training)}</Text>
+                </View>
+              ),
+            )}
             {runningTraining && trainings.length === 0 ? (
               <View style={styles.item}>
                 <Icon name="training" size={17} color={theme.training} />

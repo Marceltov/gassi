@@ -2,7 +2,7 @@
 // Geräte (sign out), the Garmin placeholder. And the installable web app: its manifest, the Apple tags, and the app
 // shell that opens without reception after the first visit. The server is shared: each test removes what it made.
 import { createClient } from "@gassi/api-client";
-import { formatCanCount } from "@gassi/domain";
+import { formatCanCount, localToUtc, utcToLocal } from "@gassi/domain";
 import { type BrowserContext, expect, type Locator, type Page, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
 import { asHirsch } from "./sessions";
@@ -77,6 +77,23 @@ test("Übungen and Leckerli are two entries in Mehr, each a list of its own with
   await expect(page).toHaveURL(`${BASE_URL}/mehr/leckerli`);
   await expect(page.getByRole("button", { name: "Übung dazu" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Leckerli dazu" })).toBeVisible();
+});
+
+test("Gewicht: a weight from a vet visit ten days ago is logged for that day, and the date goes back to now", async ({ page }) => {
+  const token = await signIn(page);
+  await page.goto("/mehr/gewicht");
+  const day = utcToLocal(Date.now() - 10 * 86_400_000, "Europe/Berlin").slice(0, 10);
+  await page.getByLabel("Gewogen am").fill(`${day}T09:30`);
+  await page.getByLabel("Gewicht in kg").fill("11,9");
+  const logged = page.waitForResponse((r) => r.url().endsWith("/api/weight") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Eintragen" }).click();
+  const { id } = (await (await logged).json()) as { id: number };
+  made.push(id);
+
+  const entry = await createClient({ baseUrl: BASE_URL, token }).entry({ id });
+  expect(entry.at).toBe(new Date(localToUtc(`${day}T09:30`, "Europe/Berlin")).toISOString());
+  await expect(page.getByLabel("Gewicht in kg")).toHaveValue("");
+  await expect(page.getByLabel("Gewogen am")).not.toHaveValue(`${day}T09:30`);
 });
 
 test("Vorrat: cans bought are entered per size in rows, a new size in a row of its own; one Eintragen records each", async ({ page }) => {
