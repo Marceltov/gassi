@@ -11,7 +11,9 @@ import { space, useTheme } from "../theme";
 import { useEdges } from "./edges";
 
 /** `topMin`: how much of the top stays readable when a tall bottom has to give way (the clock, a summary line). */
-export function Screen({ head, top, bottom, topMin, fill }: { head?: ReactNode; top: ReactNode; bottom?: ReactNode; topMin?: number; fill?: boolean }) {
+/** `low`: the top's content sits at its bottom, right above the controls, while it is shorter than the space (rows
+ * you work in, Vorrat's counts). */
+export function Screen({ head, top, bottom, topMin, fill, low }: { head?: ReactNode; top: ReactNode; bottom?: ReactNode; topMin?: number; fill?: boolean; low?: boolean }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const edges = useEdges();
@@ -29,7 +31,7 @@ export function Screen({ head, top, bottom, topMin, fill }: { head?: ReactNode; 
           {top}
         </View>
       ) : (
-        <ScrollView testID="screen-scroll" style={[styles.top, { minHeight: topMin }]} contentContainerStyle={[styles.topContent, head ? styles.underHead : null, sides]}>
+        <ScrollView testID="screen-scroll" style={[styles.top, { minHeight: topMin }]} contentContainerStyle={[styles.topContent, head ? styles.underHead : null, low ? styles.low : null, sides]}>
           {top}
         </ScrollView>
       )}
@@ -45,5 +47,6 @@ const styles = StyleSheet.create({
   fill: { overflow: "hidden" },
   head: { paddingTop: space.gutter, paddingBottom: space.gap, gap: space.gap },
   underHead: { paddingTop: 0 },
+  low: { flexGrow: 1, justifyContent: "flex-end" },
   bottom: { flexShrink: 1, minHeight: 0, paddingTop: space.gap, gap: space.gap },
 });

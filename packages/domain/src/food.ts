@@ -66,20 +66,20 @@ export function canChoices(stock: Stock | null, last: LastFood | null): { sizes:
 }
 
 /** The stock of a kind in parts: what is left ("3 × 400 g · 2 × 800 g", "1,2 kg"; null when it isn't known), for wet
- * food each can size that has some left ("3 × 400 g") and the total ("zusammen 2,8 kg"), for how long ("reicht etwa
- * 12 Tage"; null without use to go by or when it ran out), and whether it ran out (or counts below zero). */
-export function stockParts(stock: Stock, kind: FoodKind): { left: string | null; sizes: string[]; total: string | null; lasts: string | null; empty: boolean } {
+ * food each can size that has some left ("3 × 400 g"), the amount ("2,8 kg"; null when it isn't known), for how long
+ * ("reicht etwa 12 Tage"; null without use to go by or when it ran out), and whether it ran out (or counts below zero). */
+export function stockParts(stock: Stock, kind: FoodKind): { left: string | null; sizes: string[]; amount: string | null; lasts: string | null; empty: boolean } {
   const s = kind === "wet" ? stock.wet : stock.dry;
-  if (s.grams === null) return { left: null, sizes: [], total: null, lasts: null, empty: false };
+  if (s.grams === null) return { left: null, sizes: [], amount: null, lasts: null, empty: false };
   const cans = kind === "wet" ? stock.wet.sizes.filter((c) => c.cans > 0) : [];
   // wet food has run out when no size has half a can left; one size counting below zero leaves the others
   const empty = kind === "wet" ? !cans.length : s.belowZero || s.grams === 0;
   const sizes = cans.map(formatCanCount);
   const left = kind === "dry" ? formatWeight(s.grams) : empty ? formatCans(0) : sizes.join(" · ");
-  const total = kind === "wet" && !empty ? `zusammen ${formatWeight(s.grams)}` : null;
+  const amount = formatWeight(Math.max(0, s.grams));
   const days = s.daysLeft === null ? null : Math.round(s.daysLeft);
   const lasts = s.daysLeft === null || empty ? null : s.daysLeft < 0.5 ? "reicht weniger als einen Tag" : `reicht etwa ${days} ${days === 1 ? "Tag" : "Tage"}`;
-  return { left, sizes, total, lasts, empty };
+  return { left, sizes, amount, lasts, empty };
 }
 
 /** The stock of a kind in one line: "Vorrat: noch 3 × 400 g · 2 × 800 g · reicht etwa 9 Tage", "Vorrat
@@ -108,6 +108,12 @@ export const countLine = (rows: readonly { unitG: number; amountG: number }[]): 
 export function countTitle(at: string, timeZone: string): string {
   const local = utcToLocal(Date.parse(at), timeZone); // "2026-10-20T10:05"
   return `Zählung vom ${local.slice(8, 10)}.${local.slice(5, 7)}., ${local.slice(11)}`;
+}
+
+/** What a wet count comes to ("2,8 kg"): its cans per size as typed ("2,75"); null while one isn't a number. */
+export function countWeight(sizes: readonly { unitG: number; cans: string }[]): string | null {
+  const cans = sizes.map((s) => parseDecimal(s.cans));
+  return cans.some((n) => !Number.isFinite(n) || n < 0) ? null : formatWeight(sizes.reduce((g, s, i) => g + s.unitG * cans[i]!, 0));
 }
 
 /** Cans per size from the stock screen's rows: rows of the same size (a new row typed with a known size) add up. */

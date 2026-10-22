@@ -1,204 +1,124 @@
-// Vorrat: what is left of the wet food (per can size, with the total) and of the dry food, and how long it lasts
-// (from the server, worked out by the domain) on top; at the bottom what was bought (Eingekauft) or what is there when
-// counted by hand (Nachgezählt), the same way in both: wet food one row per can size with − and + (bought: whole cans
-// from 0; counted: from what the stock says, in halves for an opened can), a row of another
-// size added with "+ Dosengröße" ("Dosen à [ ] g"). A row without grams holds up Eintragen until its grams are typed or
-// it is taken away with ×: only × removes a size, so clearing a field can't. × buying hides that size from
-// the purchase rows on this phone (the stock stays); counting it sets the size to 0, which retires it on Eintragen; on
-// an added row it just drops it. Dry food is one amount in g or kg. One Eintragen records it all.
-import type { DryUnit, FoodKind } from "@gassi/domain";
-import { buyingSizes, formatCans, formSizes, type HiddenSize, parseCanSize, parseDecimal, stockParts } from "@gassi/domain";
+// Vorrat (#73): on top a card per kind with the amount and how long it lasts (from the server, worked out by the
+// domain); below the stock as a list you count in, right above the controls: wet food one row per can size with − and
+// + in halves (an opened can), dry food one row in kg; a count can also be typed ("2,75"), and a size's grams
+// corrected (Ruling X: 10000 corrected to 1000 retires 10000). A count changes nothing until "Zählung speichern" (one
+// count per kind, every size at once; a size counted to 0 is retired); until then the new number shows in orange with
+// the old one under it, the card too, and "Verwerfen" takes it back. What was bought goes in through "+ Eingekauft"
+// (RestockSheet): stock is the last count plus what was bought since minus what was fed since.
+import type { FoodKind } from "@gassi/domain";
+import { countWeight, formatWeight, formSizes, parseCanSize, parseDecimal, stockParts } from "@gassi/domain";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
-import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
-import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
-import { Segments } from "../ui/Segments";
 import { StepButton } from "../ui/Stepper";
 import { TapToEdit } from "../ui/TapToEdit";
-import { useGassi } from "../data/GassiProvider";
+import { RestockSheet } from "./RestockSheet";
 import { useServer } from "./useServer";
-import { loadHidden, saveHidden } from "./hidden";
 import { useWrite } from "./useWrite";
 
-type Mode = "restock" | "count";
-const MODES = [
-  { value: "restock", label: "Eingekauft" },
-  { value: "count", label: "Nachgezählt" },
-] as const;
-const UNITS = [
-  { value: "kg", label: "kg" },
-  { value: "g", label: "g" },
-] as const;
-const MAX_CANS = 1000;
+const MAX = 1000;
 
-/** A number of cans as the count field shows it: "2,75", "3". */
+/** A count as its field shows it: "2,75", "3". */
 const decimalText = (n: number): string => n.toLocaleString("de-DE", { maximumFractionDigits: 2, useGrouping: false });
-
 
 export function Stock() {
   const theme = useTheme();
   const { data: stock, error, reload } = useServer((a) => a.stock());
   const { message, setMessage, run } = useWrite();
-  const { me } = useGassi();
-  const [kind, setKind] = useState<FoodKind>("wet");
-  const [mode, setMode] = useState<Mode>("restock");
-  const [amount, setAmount] = useState("");
-  const [unit, setUnit] = useState<DryUnit>("kg"); // dry food: sacks in kg, the rest of one maybe in g
-  // wet food: one row per known can size, and one per size added ("+ Dosengröße"); every row's size can be edited (a
-  // row counts by its size as it reads on Eintragen). Bought counts start at 0 in whole cans; counted ones at what the
-  // stock says and can be typed freely ("2,75"; the domain checks them), − and + step by ½; sizes and counts read as text
-// and turn into a field when tapped
-  const known = stock?.wet.sizes.map((s) => s.unitG) ?? [];
-  const [extras, setExtras] = useState(0); // how many rows were added
+  const [buying, setBuying] = useState(false);
+  // what was changed by counting, by row ("k400" a can size, "dry" the dry food): a size's grams and its count as text
   const [edits, setEdits] = useState<Record<string, { size?: string; cans?: string }>>({});
-  const [removed, setRemoved] = useState<string[]>([]); // rows taken away with × in this form
-  // Eingekauft: sizes hidden from the purchase rows on this phone (Ruling Z); the stock doesn't change. Counting, × sets
-  // the size to 0 for this count (it is in no row), and Eintragen retires it.
-  const personId = me?.id ?? "";
-  // read anew for another person (the state belongs to the person it was read for)
-  const [kept, setKept] = useState<{ personId: string; hidden: HiddenSize[] }>(() => ({ personId, hidden: loadHidden(personId) }));
-  const hidden = kept.personId === personId ? kept.hidden : loadHidden(personId);
-  const offered = mode === "restock" && stock ? buyingSizes(stock, hidden) : known;
-  const removeRow = (key: string) => {
-    if (mode === "restock" && key.startsWith("k")) {
-      const unitG = Number(key.slice(1));
-      // remembered with the size's last purchase or count as the server told it, not the phone's clock
-      const next = [...hidden.filter((h) => h.unitG !== unitG), { unitG, seenLastAt: stock?.wet.sizes.find((x) => x.unitG === unitG)?.lastAt ?? null }];
-      setKept({ personId, hidden: next });
-      saveHidden(personId, next);
-    } else setRemoved([...removed, key]);
-  };
-  const initial = [
-    ...offered.map((u) => ({ key: `k${u}`, size: String(u), cans: decimalText(mode === "count" ? (stock?.wet.sizes.find((s) => s.unitG === u)?.cans ?? 0) : 0) })),
-    ...Array.from({ length: extras }, (_, i) => ({ key: `x${i}`, size: "", cans: "0" })),
-  ].filter((r) => !removed.includes(r.key));
-  const rows = initial.map((r) => ({ ...r, ...edits[r.key] }));
-  // from the edits as they are when React applies them, so quick taps in a row each count
-  const edit = (key: string, change: { size?: string; cans?: string }) => setEdits((e) => ({ ...e, [key]: { ...e[key], ...change } }));
-  const stepCans = (key: string, d: number) =>
-    setEdits((e) => {
-      const from = parseDecimal(e[key]?.cans ?? initial.find((r) => r.key === key)?.cans ?? "0") || 0;
-      return { ...e, [key]: { ...e[key], cans: decimalText(Math.min(MAX_CANS, Math.max(0, from + d))) } };
-    });
-  // what Eintragen sends (Ruling X, in the domain): rows by their sizes; counting, a known size in no row is 0
-  const { sizes, unsized } = formSizes(known, rows, mode === "count");
+  const known = stock?.wet.sizes ?? [];
+  const wetRows = known.map((s) => ({ key: `k${s.unitG}`, unitG: s.unitG, was: decimalText(s.cans), size: String(s.unitG), cans: decimalText(s.cans), ...edits[`k${s.unitG}`] }));
+  const dryWas = stock?.dry.grams == null ? "0" : decimalText(Math.max(0, stock.dry.grams) / 1000);
+  const dryCount = edits.dry?.cans ?? dryWas;
+  const wetChanged = wetRows.some((r) => r.cans !== r.was || r.size !== String(r.unitG));
+  const dryChanged = dryCount !== dryWas;
+  const changed = wetChanged || dryChanged;
+  // what saving sends (Ruling X, in the domain): every row by its size as it now reads, a size no row has any more is 0
+  const { sizes, unsized } = formSizes(
+    known.map((s) => s.unitG),
+    wetRows,
+    true,
+  );
 
-  // a message is about what was entered, and the rows are for one mode: both go when the form changes
-  const reset = () => {
+  const edit = (key: string, change: { size?: string; cans?: string }) => {
     setMessage(null);
-    setEdits({});
-    setExtras(0);
-    setRemoved([]);
-    setAmount("");
+    setEdits((e) => ({ ...e, [key]: { ...e[key], ...change } }));
   };
-  const pickKind = (k: FoodKind) => {
-    setKind(k);
-    reset();
+  // from the edits as they are when React applies them, so quick taps in a row each count
+  const step = (key: string, from: string, d: number) => {
+    setMessage(null);
+    setEdits((e) => {
+      const n = parseDecimal(e[key]?.cans ?? from) || 0;
+      return { ...e, [key]: { ...e[key], cans: decimalText(Math.min(MAX, Math.max(0, n + d))) } };
+    });
   };
-  const pickMode = (m: Mode) => {
-    setMode(m);
-    reset();
-  };
-
-  const ready = kind === "dry" ? !!amount.trim() : unsized > 0 ? false : mode === "restock" ? sizes.some((s) => parseDecimal(s.cans) > 0) : sizes.length > 0;
   const save = () =>
     void run(async (api) => {
-      if (kind === "dry") {
-        if (mode === "restock") await api.restock({ foodKind: "dry", amount, unit });
-        else await api.correctStock({ foodKind: "dry", amount, unit });
-      } else if (mode === "restock") await api.restock({ foodKind: "wet", sizes: sizes.map((s) => ({ unitG: s.unitG, cans: parseDecimal(s.cans) || 0 })) });
-      else await api.correctStock({ foodKind: "wet", sizes });
-      setAmount("");
+      if (wetChanged) await api.correctStock({ foodKind: "wet", sizes });
+      if (dryChanged) await api.correctStock({ foodKind: "dry", amount: dryCount, unit: "kg" });
       setEdits({});
-      setExtras(0);
-      setRemoved([]);
       reload();
-    }, "Eingetragen.");
+    }, "Zählung gespeichert.");
 
   const card = (k: FoodKind, title: string) => {
     const s = stock ? stockParts(stock, k) : null;
-    const big = !s ? ["…"] : s.empty ? ["aufgebraucht"] : s.sizes.length ? s.sizes : [s.left ?? "unbekannt"];
-    const lines = [
-      s?.total,
-      s?.lasts,
-      s?.empty ? "Stimmt das nicht? Unten nachzählen." : null,
-      s && !s.empty && s.left === null ? "Trag einen Einkauf ein oder zähl nach." : null,
-    ].filter(Boolean);
+    // while counting, what the count comes to
+    const counted = k === "wet" ? (wetChanged ? countWeight(sizes) : null) : dryChanged ? formatWeight((parseDecimal(dryCount) || 0) * 1000) : null;
+    const amount = counted ?? (!s ? "…" : (s.amount ?? "unbekannt"));
+    // always a third line, so both cards line up; without feedings since the last purchase or count there is nothing to go by
+    const note = !s ? "…" : s.empty ? "aufgebraucht" : s.amount === null ? "noch nichts eingetragen" : (s.lasts ?? "reicht: noch unbekannt");
     return (
       <View testID={`stock-${k}`} style={[styles.card, { backgroundColor: theme.surface }]}>
-        <Text style={[styles.small, { color: theme.muted }]}>{title}</Text>
-        {big.map((b) => (
-          <Text key={b} style={[styles.big, { color: theme.ink }]}>
-            {b}
-          </Text>
-        ))}
-        {lines.map((l) => (
-          <Text key={l} style={[styles.small, { color: theme.muted }]}>
-            {l}
-          </Text>
-        ))}
+        <Text style={[styles.small, { color: theme.muted }]} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text style={[styles.big, { color: counted ? theme.food : theme.ink }]} numberOfLines={1}>
+          {amount}
+        </Text>
+        <Text style={[styles.small, { color: theme.muted }]} numberOfLines={1}>
+          {note}
+        </Text>
       </View>
     );
   };
 
-  const wet = (
-    <>
-      {rows.map((r) => {
-        const unitG = parseCanSize(r.size);
-        const n = parseDecimal(r.cans) || 0;
-        const name = unitG ? `à ${unitG} g` : "neuer Größe";
-        const change = (d: number) => stepCans(r.key, d);
-        const step = mode === "count" ? 0.5 : 1; // counted: halves (an opened can); bought: whole cans
-        const what = mode === "count" ? "½ Dose" : "1 Dose";
-        // a known size's row keeps its id while its size is edited; an added one is named by the size typed
-        const id = r.key.startsWith("k") ? r.key.slice(1) : (unitG ?? "new");
-        return (
-          <View key={r.key} testID={`count-${id}`} style={[styles.row, { backgroundColor: theme.surface, borderColor: unitG ? "transparent" : theme.danger }]}>
-            <View style={styles.rowField}>
+  /** A row you count in, named for screen readers by `name` ("Dosen à 400 g") and its steps by `what` ("½ Dose à 400
+   * g"); `sizeField` for a can size (its grams can be corrected), none for the dry food. */
+  const row = (key: string, name: string, what: string, was: string, value: string, sizeField?: { size: string; unitG: number | null }) => {
+    const n = parseDecimal(value);
+    const isChanged = value !== was;
+    const id = key === "dry" ? "dry" : key.slice(1);
+    return (
+      <View key={key} testID={`count-${id}`} style={[styles.row, { backgroundColor: theme.surface, borderColor: sizeField && !sizeField.unitG ? theme.danger : "transparent" }]}>
+        <View style={styles.rowField}>
+          {sizeField ? (
+            <>
               <Text style={[styles.labelText, { color: theme.muted }]}>Dosen à</Text>
-              <TapToEdit
-                label="Dosengröße in Gramm"
-                value={r.size}
-                onChange={(size) => edit(r.key, { size })}
-                startEditing={r.key.startsWith("x")}
-                warn={!unitG}
-                inputMode="numeric"
-                keyboardType="number-pad"
-                width={56}
-                style={styles.gramValue}
-              />
+              <TapToEdit label="Dosengröße in Gramm" value={sizeField.size} onChange={(size) => edit(key, { size })} warn={!sizeField.unitG} inputMode="numeric" keyboardType="number-pad" width={56} style={styles.gramValue} />
               <Text style={[styles.labelText, { color: theme.muted }]}>g</Text>
-            </View>
-            <StepButton small label={`${what} ${name} weniger`} sign="−" disabled={n <= 0} onPress={() => change(-step)} />
-            {mode === "count" ? (
-              <TapToEdit testID={`count-${id}-value`} label={`Anzahl Dosen ${name}`} value={r.cans} onChange={(cans) => edit(r.key, { cans })} inputMode="decimal" keyboardType="decimal-pad" style={styles.rowValue} width={72} />
-            ) : (
-              <Text testID={`count-${id}-value`} style={[styles.rowValue, { color: theme.ink }]}>
-                {formatCans(n)}
-              </Text>
-            )}
-            <StepButton small label={`${what} ${name} mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => change(step)} />
-            <Pressable accessibilityRole="button" accessibilityLabel="Dosengröße entfernen" hitSlop={8} onPress={() => removeRow(r.key)} style={({ pressed }) => [styles.remove, { opacity: pressed ? 0.6 : 1 }]}>
-              <Text style={[styles.removeText, { color: theme.muted }]}>×</Text>
-            </Pressable>
-          </View>
-        );
-      })}
-      {unsized ? (
-        <Text testID="stock-unsized" style={[styles.warn, { color: theme.danger }]}>
-          {`${unsized === 1 ? "Eine Zeile hat" : `${unsized} Zeilen haben`} keine Dosengröße: Gramm eintragen oder mit × entfernen.`}
-        </Text>
-      ) : null}
-      <BigButton kind="neutral" size="m" label="+ Dosengröße" a11y="Dosengröße hinzufügen" onPress={() => setExtras(extras + 1)} />
-    </>
-  );
+            </>
+          ) : (
+            <Text style={[styles.labelText, { color: theme.muted }]}>Menge in kg</Text>
+          )}
+        </View>
+        <StepButton small label={`${what} weniger`} sign="−" disabled={!(n > 0)} onPress={() => step(key, was, -0.5)} />
+        <View style={styles.valueBox}>
+          <TapToEdit testID={`count-${id}-value`} label={`Anzahl ${name}`} value={value} onChange={(cans) => edit(key, { cans })} inputMode="decimal" keyboardType="decimal-pad" style={isChanged ? { ...styles.value, color: theme.food } : styles.value} width={64} />
+          {/* always there, so every row keeps its height; seen only once the count changed */}
+          <Text style={[styles.was, { color: theme.muted, opacity: isChanged ? 1 : 0 }]} aria-hidden={!isChanged}>{`vorher ${was}`}</Text>
+        </View>
+        <StepButton small label={`${what} mehr`} sign="+" disabled={n >= MAX} onPress={() => step(key, was, 0.5)} />
+      </View>
+    );
+  };
 
   return (
     <Screen
-      top={
+      head={
         <>
           <Text style={[styles.title, { color: theme.ink }]}>Vorrat</Text>
           {error && !stock ? <Text style={[styles.small, { color: theme.muted }]}>{error}</Text> : null}
@@ -208,6 +128,28 @@ export function Stock() {
           </View>
         </>
       }
+      top={
+        <>
+          <Text style={[styles.section, { color: theme.muted }]}>Nassfutter</Text>
+          {wetRows.length ? (
+            wetRows.map((r) => {
+              const unitG = parseCanSize(r.size);
+              const name = unitG ? `à ${unitG} g` : "neuer Größe";
+              return row(r.key, `Dosen ${name}`, `½ Dose ${name}`, r.was, r.cans, { size: r.size, unitG });
+            })
+          ) : (
+            <Text style={[styles.small, { color: theme.muted }]}>Noch keine Dosen: trag einen Einkauf ein.</Text>
+          )}
+          {unsized ? (
+            <Text testID="stock-unsized" style={[styles.warn, { color: theme.danger }]}>
+              {`${unsized === 1 ? "Eine Zeile hat" : `${unsized} Zeilen haben`} keine Dosengröße: Gramm eintragen.`}
+            </Text>
+          ) : null}
+          <Text style={[styles.section, { color: theme.muted }]}>Trockenfutter</Text>
+          {row("dry", "kg Trockenfutter", "½ kg Trockenfutter", dryWas, dryCount)}
+        </>
+      }
+      low
       bottom={
         <>
           {message ? (
@@ -215,22 +157,39 @@ export function Stock() {
               {message}
             </Text>
           ) : null}
-          <Segments options={FOOD_KIND_OPTIONS} value={kind} onChange={pickKind} kind="food" />
-          <Segments options={MODES} value={mode} onChange={pickMode} />
-          {kind === "wet" ? (
-            wet
-          ) : (
-            <View style={styles.fields}>
-              <Field label="Menge" value={amount} onChangeText={setAmount} inputMode="decimal" keyboardType="decimal-pad" />
-              <View style={styles.unit}>
-                <Segments options={UNITS} value={unit} onChange={setUnit} />
+          {changed ? (
+            <View style={styles.pair}>
+              <View style={styles.side}>
+                <BigButton kind="neutral" size="m" label="Verwerfen" onPress={() => setEdits({})} />
+              </View>
+              <View style={styles.main}>
+                <BigButton kind="food" size="m" icon="check" label="Zählung speichern" disabled={unsized > 0} onPress={save} />
               </View>
             </View>
+          ) : (
+            <BigButton
+              kind="food"
+              size="m"
+              label="+ Eingekauft"
+              a11y="Eingekauft"
+              onPress={() => {
+                setMessage(null);
+                setBuying(true);
+              }}
+            />
           )}
-          <BigButton kind="food" size="l" icon="check" label="Eintragen" disabled={!ready} onPress={save} />
+          <RestockSheet
+            open={buying}
+            onClose={() => setBuying(false)}
+            stock={stock ?? null}
+            onDone={() => {
+              setBuying(false);
+              setMessage("Eingetragen.");
+              reload();
+            }}
+          />
         </>
       }
-      topMin={150}
     />
   );
 }
@@ -241,16 +200,17 @@ const styles = StyleSheet.create({
   card: { flex: 1, borderRadius: radius.tile, padding: 12, gap: 2 },
   big: { fontSize: 22, fontWeight: "700" },
   small: { fontSize: 13 },
-  fields: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
-  unit: { width: 120 },
-  row: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.tile, borderWidth: 2, paddingVertical: 4, paddingHorizontal: 10 },
-  warn: { fontSize: 14, fontWeight: "700" },
-  rowLabel: { flex: 1, fontSize: 14, fontWeight: "600" },
+  section: { fontSize: 13, fontWeight: "700", marginTop: 4 },
+  row: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.tile, borderWidth: 2, paddingVertical: 4, paddingHorizontal: 10, minHeight: 52 },
   rowField: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   labelText: { fontSize: 14, fontWeight: "600" },
-  remove: { width: 24, alignItems: "center", justifyContent: "center" },
-  removeText: { fontSize: 20, fontWeight: "700" },
   gramValue: { textAlign: "right" },
-  rowValue: { minWidth: 72, textAlign: "center", fontSize: 16, fontWeight: "700" },
+  valueBox: { alignItems: "center" },
+  value: { textAlign: "center", fontSize: 16, fontWeight: "700" },
+  was: { fontSize: 11 },
+  warn: { fontSize: 14, fontWeight: "700" },
+  pair: { flexDirection: "row", gap: 8 },
+  side: { flex: 1 },
+  main: { flex: 2 },
   message: { fontSize: 15, fontWeight: "600" },
 });
