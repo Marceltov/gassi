@@ -3,9 +3,11 @@ import { useColorScheme } from "react-native";
 import { gradients, kinds } from "./colors";
 
 // The icon squares of Mehr's lists and the other lists' rows (like the iPhone's settings): the weight's rose, the
-// household's violet, the devices' slate, the watch's grey. Vorrat uses food, Hunde walk, Übungen training.
+// household's violet, the devices' slate, the watch's grey, the treats' teal. Vorrat uses food, Hunde walk, Übungen
+// training.
 const listTones = {
   weight: "#d4567a",
+  treat: "#17797a",
   household: "#8a5ad6",
   device: "#5f6b7a",
   garmin: "#3a4048",

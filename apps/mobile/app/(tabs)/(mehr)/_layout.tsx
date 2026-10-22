@@ -1,4 +1,4 @@
-// The Mehr tab's stack: Mehr, its screens (Gewicht, Vorrat, Hunde, Übungen und Leckerli, Haushalt, Geräte), a weight's
+// The Mehr tab's stack: Mehr, its screens (Gewicht, Vorrat, Hunde, Übungen, Leckerli, Haushalt, Geräte), a weight's
 // entry.
 import { Stack } from "expo-router";
 

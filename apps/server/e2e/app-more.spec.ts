@@ -1,4 +1,4 @@
-// Mehr: Gewicht and Vorrat (data) on top, then the settings: Hunde, Übungen und Leckerli, Haushalt (invites), Meine
+// Mehr: Gewicht and Vorrat (data) on top, then the settings: Hunde, Übungen, Leckerli, Haushalt (invites), Meine
 // Geräte (sign out), the Garmin placeholder. And the installable web app: its manifest, the Apple tags, and the app
 // shell that opens without reception after the first visit. The server is shared: each test removes what it made.
 import { createClient } from "@gassi/api-client";
@@ -25,7 +25,7 @@ test.afterEach(async () => {
 test("Mehr lists Gewicht and Vorrat first, then the settings, and the Garmin watch for later, the source code; no export", async ({ page }) => {
   await signIn(page);
   await page.goto("/mehr");
-  const rows = ["Gewicht", "Vorrat", "Hunde", "Übungen und Leckerli", "Haushalt", "Meine Geräte", "Quellcode"];
+  const rows = ["Gewicht", "Vorrat", "Hunde", "Übungen", "Leckerli", "Haushalt", "Meine Geräte", "Quellcode"];
   for (const name of rows) await expect(page.getByRole("button", { name: new RegExp(`^${name}`) })).toBeVisible();
   await expect(page.getByTestId("more-Garmin-Uhr")).toContainText("kommt später");
   await expect(page.getByText(/Export/)).toHaveCount(0);
@@ -50,6 +50,33 @@ test("Gewicht: 12,4 kg logged shows in the list, on the curve and on Mehr", asyn
 
   await page.getByRole("tab", { name: "Mehr" }).click();
   await expect(page.getByTestId("more-Gewicht")).toContainText("12,4 kg · gerade eben");
+});
+
+test("Übungen and Leckerli are two entries in Mehr, each a list of its own with how many", async ({ page }) => {
+  const client = asHirsch();
+  const name = `Bleib ${Date.now()}`;
+  await signIn(page);
+  await page.goto("/mehr");
+  const exercises = (await client.exercises()).exercises.length;
+  const treats = (await client.treatKinds()).treatKinds.length;
+  await expect(page.getByTestId("more-Uebungen")).toContainText(exercises === 1 ? "1 Übung" : exercises ? `${exercises} Übungen` : "keine");
+  await expect(page.getByTestId("more-Leckerli")).toContainText(treats === 1 ? "1 Sorte" : treats ? `${treats} Sorten` : "keine");
+
+  await page.getByTestId("more-Uebungen").click();
+  await expect(page).toHaveURL(`${BASE_URL}/mehr/uebungen`);
+  await expect(page.getByRole("button", { name: "Leckerli dazu" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Übung dazu" }).click();
+  await page.getByTestId("catalog-sheet").getByLabel("Name").fill(name);
+  await page.getByTestId("catalog-sheet").getByRole("button", { name: "Hinzufügen" }).click();
+  await expect(page.getByRole("button", { name: new RegExp(`^${name}`) })).toBeVisible();
+  const added = (await client.exercises()).exercises.find((e) => e.name === name)!;
+  await client.updateExercise({ id: added.id, archived: true });
+
+  await page.getByRole("tab", { name: "Mehr" }).click();
+  await page.getByTestId("more-Leckerli").click();
+  await expect(page).toHaveURL(`${BASE_URL}/mehr/leckerli`);
+  await expect(page.getByRole("button", { name: "Übung dazu" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Leckerli dazu" })).toBeVisible();
 });
 
 test("Gewicht: a weight from a vet visit ten days ago is logged for that day, and the date goes back to now", async ({ page }) => {
