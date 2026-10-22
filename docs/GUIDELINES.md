@@ -15,12 +15,19 @@ here in the same PR that follows it.
 
 ## No compatibility
 
-- Only two people use Gassi, and it stays 0.x while there is no real data (tags `v0.N.0`). A renamed or removed route,
-  endpoint or field is just deleted: no redirects, aliases or compatibility layers, even when an issue asks for one.
-- Schema changes may be folded into one migration while nothing real is stored; the PR says so.
+- Only two people use Gassi, and it stays 0.x (tags `v0.N.0`). A renamed or removed route, endpoint or field is just
+  deleted: no redirects, aliases or compatibility layers, even when an issue asks for one.
+
+## Data
+
+- Since 2026-10-22 the deployed Gassi holds real data. Deleting or resetting it isn't forbidden, but we are reluctant:
+  a schema change comes with a migration that keeps the data, and a change that would lose data says so in its PR and
+  is agreed before it merges (merging main deploys).
 
 ## Where code goes
 
+- No redundancy anywhere: one implementation of a thing, shared through good abstractions and generics. Before adding
+  a file or function, look for one to extend; duplicated routes, components or logic get folded (#65 is the first).
 - A domain rule exists once, in `packages/domain` (no Node, React, Next or database there). The API exists once, in
   the contract in `packages/api-client` (ADR 0003).
 - `apps/server/backend` is framework-free and reached from `app/` only through `backend/index.ts`.
