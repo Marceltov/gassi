@@ -2,10 +2,10 @@
 // Start's tiles (its kind's diagonal gradient, a soft shadow, a light top edge); a neutral one stays calm (its surface
 // with a faint shadow and edge). Disabled, it is flat and faded.
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { type ButtonKind, radius, useTheme } from "../theme";
+import { type ButtonKind, FIELD_HEIGHT, radius, useTheme } from "../theme";
 import { Icon, type IconName } from "./Icon";
 
-const sizes = { xl: { height: 100, font: 21, icon: 26 }, l: { height: 72, font: 17, icon: 22 }, m: { height: 52, font: 15, icon: 18 } };
+const sizes = { xl: { height: 100, font: 21, icon: 26 }, l: { height: 72, font: 17, icon: 22 }, m: { height: 52, font: 15, icon: 18 }, s: { height: FIELD_HEIGHT, font: 15, icon: 16 } };
 
 type Props = {
   kind: ButtonKind;

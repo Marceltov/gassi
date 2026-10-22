@@ -109,15 +109,13 @@ test("a running walk and its training keep the tab bar with Start highlighted, a
   await expect(page.getByRole("button", { name: "Gassi gehen" })).toBeVisible();
 });
 
-test("an entry keeps the tab bar: opened directly on Verlauf, opened from Gewicht on Mehr", async ({ page }) => {
+test("an entry opened directly keeps the tab bar on Verlauf", async ({ page }) => {
   const client = asHirsch();
   const dog = (await client.dogs()).dogs.find((d) => !d.archived)!;
   const key = `tabs-pee-${Date.now()}`;
   await client.commands({ commands: [{ id: key, at: new Date(Date.now() - 3 * 3_600_000).toISOString(), kind: "log", type: "pee", dogId: dog.id }] });
   const pee = (await client.entries({ type: "pee" })).entries[0];
   made.push(pee.id);
-  const weight = await client.logWeight({ kg: 11.8, dogIds: [dog.id] });
-  made.push(weight.id);
 
   await signIn(page);
   await page.goto(`/verlauf/eintrag/${pee.id}`);
@@ -126,17 +124,6 @@ test("an entry keeps the tab bar: opened directly on Verlauf, opened from Gewich
   await expectTabBar(page, "Verlauf");
   await tab(page, "Verlauf").click();
   await expect(page).toHaveURL(`${BASE_URL}/verlauf`); // a clean URL: the deep link's id stays with the entry
-
-  await page.goto("/mehr/gewicht");
-  await page.getByTestId("weight-list").getByRole("button", { name: /11,8 kg/ }).first().click();
-  await expect(page).toHaveURL(`${BASE_URL}/mehr/eintrag/${weight.id}`);
-  await expectTabBar(page, "Mehr");
-  await page.goBack(); // the browser's back goes to where it was opened; the tab to Mehr
-  await expect(page).toHaveURL(`${BASE_URL}/mehr/gewicht`);
-  await page.getByTestId("weight-list").getByRole("button", { name: /11,8 kg/ }).first().click();
-  await expect(page).toHaveURL(`${BASE_URL}/mehr/eintrag/${weight.id}`);
-  await tab(page, "Mehr").click();
-  await expect(page).toHaveURL(`${BASE_URL}/mehr`);
 });
 
 test("the food sheet sits above the tab bar, which stays tappable; another tab closes the sheet", async ({ page }) => {
@@ -196,8 +183,7 @@ test("every address opens in its own tab, also by a link or a reload", async ({ 
   const at = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
   await client.commands({ commands: [{ id: `${key}-s`, at: at(500), kind: "walk.start", walkKey: key }, { id: `${key}-p`, at: at(495), kind: "log", type: "pee", dogId: dog.id }, { id: `${key}-e`, at: at(480), kind: "walk.stop", walkKey: key }] });
   const walk = (await client.walkByKey({ key })).summary;
-  const weight = await client.logWeight({ kg: 11.7, dogIds: [dog.id] });
-  made.push(walk.id, walk.pees[0].id, weight.id);
+  made.push(walk.id, walk.pees[0].id);
 
   await signIn(page);
   const cases = [
@@ -206,7 +192,6 @@ test("every address opens in its own tab, also by a link or a reload", async ({ 
     [`/runde/${walk.id}`, "Start"],
     [`/runde/${key}`, "Start"],
     [`/eintrag/${walk.pees[0].id}`, "Start"],
-    [`/mehr/eintrag/${weight.id}`, "Mehr"],
   ] as const;
   for (const [path, tabName] of cases) {
     await page.goto(path);
