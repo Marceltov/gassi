@@ -65,7 +65,6 @@ export function More() {
           <SignOutSheet open={signingOut} onClose={() => setSigningOut(false)} />
         </>
       }
-      fill
     />
   );
 }
