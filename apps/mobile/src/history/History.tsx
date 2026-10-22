@@ -1,7 +1,8 @@
 // Verlauf: who went when, fed how much, trained what and how well. The entries newest first under their day on top;
 // the filters (who, what, which dog) at the bottom for the thumb. A walk opens its summary, anything else its detail.
+// What is shown lives in the URL (/verlauf?type=pee), so a Start tile, a link or a reload can open it filtered.
 import { byDay, ENTRY_TYPES, type EntryType, TYPE_LABEL } from "@gassi/domain";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
@@ -25,7 +26,10 @@ export function History() {
   const router = useRouter();
   const theme = useTheme();
   const { people, dogs } = useGassi();
-  const [filter, setFilter] = useState<Filter>({});
+  const param = useLocalSearchParams<{ type?: string }>().type;
+  const type = ENTRY_TYPES.find((t) => t === param);
+  const [rest, setRest] = useState<Omit<Filter, "type">>({});
+  const filter: Filter = { ...rest, type };
   const [choosing, setChoosing] = useState<Choosing | null>(null);
   const { entries, more, loadingMore, error, loadMore } = useHistory(filter);
   const now = useNow(60_000); // "Heute" becomes "Gestern" at midnight
@@ -40,7 +44,9 @@ export function History() {
   const dogsOf = (e: Entry) => (active.length > 1 && e.dogIds.length && !active.every((d) => e.dogIds.includes(d.id)) ? e.dogIds.map(dogName).join(", ") : "");
 
   const set = (change: Filter) => {
-    setFilter((f) => ({ ...f, ...change }));
+    const { type: chosen, ...others } = change;
+    if ("type" in change) router.setParams({ type: chosen });
+    setRest((f) => ({ ...f, ...others }));
     setChoosing(null);
   };
   // "Alle" first, then each option; the chosen one is marked
