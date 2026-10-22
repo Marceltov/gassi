@@ -96,6 +96,17 @@ test("Gewicht: a day last month is added, changed and deleted from the calendar;
   await expect(month).toHaveText(thisMonth!);
 });
 
+test("Vorrat: with many can sizes on a small phone nothing is cut off; the page scrolls under its title, Eintragen stays", async ({ page }) => {
+  await signIn(page);
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [100, 200, 300, 400, 800].map((unitG) => ({ unitG, cans: 2 })) })).entries.map((e) => e.id));
+  await expectFits(page, "/mehr/vorrat", "Nassfutter"); // ends at 430×932
+  await page.setViewportSize({ width: 360, height: 640 });
+  await expect(page.getByTestId("stock-wet").getByText(/^zusammen/)).toBeInViewport({ ratio: 1 });
+  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).scrollIntoViewIfNeeded();
+  await expect(page.getByText("Vorrat", { exact: true }).last()).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Eintragen" })).toBeInViewport();
+});
+
 test("Vorrat: the fields typed into are 16 px, so an iPhone doesn't zoom into them", async ({ page }) => {
   await signIn(page);
   await page.goto("/mehr/vorrat");
@@ -452,13 +463,13 @@ test("Vorrat: quick + taps each count; a count reads out with its value; clearin
   await expect(page.getByRole("button", { name: "Eintragen" })).toBeDisabled();
 });
 
-test("Mehr and its screens fit a small and a big phone: only a list scrolls, under a title that stays", async ({ page }) => {
+test("Mehr and its screens fit a small and a big phone: the title and the buttons below stay, only the content between scrolls", async ({ page }) => {
   await signIn(page);
   await expectFits(page, "/mehr", "Abmelden");
   await expectFits(page, "/mehr/gewicht", "Gewicht heute in kg");
-  await expectFits(page, "/mehr/vorrat", "Nassfutter", { scrolls: "stock-sizes" });
+  await expectFits(page, "/mehr/vorrat", "Nassfutter");
   for (const [path, title] of [["hunde", "Hunde"], ["uebungen", "Übungen"], ["leckerli", "Leckerli"], ["haushalt", "Haushalt"], ["geraete", "Meine Geräte"]]) {
-    await expectFits(page, `/mehr/${path}`, title, { scrolls: "screen-scroll" });
+    await expectFits(page, `/mehr/${path}`, title);
   }
 });
 

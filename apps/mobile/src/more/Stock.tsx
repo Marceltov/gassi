@@ -9,7 +9,7 @@
 import type { DryUnit, FoodKind } from "@gassi/domain";
 import { buyingSizes, formatCans, formSizes, type HiddenSize, parseCanSize, parseDecimal, stockParts } from "@gassi/domain";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Field } from "../ui/Field";
@@ -144,10 +144,9 @@ export function Stock() {
     );
   };
 
-  // the size rows grow with the sizes bought: only they scroll, the rest of Vorrat stays put
   const wet = (
     <>
-      <ScrollView testID="stock-sizes" style={styles.sizes} contentContainerStyle={styles.gap}>
+      <View style={styles.gap}>
         {rows.map((r) => {
           const unitG = parseCanSize(r.size);
           const n = parseDecimal(r.cans) || 0;
@@ -189,7 +188,7 @@ export function Stock() {
             </View>
           );
         })}
-      </ScrollView>
+      </View>
       {unsized ? (
         <Text testID="stock-unsized" style={[styles.warn, { color: theme.danger }]}>
           {`${unsized === 1 ? "Eine Zeile hat" : `${unsized} Zeilen haben`} keine Dosengröße: Gramm eintragen oder mit × entfernen.`}
@@ -199,25 +198,21 @@ export function Stock() {
     </>
   );
 
+  // the title and Eintragen stay put; the cards, the choices and the size rows in between scroll when they don't fit
   return (
     <Screen
-      top={
+      head={
         <>
           <Text style={[styles.title, { color: theme.ink }]}>Vorrat</Text>
           {error && !stock ? <Text style={[styles.small, { color: theme.muted }]}>{error}</Text> : null}
+        </>
+      }
+      top={
+        <>
           <View style={styles.cards}>
             {card("wet", "Nassfutter")}
             {card("dry", "Trockenfutter")}
           </View>
-        </>
-      }
-      bottom={
-        <>
-          {message ? (
-            <Text testID="stock-message" style={[styles.message, { color: theme.ink }]}>
-              {message}
-            </Text>
-          ) : null}
           <Segments options={FOOD_KIND_OPTIONS} value={kind} onChange={pickKind} kind="food" />
           <Segments options={MODES} value={mode} onChange={pickMode} />
           {kind === "wet" ? (
@@ -230,11 +225,18 @@ export function Stock() {
               </View>
             </View>
           )}
+        </>
+      }
+      bottom={
+        <>
+          {message ? (
+            <Text testID="stock-message" style={[styles.message, { color: theme.ink }]}>
+              {message}
+            </Text>
+          ) : null}
           <BigButton kind="food" size="m" icon="check" label="Eintragen" disabled={!ready} onPress={save} />
         </>
       }
-      topMin={150}
-      fill
     />
   );
 }
@@ -247,7 +249,6 @@ const styles = StyleSheet.create({
   small: { fontSize: 13 },
   fields: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   unit: { width: 120 },
-  sizes: { flexShrink: 1, minHeight: 0 },
   gap: { gap: 8 },
   row: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.tile, borderWidth: 2, paddingVertical: 4, paddingHorizontal: 10 },
   warn: { fontSize: 14, fontWeight: "700" },

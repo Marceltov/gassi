@@ -39,9 +39,9 @@ export function More() {
 
   return (
     <Screen
+      head={<Text style={[styles.title, { color: theme.ink }]}>Mehr</Text>}
       top={
         <>
-          <Text style={[styles.title, { color: theme.ink }]}>Mehr</Text>
           <Group>
             <Row testID="more-Gewicht" icon="weight" tone="weight" label="Gewicht" value={weight} onPress={go("/mehr/gewicht")} />
             <Row testID="more-Vorrat" icon="stock" tone="food" label="Vorrat" value={food} onPress={go("/mehr/vorrat")} />
