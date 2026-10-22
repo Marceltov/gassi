@@ -1,6 +1,6 @@
 // Gewicht: the chosen dog's latest weight and how it changed on top, then one month at a time (‹ ›, never past this
 // month): the curve of its weights and a calendar with each day's weight. A tap on a past day or today opens a sheet to
-// add that day's weight, or to change or delete it. At the bottom today's weight and Eintragen. With several dogs,
+// add that day's weight, or to change or delete it. At the bottom today's weight with Eintragen beside it. With several dogs,
 // chips choose the dog.
 import type { Output } from "@gassi/api-client";
 import { addMonths, dayHeading, dayOf, formatKg, kgToGrams, monthLabel, monthOf, noonOf, WEIGHT_MESSAGES, weightChange, weightsByDay } from "@gassi/domain";
@@ -10,7 +10,7 @@ import { useGassi } from "../data/GassiProvider";
 import { useNow } from "../start/useNow";
 import { useTheme } from "../theme";
 import { TIME_ZONE } from "../time";
-import { BigButton } from "../ui/BigButton";
+import { BigButton, sizes } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
@@ -133,8 +133,12 @@ export function Weight() {
       bottom={
         <>
           {message && !day ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-          <Field label="Gewicht heute in kg" value={kg} onChangeText={setKg} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" onSubmitEditing={() => kg.trim() && saveToday()} />
-          <BigButton kind="walk" size="l" icon="check" label="Eintragen" disabled={!kg.trim()} onPress={saveToday} />
+          <View style={styles.today}>
+            <Field label="Gewicht heute in kg" height={sizes.m.height} value={kg} onChangeText={setKg} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" onSubmitEditing={() => kg.trim() && saveToday()} />
+            <View style={styles.enter}>
+              <BigButton kind="walk" size="m" icon="check" label="Eintragen" disabled={!kg.trim()} onPress={saveToday} />
+            </View>
+          </View>
         </>
       }
       topMin={170}
@@ -152,5 +156,7 @@ const styles = StyleSheet.create({
   arrow: { width: 64 },
   heading: { flex: 1, textAlign: "center", fontSize: 17, fontWeight: "700" },
   sheet: { gap: 10 },
+  today: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  enter: { width: 150 },
   sheetTitle: { fontSize: 17, fontWeight: "700" },
 });
