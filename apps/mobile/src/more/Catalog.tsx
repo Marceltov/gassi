@@ -1,5 +1,6 @@
-// Übungen und Leckerli: the household's lists for training. A tap opens one to rename it (a treat also its grams per
-// piece and whether it comes out of the dry food) or remove it; removed ones keep their name in past trainings.
+// Übungen or Leckerli: one of the household's lists for training, each its own screen in Mehr. A tap opens one to rename
+// it (a treat also its grams per piece and whether it comes out of the dry food) or remove it; removed ones keep their
+// name in past trainings.
 import type { Client } from "@gassi/api-client";
 import { parseDecimal } from "@gassi/domain";
 import { useState } from "react";
@@ -20,7 +21,7 @@ type Editing = { what: "exercise"; item: Exercise | null; name: string } | { wha
 
 const grams = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 1 });
 
-export function Catalog() {
+export function Catalog({ what }: { what: Editing["what"] }) {
   const theme = useTheme();
   const { refresh } = useGassi();
   const { data, error, reload } = useServer((a) => Promise.all([a.exercises(), a.treatKinds()]));
@@ -58,28 +59,28 @@ export function Catalog() {
     <Screen
       top={
         <>
-          <Text style={[styles.title, { color: theme.ink }]}>Übungen und Leckerli</Text>
+          <Text style={[styles.title, { color: theme.ink }]}>{what === "exercise" ? "Übungen" : "Leckerli"}</Text>
           {error && !data ? <Text style={[styles.small, { color: theme.muted }]}>{error}</Text> : null}
-          {data ? (
-            <>
-              <Group title="Übungen">
-                {exercises.length ? null : <Row label="Noch keine" muted />}
-                {exercises.map((x) => (
-                  <Row key={x.id} label={x.name} onPress={() => open({ what: "exercise", item: x, name: x.name })} />
-                ))}
-              </Group>
-              <Group title="Leckerli">
-                {treats.length ? null : <Row label="Noch keine" muted />}
-                {treats.map((t) => (
-                  <Row
-                    key={t.id}
-                    label={t.name}
-                    value={`${grams(t.gramsPerPiece)} g${t.fromDry ? " · aus dem Trockenfutter" : ""}`}
-                    onPress={() => open({ what: "treat", item: t, name: t.name, grams: grams(t.gramsPerPiece), fromDry: t.fromDry })}
-                  />
-                ))}
-              </Group>
-            </>
+          {data && what === "exercise" ? (
+            <Group>
+              {exercises.length ? null : <Row label="Noch keine" muted />}
+              {exercises.map((x) => (
+                <Row key={x.id} label={x.name} onPress={() => open({ what: "exercise", item: x, name: x.name })} />
+              ))}
+            </Group>
+          ) : null}
+          {data && what === "treat" ? (
+            <Group>
+              {treats.length ? null : <Row label="Noch keine" muted />}
+              {treats.map((t) => (
+                <Row
+                  key={t.id}
+                  label={t.name}
+                  value={`${grams(t.gramsPerPiece)} g${t.fromDry ? " · aus dem Trockenfutter" : ""}`}
+                  onPress={() => open({ what: "treat", item: t, name: t.name, grams: grams(t.gramsPerPiece), fromDry: t.fromDry })}
+                />
+              ))}
+            </Group>
           ) : null}
           <Sheet open={!!editing} onClose={() => setEditing(null)} label={editing ? (editing.item?.name ?? (editing.what === "exercise" ? "Neue Übung" : "Neues Leckerli")) : undefined}>
             {editing ? (
@@ -104,16 +105,11 @@ export function Catalog() {
         </>
       }
       bottom={
-        <>
-          <View style={styles.pair}>
-            <View style={styles.half}>
-              <BigButton kind="training" size="l" icon="add" label="Übung dazu" onPress={() => open({ what: "exercise", item: null, name: "" })} />
-            </View>
-            <View style={styles.half}>
-              <BigButton kind="training" size="l" icon="add" label="Leckerli dazu" onPress={() => open(newTreat)} />
-            </View>
-          </View>
-        </>
+        what === "exercise" ? (
+          <BigButton kind="training" size="l" icon="add" label="Übung dazu" onPress={() => open({ what: "exercise", item: null, name: "" })} />
+        ) : (
+          <BigButton kind="training" size="l" icon="add" label="Leckerli dazu" onPress={() => open(newTreat)} />
+        )
       }
     />
   );
@@ -126,6 +122,4 @@ const styles = StyleSheet.create({
   sheetTitle: { fontSize: 17, fontWeight: "700" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   message: { fontSize: 15, fontWeight: "600" },
-  pair: { flexDirection: "row", gap: 8 },
-  half: { flex: 1 },
 });
