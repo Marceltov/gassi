@@ -70,3 +70,14 @@ From the repo root: `npm install`, `npm test`, `npm run test:e2e`, `npm run lint
 `npm run web -w @gassi/mobile` (see `apps/mobile/.env.example`).
 
 How it is planned and built: [docs/PLAN.md](docs/PLAN.md), [docs/BUILD.md](docs/BUILD.md) (history of steps 1 and 2a), [docs/adr/](docs/adr/).
+
+## License
+
+Copyright (C) 2026 Marcel Bruckner
+
+Gassi is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public
+License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+version. It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See [LICENSE](LICENSE) for the full text.
+
+If you run a modified Gassi as a service for others, the AGPL asks you to offer them its source.
