@@ -56,6 +56,9 @@ labels, ports); they apply to that deployment folder, not to the app code here.
 
 ## Decisions to respect
 
+`docs/GUIDELINES.md` holds the working rules (English code and German UI, no compatibility layers, tests, shipping);
+add a ruling there when one is made.
+
 - **Rebuild plan:** `docs/PLAN.md` in five steps (foundation, web app, Android app, Garmin app, release); each step
   gets its own design and plan. No iOS app from us (ADR 0005). Nobody depends on 0.2; no compatibility layers.
 - **One model:** an `Entry` for one or more dogs (`dogIds`; pee/poop/weight exactly one, restock/stockcheck/note none),
