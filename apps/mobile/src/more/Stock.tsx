@@ -2,7 +2,8 @@
 // (from the server, worked out by the domain) on top; at the bottom what was bought (Eingekauft) or what is there when
 // counted by hand (Nachgezählt), the same way in both: wet food one row per can size with − and + (bought: whole cans
 // from 0; counted: from what the stock says, in halves for an opened can), a row of another
-// size added with "+ Dosengröße" ("Dosen à [ ] g"; one without grams isn't recorded). × buying hides that size from
+// size added with "+ Dosengröße" ("Dosen à [ ] g"). A row without grams holds up Eintragen until its grams are typed or
+// it is taken away with ×: only × removes a size, so clearing a field can't. × buying hides that size from
 // the purchase rows on this phone (the stock stays); counting it sets the size to 0, which retires it on Eintragen; on
 // an added row it just drops it. Dry food is one amount in g or kg. One Eintragen records it all.
 import type { DryUnit, FoodKind } from "@gassi/domain";
@@ -70,13 +71,18 @@ export function Stock() {
       saveHidden(personId, next);
     } else setRemoved([...removed, key]);
   };
-  const rows = [
+  const initial = [
     ...offered.map((u) => ({ key: `k${u}`, size: String(u), cans: decimalText(mode === "count" ? (stock?.wet.sizes.find((s) => s.unitG === u)?.cans ?? 0) : 0) })),
     ...Array.from({ length: extras }, (_, i) => ({ key: `x${i}`, size: "", cans: "0" })),
-  ]
-    .filter((r) => !removed.includes(r.key))
-    .map((r) => ({ ...r, ...edits[r.key] }));
-  const edit = (key: string, change: { size?: string; cans?: string }) => setEdits({ ...edits, [key]: { ...edits[key], ...change } });
+  ].filter((r) => !removed.includes(r.key));
+  const rows = initial.map((r) => ({ ...r, ...edits[r.key] }));
+  // from the edits as they are when React applies them, so quick taps in a row each count
+  const edit = (key: string, change: { size?: string; cans?: string }) => setEdits((e) => ({ ...e, [key]: { ...e[key], ...change } }));
+  const stepCans = (key: string, d: number) =>
+    setEdits((e) => {
+      const from = parseDecimal(e[key]?.cans ?? initial.find((r) => r.key === key)?.cans ?? "0") || 0;
+      return { ...e, [key]: { ...e[key], cans: decimalText(Math.min(MAX_CANS, Math.max(0, from + d))) } };
+    });
   // what Eintragen sends (Ruling X, in the domain): rows by their sizes; counting, a known size in no row is 0
   const { sizes, unsized } = formSizes(known, rows, mode === "count");
 
@@ -97,7 +103,7 @@ export function Stock() {
     reset();
   };
 
-  const ready = kind === "dry" ? !!amount.trim() : mode === "restock" ? sizes.some((s) => parseDecimal(s.cans) > 0) : sizes.length > 0;
+  const ready = kind === "dry" ? !!amount.trim() : unsized > 0 ? false : mode === "restock" ? sizes.some((s) => parseDecimal(s.cans) > 0) : sizes.length > 0;
   const save = () =>
     void run(async (api) => {
       if (kind === "dry") {
@@ -144,13 +150,13 @@ export function Stock() {
         const unitG = parseCanSize(r.size);
         const n = parseDecimal(r.cans) || 0;
         const name = unitG ? `à ${unitG} g` : "neuer Größe";
-        const change = (d: number) => edit(r.key, { cans: decimalText(Math.min(MAX_CANS, Math.max(0, n + d))) });
+        const change = (d: number) => stepCans(r.key, d);
         const step = mode === "count" ? 0.5 : 1; // counted: halves (an opened can); bought: whole cans
         const what = mode === "count" ? "½ Dose" : "1 Dose";
         // a known size's row keeps its id while its size is edited; an added one is named by the size typed
         const id = r.key.startsWith("k") ? r.key.slice(1) : (unitG ?? "new");
         return (
-          <View key={r.key} testID={`count-${id}`} style={[styles.row, { backgroundColor: theme.surface }]}>
+          <View key={r.key} testID={`count-${id}`} style={[styles.row, { backgroundColor: theme.surface, borderColor: unitG ? "transparent" : theme.danger }]}>
             <View style={styles.rowField}>
               <Text style={[styles.labelText, { color: theme.muted }]}>Dosen à</Text>
               <TapToEdit
@@ -182,8 +188,8 @@ export function Stock() {
         );
       })}
       {unsized ? (
-        <Text testID="stock-unsized" style={[styles.small, { color: theme.muted }]}>
-          {unsized === 1 ? "Eine Zeile ohne Dosengröße wird nicht eingetragen." : `${unsized} Zeilen ohne Dosengröße werden nicht eingetragen.`}
+        <Text testID="stock-unsized" style={[styles.warn, { color: theme.danger }]}>
+          {`${unsized === 1 ? "Eine Zeile hat" : `${unsized} Zeilen haben`} keine Dosengröße: Gramm eintragen oder mit × entfernen.`}
         </Text>
       ) : null}
       <BigButton kind="neutral" size="m" label="+ Dosengröße" a11y="Dosengröße hinzufügen" onPress={() => setExtras(extras + 1)} />
@@ -237,7 +243,8 @@ const styles = StyleSheet.create({
   small: { fontSize: 13 },
   fields: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   unit: { width: 120 },
-  row: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.tile, paddingVertical: 6, paddingHorizontal: 12 },
+  row: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.tile, borderWidth: 2, paddingVertical: 4, paddingHorizontal: 10 },
+  warn: { fontSize: 14, fontWeight: "700" },
   rowLabel: { flex: 1, fontSize: 14, fontWeight: "600" },
   rowField: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   labelText: { fontSize: 14, fontWeight: "600" },
