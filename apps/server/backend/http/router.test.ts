@@ -1,12 +1,13 @@
 import { describe, expect, test } from "vitest";
 import { Devices } from "../auth/devices";
+import { Throttle } from "../auth/throttle";
 import { freshDatabase, HIRSCH } from "../db/testing";
 import { apiRouter } from "./api";
 import { TEST_CODE_KEY } from "./testing";
 
 const { db } = freshDatabase();
 const NOW = new Date("2026-10-20T10:00:00Z");
-const handle = () => apiRouter({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", codeKey: TEST_CODE_KEY, oidc: false, mailer: null });
+const handle = () => apiRouter({ db: db(), now: () => NOW, publicUrl: "https://gassi.example", codeKey: TEST_CODE_KEY, codeThrottle: new Throttle(), client: "test", oidc: false, mailer: null });
 const call = (path: string, init: RequestInit & { token?: string } = {}) =>
   handle()(new Request(`https://gassi.example${path}`, { ...init, headers: { "content-type": "application/json", ...(init.token ? { authorization: `Bearer ${init.token}` } : {}) } }));
 const phone = () => new Devices(db(), () => NOW).create(HIRSCH.id, { kind: "phone", name: "iPhone" });
