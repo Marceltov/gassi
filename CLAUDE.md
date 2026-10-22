@@ -56,8 +56,9 @@ labels, ports); they apply to that deployment folder, not to the app code here.
 
 ## Decisions to respect
 
-`docs/GUIDELINES.md` holds the working rules (English code and German UI, no compatibility layers, tests, shipping);
-add a ruling there when one is made.
+**Read `docs/GUIDELINES.md` before writing, naming or reviewing code**, and whenever a question of naming, language,
+compatibility, tests or shipping comes up. It holds the working rules (English code and German UI, no compatibility
+layers or redirects, where code goes, tests, shipping). When Marcel makes a new ruling, add it there in the same PR.
 
 - **Rebuild plan:** `docs/PLAN.md` in five steps (foundation, web app, Android app, Garmin app, release); each step
   gets its own design and plan. No iOS app from us (ADR 0005). Nobody depends on 0.2; no compatibility layers.
