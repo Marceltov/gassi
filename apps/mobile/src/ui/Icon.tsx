@@ -32,6 +32,7 @@ const SYMBOLS = {
   add: sym("plus", "add"),
   invite: sym("person.badge.plus", "person_add"),
   treat: sym("gift.fill", "pet_supplies"),
+  code: sym("chevron.left.forwardslash.chevron.right", "code"),
   signIn: sym("arrow.right.circle.fill", "login"),
 };
 
