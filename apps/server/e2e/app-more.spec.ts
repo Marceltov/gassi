@@ -441,3 +441,15 @@ test("Vorrat: quick + taps each count; a count reads out with its value; clearin
   await expect(page.getByTestId("stock-unsized")).toHaveText("Eine Zeile hat keine Dosengröße: Gramm eintragen oder mit × entfernen.");
   await expect(page.getByRole("button", { name: "Eintragen" })).toBeDisabled();
 });
+
+test("Gewicht never scrolls: from a small phone to a big one, the curve and the calendar take the height there is", async ({ page }) => {
+  await signIn(page);
+  for (const [width, height] of [[360, 640], [430, 932]] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto("/mehr/gewicht");
+    await expect(page.getByTestId("month-calendar")).toBeVisible();
+    const scrolling = await page.evaluate(() => [...document.querySelectorAll("*")].filter((e) => e.scrollHeight > e.clientHeight + 1 && ["auto", "scroll"].includes(getComputedStyle(e).overflowY)).length);
+    expect(scrolling, `${width}×${height}`).toBe(0);
+    await expect(page.getByRole("button", { name: "Eintragen", exact: true })).toBeInViewport();
+  }
+});

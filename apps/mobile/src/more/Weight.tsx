@@ -1,4 +1,5 @@
-// Gewicht: the chosen dog's latest weight and how it changed on top, then one month at a time (‹ ›, never past this
+// Gewicht, as tall as the screen and never scrolling: the chosen dog's latest weight and how it changed on top, then one
+// month at a time (‹ ›, never past this
 // month): the curve of its weights and a calendar with each day's weight. A tap on a past day or today opens a sheet to
 // add that day's weight, or to change or delete it. At the bottom today's weight with Eintragen beside it. With several dogs,
 // chips choose the dog.
@@ -111,7 +112,9 @@ export function Weight() {
               <BigButton kind="neutral" size="m" label="›" a11y="Monat danach" disabled={month >= thisMonth} onPress={() => setMonth(addMonths(month, 1))} />
             </View>
           </View>
-          {points.length ? <Curve points={points} height={110} /> : <Text style={[styles.small, { color: theme.muted }]}>Kein Gewicht in diesem Monat.</Text>}
+          <View style={[styles.curve, { backgroundColor: theme.surface }]}>
+            {points.length ? <Curve points={points} /> : <Text style={[styles.small, styles.none, { color: theme.muted }]}>Kein Gewicht in diesem Monat.</Text>}
+          </View>
           <MonthCalendar month={month} today={today} tone={theme.weight} label={dayTitle} valueOf={(date) => (byDay.has(date) ? shortKg(byDay.get(date)!.amountG) : null)} onPress={openDay} />
           <Sheet open={day !== null} onClose={() => setDay(null)} label={day ? dayTitle(day.date) : undefined}>
             {day ? (
@@ -141,7 +144,7 @@ export function Weight() {
           </View>
         </>
       }
-      topMin={170}
+      fill
     />
   );
 }
@@ -156,6 +159,8 @@ const styles = StyleSheet.create({
   arrow: { width: 64 },
   heading: { flex: 1, textAlign: "center", fontSize: 17, fontWeight: "700" },
   sheet: { gap: 10 },
+  curve: { flex: 1, minHeight: 48, borderRadius: 12, justifyContent: "center" },
+  none: { textAlign: "center" },
   today: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   enter: { width: 150 },
   sheetTitle: { fontSize: 17, fontWeight: "700" },
