@@ -26,6 +26,8 @@ here in the same PR that follows it.
 
 ## Where code goes
 
+- No redundancy anywhere: one implementation of a thing, shared through good abstractions and generics. Before adding
+  a file or function, look for one to extend; duplicated routes, components or logic get folded (#65 is the first).
 - A domain rule exists once, in `packages/domain` (no Node, React, Next or database there). The API exists once, in
   the contract in `packages/api-client` (ADR 0003).
 - `apps/server/backend` is framework-free and reached from `app/` only through `backend/index.ts`.
