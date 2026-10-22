@@ -115,7 +115,7 @@ test("filtered by Herzii, the walk she went on stays and Hirsch's feeding goes; 
 
   await walkRow.click();
   await expect(page).toHaveURL(`${BASE_URL}/runde/${walk.id}`);
-  await expect(page.getByTestId("summary-pees")).toContainText("1×");
+  await expect(page.getByTestId("summary-counts")).toHaveText("1× Pipi");
   // opened from Verlauf, the summary stays on Verlauf's tab, and Fertig goes back to the filtered list
   await expect(page.getByRole("tab", { name: "Verlauf" })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("button", { name: "Fertig" }).click();
@@ -150,14 +150,14 @@ test("from a walk's summary: its pee is deleted, its start moved, then the walk 
   const pee = walk.pees[0];
   await signIn(page);
   await page.goto(`/runde/${walk.id}`);
-  await expect(page.getByTestId("summary-pees")).toContainText("1×");
+  await expect(page.getByTestId("summary-counts")).toHaveText("1× Pipi");
 
   await page.getByTestId(`summary-mark-${pee.id}`).click();
   await expect(page).toHaveURL(`${BASE_URL}/eintrag/${pee.id}`);
   await page.getByRole("button", { name: "Löschen", exact: true }).click();
   await page.getByTestId("delete-sheet").getByRole("button", { name: "Ja, löschen" }).click();
   await expect(page).toHaveURL(`${BASE_URL}/runde/${walk.id}`);
-  await expect(page.getByTestId("summary-pees")).toContainText("keins");
+  await expect(page.getByTestId("summary-counts")).toHaveText("Noch nichts");
 
   // ten minutes earlier, typed as this phone's local time (the page runs in Europe/Berlin)
   const earlier = utcToLocal(Date.parse(walk.startedAt) - 10 * 60_000, "Europe/Berlin");
@@ -209,4 +209,31 @@ test("a training reads Sitz 2/3 in the list; its repetitions are changed in its 
   await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
   await expect(row).toContainText("Sitz 3/4");
   expect((await client.entry({ id: training.id })).exercises).toEqual([{ name: "Sitz", ok: 3, fail: 1 }]);
+});
+
+test("a walk's summary counts what happened, lists it by time, and a training opens its detail", async ({ page }) => {
+  const client = asHirsch();
+  const dog = await firstDog();
+  const key = `history-summary-${Date.now()}`;
+  await client.commands({
+    commands: [
+      { id: `${key}-start`, at: minutesAgo(300), kind: "walk.start", walkKey: key },
+      { id: `${key}-pee`, at: minutesAgo(295), kind: "log", type: "pee", dogId: dog.id },
+      { id: `${key}-t`, at: minutesAgo(290), kind: "training.start", trainingKey: `${key}-t`, walkKey: key },
+      { id: `${key}-t-stop`, at: minutesAgo(285), kind: "training.stop", trainingKey: `${key}-t` },
+      { id: `${key}-poop`, at: minutesAgo(280), kind: "log", type: "poop", dogId: dog.id },
+      { id: `${key}-stop`, at: minutesAgo(270), kind: "walk.stop", walkKey: key },
+    ],
+  });
+  const walk = (await client.walkByKey({ key })).summary;
+  made.push(walk.id, walk.pees[0].id, walk.poops[0].id, walk.trainings[0].id);
+
+  await signIn(page);
+  await page.goto(`/runde/${walk.id}`);
+  await expect(page.getByTestId("summary-counts")).toHaveText("1× Pipi · 1× Poopoo · 1 Training");
+  const ids = [`summary-mark-${walk.pees[0].id}`, `summary-training-${walk.trainings[0].id}`, `summary-mark-${walk.poops[0].id}`];
+  const tops = await Promise.all(ids.map(async (id) => (await page.getByTestId(id).boundingBox())!.y));
+  expect(tops).toEqual([...tops].sort((a, b) => a - b)); // by time
+  await page.getByTestId(`summary-training-${walk.trainings[0].id}`).click();
+  await expect(page).toHaveURL(`${BASE_URL}/eintrag/${walk.trainings[0].id}`);
 });
