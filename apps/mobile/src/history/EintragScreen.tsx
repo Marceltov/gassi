@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { EntryDetail } from "./EntryDetail";
 
-// /eintrag/<id>: an entry's detail, the one screen behind the route files of Start, Verlauf and Mehr
+// An entry's detail, the one screen behind /eintrag/<id> (Start), /verlauf/eintrag/<id> and /mehr/eintrag/<id>
 export function EintragScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   return <EntryDetail key={id} id={Number(id)} />;

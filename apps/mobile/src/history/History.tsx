@@ -47,7 +47,7 @@ export function History() {
 
   // a second tap before the next screen is up must not open it twice
   const { leave } = useLeaving();
-  const open = (e: Entry) => leave(() => router.push(e.type === "walk" ? `/runde/${e.id}` : `/eintrag/${e.id}`));
+  const open = (e: Entry) => leave(() => router.push(e.type === "walk" ? `/verlauf/runde/${e.id}` : `/verlauf/eintrag/${e.id}`));
 
   const active = dogs.filter((d) => !d.archived);
   const dogName = (id: number) => dogs.find((d) => d.id === id)?.name ?? "Hund";

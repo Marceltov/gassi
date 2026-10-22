@@ -61,7 +61,7 @@ export function Weight() {
               <View testID="weight-list">
                 <Group>
                   {mine.map((w) => (
-                    <Row key={w.id} label={dayHeading(Date.parse(w.at), TIME_ZONE)} value={`${formatKg(w.amountG ?? 0)} · ${w.byName}`} onPress={() => router.push(`/eintrag/${w.id}`)} />
+                    <Row key={w.id} label={dayHeading(Date.parse(w.at), TIME_ZONE)} value={`${formatKg(w.amountG ?? 0)} · ${w.byName}`} onPress={() => router.push(`/mehr/eintrag/${w.id}`)} />
                   ))}
                 </Group>
               </View>
