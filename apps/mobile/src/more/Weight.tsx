@@ -1,5 +1,6 @@
 // Gewicht: the chosen dog's curve and its weights (newest first, a tap opens one to change or delete it) on top; the
-// new weight in kg and Eintragen at the bottom. With several dogs, chips choose the dog.
+// new weight in kg, when it was weighed (now unless changed, e.g. a vet visit last week) and Eintragen at the bottom.
+// With several dogs, chips choose the dog.
 import { dayHeading, formatKg } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -10,6 +11,7 @@ import { TIME_ZONE } from "../time";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
 import { Field } from "../ui/Field";
+import { TimeField } from "../history/TimeField";
 import { Screen } from "../ui/Screen";
 import { Curve } from "./Curve";
 import { Group, Row } from "./List";
@@ -24,6 +26,7 @@ export function Weight() {
   const [chosen, setChosen] = useState<number | null>(null);
   const dogId = chosen ?? active[0]?.id ?? null;
   const [kg, setKg] = useState("");
+  const [at, setAt] = useState<string | null>(null); // null: now
   const { data, error, reload } = useServer((a) => a.weights());
   const { message, run } = useWrite();
 
@@ -31,8 +34,9 @@ export function Weight() {
   const points = mine.map((w) => ({ at: Date.parse(w.at), kg: (w.amountG ?? 0) / 1000 }));
   const save = () =>
     void run(async (api) => {
-      await api.logWeight({ kg, ...(dogId !== null ? { dogIds: [dogId] } : {}) });
+      await api.logWeight({ kg, ...(at !== null ? { at } : {}), ...(dogId !== null ? { dogIds: [dogId] } : {}) });
       setKg("");
+      setAt(null);
       reload();
     }, "Eingetragen.");
 
@@ -68,6 +72,7 @@ export function Weight() {
       bottom={
         <>
           {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
+          <TimeField label="Gewogen am" value={at ?? new Date().toISOString()} onChange={setAt} />
           <Field label="Gewicht in kg" value={kg} onChangeText={setKg} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" onSubmitEditing={() => kg.trim() && save()} />
           <BigButton kind="walk" size="l" icon="check" label="Eintragen" disabled={!kg.trim()} onPress={save} />
         </>
