@@ -18,6 +18,10 @@ export const gradients = {
   poop: ["#7a5535", "#45301a"],
 } as const;
 
+// Something that needs fixing before it can be saved (a can size without grams): red as text and as an outline, on the
+// page and on a card, in each theme (colors.test.ts).
+export const danger = { dark: "#ff7b72", light: "#b42318" };
+
 function luminance(hex: string): number {
   const n = parseInt(hex.slice(1), 16);
   const [r, g, b] = [n >> 16, (n >> 8) & 255, (n >> 0) & 255].map((v) => {

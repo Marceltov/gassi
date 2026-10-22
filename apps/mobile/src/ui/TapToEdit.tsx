@@ -29,7 +29,7 @@ export function TapToEdit({ label, value, onChange, placeholder = "…", startEd
     );
   return (
     <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={`${label}, ${value || "leer"}`} onPress={() => setEditing(true)} hitSlop={6} style={{ width }}>
-      <Text style={[styles.text, style, { color: value ? theme.ink : theme.muted }, warn ? { textDecorationLine: "underline", textDecorationColor: theme.pee } : null]}>{value || placeholder}</Text>
+      <Text style={[styles.text, style, { color: value ? theme.ink : theme.muted }, warn ? { textDecorationLine: "underline", textDecorationColor: theme.danger } : null]}>{value || placeholder}</Text>
     </Pressable>
   );
 }

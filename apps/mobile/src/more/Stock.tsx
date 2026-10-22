@@ -156,7 +156,7 @@ export function Stock() {
         // a known size's row keeps its id while its size is edited; an added one is named by the size typed
         const id = r.key.startsWith("k") ? r.key.slice(1) : (unitG ?? "new");
         return (
-          <View key={r.key} testID={`count-${id}`} style={[styles.row, { backgroundColor: theme.surface }]}>
+          <View key={r.key} testID={`count-${id}`} style={[styles.row, { backgroundColor: theme.surface, borderColor: unitG ? "transparent" : theme.danger }]}>
             <View style={styles.rowField}>
               <Text style={[styles.labelText, { color: theme.muted }]}>Dosen à</Text>
               <TapToEdit
@@ -188,7 +188,7 @@ export function Stock() {
         );
       })}
       {unsized ? (
-        <Text testID="stock-unsized" style={[styles.small, { color: theme.muted }]}>
+        <Text testID="stock-unsized" style={[styles.warn, { color: theme.danger }]}>
           {`${unsized === 1 ? "Eine Zeile hat" : `${unsized} Zeilen haben`} keine Dosengröße: Gramm eintragen oder mit × entfernen.`}
         </Text>
       ) : null}
@@ -243,7 +243,8 @@ const styles = StyleSheet.create({
   small: { fontSize: 13 },
   fields: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   unit: { width: 120 },
-  row: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.tile, paddingVertical: 6, paddingHorizontal: 12 },
+  row: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.tile, borderWidth: 2, paddingVertical: 4, paddingHorizontal: 10 },
+  warn: { fontSize: 14, fontWeight: "700" },
   rowLabel: { flex: 1, fontSize: 14, fontWeight: "600" },
   rowField: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   labelText: { fontSize: 14, fontWeight: "600" },
