@@ -20,7 +20,7 @@ import type { Names } from "./people";
 
 export type { Person, SessionsView, TrainingView, WalkView };
 
-export type TrainingSummary = { min: number; exercises: ExerciseTotal[]; treats: { name: string; count: number }[] };
+export type TrainingSummary = { startedAt: string; min: number; exercises: ExerciseTotal[]; treats: { name: string; count: number }[] };
 export type WalkSummary = {
   id: number; // the walk's entry
   note: string | null;
@@ -142,7 +142,7 @@ export class Sessions {
       db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["exercise.name", "ok_count", "fail_count"]).where("entry_id", "=", t.id).orderBy(sql`training_exercise.rowid`).execute(),
       db.selectFrom("training_treat").innerJoin("treat_kind", "treat_kind.id", "training_treat.treat_kind_id").select(["treat_kind.name", "count"]).where("entry_id", "=", t.id).where("count", ">", 0).orderBy("treat_kind.name").execute(),
     ]);
-    return { min: minutesBetween(t.at, t.endedAt ?? walkEnd)!, exercises: exerciseTotals(exercises.map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count }))), treats };
+    return { startedAt: t.at, min: minutesBetween(t.at, t.endedAt ?? walkEnd)!, exercises: exerciseTotals(exercises.map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count }))), treats };
   }
 }
 

@@ -93,7 +93,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
             {shown.trainings.map((t, i) => (
               <View key={i} style={styles.label}>
                 <Icon name="training" size={17} color={theme.training} />
-                <Text style={[styles.line, styles.right, { color: theme.ink }]}>{trainingLine(t)}</Text>
+                <Text style={[styles.line, styles.right, { color: theme.ink }]}>{`${hhmm(t.startedAt)} · ${trainingLine(t)}`}</Text>
               </View>
             ))}
           </View>

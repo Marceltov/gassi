@@ -309,7 +309,7 @@ describe("trainings", () => {
     expect((await s.current()).training!.reps).toEqual([{ exerciseId: sitz.id, dogId: 1, ok: 1, fail: 0 }]);
   });
 
-  test("a walk's summary lists its trainings with exercises and treats", async () => {
+  test("a walk's summary lists its trainings with their start, exercises and treats", async () => {
     const c = new Catalog(db());
     const sitz = await c.addExercise("Sitz");
     const kaese = await c.addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
@@ -326,7 +326,7 @@ describe("trainings", () => {
       cmd(40, { kind: "walk.stop", walkKey: "w" }),
     ]);
     const walk = (await entries()).find((e) => e.type === "walk")!;
-    expect((await s.summary(walk.id)).trainings).toEqual([{ min: 6, exercises: [{ name: "Sitz", ok: 2, fail: 1 }], treats: [{ name: "Käse", count: 2 }] }]);
+    expect((await s.summary(walk.id)).trainings).toEqual([{ startedAt: at(10), min: 6, exercises: [{ name: "Sitz", ok: 2, fail: 1 }], treats: [{ name: "Käse", count: 2 }] }]);
   });
 
   test("a treat tap after the training ended is dropped", async () => {
