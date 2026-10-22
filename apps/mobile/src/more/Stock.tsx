@@ -2,7 +2,8 @@
 // (from the server, worked out by the domain) on top; at the bottom what was bought (Eingekauft) or what is there when
 // counted by hand (Nachgezählt), the same way in both: wet food one row per can size with − and + (bought: whole cans
 // from 0; counted: from what the stock says, in halves for an opened can), a row of another
-// size added with "+ Dosengröße" ("Dosen à [ ] g"; one without grams isn't recorded). × buying hides that size from
+// size added with "+ Dosengröße" ("Dosen à [ ] g"). A row without grams holds up Eintragen until its grams are typed or
+// it is taken away with ×: only × removes a size, so clearing a field can't. × buying hides that size from
 // the purchase rows on this phone (the stock stays); counting it sets the size to 0, which retires it on Eintragen; on
 // an added row it just drops it. Dry food is one amount in g or kg. One Eintragen records it all.
 import type { DryUnit, FoodKind } from "@gassi/domain";
@@ -84,8 +85,6 @@ export function Stock() {
     });
   // what Eintragen sends (Ruling X, in the domain): rows by their sizes; counting, a known size in no row is 0
   const { sizes, unsized } = formSizes(known, rows, mode === "count");
-  // counting, a known size whose grams were cleared is in no row any more, so Eintragen sets it to 0 (retires it): say so
-  const cleared = mode === "count" ? known.filter((u) => rows.some((r) => r.key === `k${u}` && !parseCanSize(r.size)) && !rows.some((r) => parseCanSize(r.size) === u)) : [];
 
   // a message is about what was entered, and the rows are for one mode: both go when the form changes
   const reset = () => {
@@ -104,7 +103,7 @@ export function Stock() {
     reset();
   };
 
-  const ready = kind === "dry" ? !!amount.trim() : mode === "restock" ? sizes.some((s) => parseDecimal(s.cans) > 0) : sizes.length > 0;
+  const ready = kind === "dry" ? !!amount.trim() : unsized > 0 ? false : mode === "restock" ? sizes.some((s) => parseDecimal(s.cans) > 0) : sizes.length > 0;
   const save = () =>
     void run(async (api) => {
       if (kind === "dry") {
@@ -190,12 +189,7 @@ export function Stock() {
       })}
       {unsized ? (
         <Text testID="stock-unsized" style={[styles.small, { color: theme.muted }]}>
-          {unsized === 1 ? "Eine Zeile ohne Dosengröße wird nicht eingetragen." : `${unsized} Zeilen ohne Dosengröße werden nicht eingetragen.`}
-        </Text>
-      ) : null}
-      {cleared.length ? (
-        <Text testID="stock-cleared" style={[styles.small, { color: theme.muted }]}>
-          {`Ohne Dosengröße gilt ${cleared.map((u) => `à ${u} g`).join(", ")} beim Eintragen als leer.`}
+          {`${unsized === 1 ? "Eine Zeile hat" : `${unsized} Zeilen haben`} keine Dosengröße: Gramm eintragen oder mit × entfernen.`}
         </Text>
       ) : null}
       <BigButton kind="neutral" size="m" label="+ Dosengröße" a11y="Dosengröße hinzufügen" onPress={() => setExtras(extras + 1)} />

@@ -65,10 +65,13 @@ test("Vorrat: cans bought are entered per size in rows, a new size in a row of i
   await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
   await page.getByTestId("count-new").getByLabel("Dosengröße in Gramm").fill("1234");
   await page.getByRole("button", { name: "1 Dose à 1234 g mehr" }).click();
-  // a new row left without grams isn't recorded
+  // a row without grams holds up Eintragen until it is taken away with ×
   await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
   await page.getByRole("button", { name: "1 Dose neuer Größe mehr" }).click();
-  await expect(page.getByTestId("stock-unsized")).toHaveText("Eine Zeile ohne Dosengröße wird nicht eingetragen.");
+  await expect(page.getByTestId("stock-unsized")).toHaveText("Eine Zeile hat keine Dosengröße: Gramm eintragen oder mit × entfernen.");
+  await expect(page.getByRole("button", { name: "Eintragen" })).toBeDisabled();
+  await page.getByTestId("count-new").getByRole("button", { name: "Dosengröße entfernen" }).click();
+  await expect(page.getByTestId("stock-unsized")).toHaveCount(0);
   await expect(page.getByTestId("count-1234-value")).toHaveText("1 Dose");
   const bought = page.waitForResponse((r) => r.url().endsWith("/api/stock/restock") && r.request().method() === "POST");
   await page.getByRole("button", { name: "Eintragen" }).click();
@@ -363,7 +366,7 @@ test("a sheet that opens with its field focused closes with Escape from that fie
   await expect(add).toBeFocused();
 });
 
-test("Vorrat: quick + taps each count; a count reads out with its value; a cleared size says it counts as empty", async ({ page }) => {
+test("Vorrat: quick + taps each count; a count reads out with its value; clearing a size's grams holds up Eintragen", async ({ page }) => {
   await signIn(page);
   made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 777, cans: 1 }] })).entries.map((e) => e.id));
   await page.goto("/mehr/vorrat");
@@ -379,5 +382,6 @@ test("Vorrat: quick + taps each count; a count reads out with its value; a clear
 
   await typeIn(row.getByLabel("Dosengröße in Gramm"), "");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("stock-cleared")).toHaveText("Ohne Dosengröße gilt à 777 g beim Eintragen als leer.");
+  await expect(page.getByTestId("stock-unsized")).toHaveText("Eine Zeile hat keine Dosengröße: Gramm eintragen oder mit × entfernen.");
+  await expect(page.getByRole("button", { name: "Eintragen" })).toBeDisabled();
 });
