@@ -15,9 +15,14 @@ here in the same PR that follows it.
 
 ## No compatibility
 
-- Only two people use Gassi, and it stays 0.x while there is no real data (tags `v0.N.0`). A renamed or removed route,
-  endpoint or field is just deleted: no redirects, aliases or compatibility layers, even when an issue asks for one.
-- Schema changes may be folded into one migration while nothing real is stored; the PR says so.
+- Only two people use Gassi, and it stays 0.x (tags `v0.N.0`). A renamed or removed route, endpoint or field is just
+  deleted: no redirects, aliases or compatibility layers, even when an issue asks for one.
+
+## Data
+
+- Since 2026-10-22 the deployed Gassi holds real data. Deleting or resetting it isn't forbidden, but we are reluctant:
+  a schema change comes with a migration that keeps the data, and a change that would lose data says so in its PR and
+  is agreed before it merges (merging main deploys).
 
 ## Where code goes
 
