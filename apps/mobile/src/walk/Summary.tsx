@@ -1,5 +1,6 @@
 // A walk looked back on: after Zuhause, and from Verlauf. The map when there is a track, Dauer, Strecke, Pause, who
-// went (tap a person to change it), each Pipi/Poopoo with its time, the trainings, a note, and a way to its detail
+// went (tap a person to change it), how many Pipi, Poopoo and trainings, then each of them by time (a tap opens it),
+// a note, and a way to its detail
 // (time, end, dogs, delete); Fertig leads back. Right after Zuhause without reception it shows what this phone knows
 // and says so; changes need the server (the writes' client: OFFLINE without reception, NO_ANSWER without an answer
 // in time).
@@ -17,8 +18,8 @@ import { Chip } from "../ui/Chip";
 import { Icon } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
 import { LAST_WALKER } from "./lastOne";
-import { trainingLine } from "./lines";
-import type { Shown, Tap } from "./taps";
+import { countLine, trainingLine, type WalkItem, walkItems } from "./lines";
+import type { Shown } from "./taps";
 import { useWalkSummary } from "./useWalkSummary";
 
 export function Summary({ idOrKey }: { idOrKey: string }) {
@@ -59,7 +60,9 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
 
   const several = new Set(shown.taps.map((t) => t.dogId)).size > 1 || dogs.filter((d) => !d.archived).length > 1;
   const dogName = (id: number) => dogs.find((d) => d.id === id)?.name ?? "Hund";
-  const markText = (t: Tap) => `${hhmm(t.at)}${several ? ` · ${dogName(t.dogId)}` : ""}`;
+  const LABEL = { pee: "Pipi", poop: "Poopoo" } as const;
+  // what a row says after its time: "Pipi", "Pipi · Toffee", "Training · 4 Min. · Sitz 4/5"
+  const itemText = (i: WalkItem) => (i.kind === "tap" ? `${LABEL[i.tap.type]}${several ? ` · ${dogName(i.tap.dogId)}` : ""}` : trainingLine(i.training));
   const everyone = [...people, ...shown.walkers.filter((w) => !people.some((p) => p.id === w.id))];
   const walkerIds = shown.walkers.map((w) => w.id);
   const toggle = (id: string) => {
@@ -88,14 +91,10 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
             ))}
           </View>
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
-            {marks("pee", "Pipi", shown.taps.filter((t) => t.type === "pee"), "summary-pees")}
-            {marks("poop", "Poopoo", shown.taps.filter((t) => t.type === "poop"), "summary-poops")}
-            {shown.trainings.map((t, i) => (
-              <View key={i} style={styles.label}>
-                <Icon name="training" size={17} color={theme.training} />
-                <Text style={[styles.line, styles.right, { color: theme.ink }]}>{`${hhmm(t.startedAt)} · ${trainingLine(t)}`}</Text>
-              </View>
-            ))}
+            <Text testID="summary-counts" style={[styles.line, { color: theme.ink }]}>
+              {countLine(shown.taps, shown.trainings)}
+            </Text>
+            {walkItems(shown.taps, shown.trainings).map(row)}
           </View>
           <TextInput
             value={noteText}
@@ -122,37 +121,38 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
       </View>
     );
   }
-  // how many, then each with its time (and dog): one the server has opens its detail (time, dog, delete)
-  function marks(kind: "pee" | "poop", label: string, taps: Tap[], testID: string) {
-    return (
-      <View testID={testID} style={styles.marks}>
-        <View style={styles.row}>
-          <View style={styles.label}>
-            <Icon name={kind} size={17} color={theme[kind]} />
-            <Text style={[styles.line, { color: theme.ink }]}>{label}</Text>
-          </View>
-          <Text style={[styles.line, styles.right, { color: theme.ink }]}>{taps.length ? `${taps.length}×` : "keins"}</Text>
+  // one pee, poop or training by its time: one the server has opens its detail (time, dog, delete; a training's
+  // exercises), one only this phone has waits for reception
+  function row(i: WalkItem) {
+    const id = i.kind === "tap" ? i.tap.id : i.training.id;
+    const icon = i.kind === "tap" ? i.tap.type : "training";
+    const text = itemText(i);
+    const content = (
+      <>
+        <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(i.at)}</Text>
+        <Icon name={icon} size={17} color={theme[icon]} />
+        <Text style={[styles.line, styles.text, { color: id !== undefined && !local ? theme.ink : theme.muted }]}>{id !== undefined && !local ? text : `${text} · wartet auf Empfang`}</Text>
+      </>
+    );
+    const key = `${i.kind}${i.at}${i.kind === "tap" ? i.tap.dogId : ""}`;
+    if (id === undefined || local)
+      return (
+        <View key={key} style={styles.mark}>
+          {content}
         </View>
-        {taps.map((t) =>
-          t.id !== undefined && !local ? (
-            <Pressable
-              key={`${t.id}`}
-              testID={`summary-mark-${t.id}`}
-              accessibilityRole="button"
-              accessibilityLabel={`${label} ${markText(t)} ändern`}
-              onPress={() => router.push(`/eintrag/${t.id}`)}
-              style={({ pressed }) => [styles.mark, { backgroundColor: theme.neutral, opacity: pressed ? 0.7 : 1 }]}
-            >
-              <Text style={[styles.line, { color: theme.ink }]}>{markText(t)}</Text>
-              <Icon name="next" size={18} color={theme.muted} />
-            </Pressable>
-          ) : (
-            <View key={`${t.at}/${t.dogId}`} style={styles.mark}>
-              <Text style={[styles.line, { color: theme.muted }]}>{`${markText(t)} · wartet auf Empfang`}</Text>
-            </View>
-          ),
-        )}
-      </View>
+      );
+    return (
+      <Pressable
+        key={key}
+        testID={i.kind === "tap" ? `summary-mark-${id}` : `summary-training-${id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`${hhmm(i.at)} ${text} ändern`}
+        onPress={() => router.push(`/eintrag/${id}`)}
+        style={({ pressed }) => [styles.mark, { backgroundColor: theme.neutral, opacity: pressed ? 0.7 : 1 }]}
+      >
+        {content}
+        <Icon name="next" size={18} color={theme.muted} />
+      </Pressable>
     );
   }
 }
@@ -165,11 +165,9 @@ const styles = StyleSheet.create({
   value: { fontSize: 17, fontWeight: "700" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   card: { borderRadius: 12, padding: 12, gap: 6 },
-  row: { flexDirection: "row", justifyContent: "space-between", gap: 12 },
-  marks: { gap: 4 },
-  label: { flexDirection: "row", alignItems: "center", gap: 8 },
-  mark: { flexDirection: "row", justifyContent: "space-between", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, minHeight: 40, alignItems: "center" },
+  mark: { flexDirection: "row", gap: 8, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, minHeight: 40, alignItems: "center" },
+  time: { fontVariant: ["tabular-nums"] },
+  text: { flex: 1 },
   line: { fontSize: 15 },
-  right: { flexShrink: 1, textAlign: "right" },
   note: { borderRadius: 12, padding: 12, minHeight: 60, fontSize: 15 },
 });
