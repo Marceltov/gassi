@@ -146,73 +146,75 @@ export function Stock() {
 
   const wet = (
     <>
-      <View style={styles.gap}>
-        {rows.map((r) => {
-          const unitG = parseCanSize(r.size);
-          const n = parseDecimal(r.cans) || 0;
-          const name = unitG ? `à ${unitG} g` : "neuer Größe";
-          const change = (d: number) => stepCans(r.key, d);
-          const step = mode === "count" ? 0.5 : 1; // counted: halves (an opened can); bought: whole cans
-          const what = mode === "count" ? "½ Dose" : "1 Dose";
-          // a known size's row keeps its id while its size is edited; an added one is named by the size typed
-          const id = r.key.startsWith("k") ? r.key.slice(1) : (unitG ?? "new");
-          return (
-            <View key={r.key} testID={`count-${id}`} style={[styles.row, { backgroundColor: theme.surface, borderColor: unitG ? "transparent" : theme.danger }]}>
-              <View style={styles.rowField}>
-                <Text style={[styles.labelText, { color: theme.muted }]}>Dosen à</Text>
-                <TapToEdit
-                  label="Dosengröße in Gramm"
-                  value={r.size}
-                  onChange={(size) => edit(r.key, { size })}
-                  startEditing={r.key.startsWith("x")}
-                  warn={!unitG}
-                  inputMode="numeric"
-                  keyboardType="number-pad"
-                  width={56}
-                  style={styles.gramValue}
-                />
-                <Text style={[styles.labelText, { color: theme.muted }]}>g</Text>
-              </View>
-              <StepButton small label={`${what} ${name} weniger`} sign="−" disabled={n <= 0} onPress={() => change(-step)} />
-              {mode === "count" ? (
-                <TapToEdit testID={`count-${id}-value`} label={`Anzahl Dosen ${name}`} value={r.cans} onChange={(cans) => edit(r.key, { cans })} inputMode="decimal" keyboardType="decimal-pad" style={styles.rowValue} width={72} />
-              ) : (
-                <Text testID={`count-${id}-value`} style={[styles.rowValue, { color: theme.ink }]}>
-                  {formatCans(n)}
-                </Text>
-              )}
-              <StepButton small label={`${what} ${name} mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => change(step)} />
-              <Pressable accessibilityRole="button" accessibilityLabel="Dosengröße entfernen" hitSlop={8} onPress={() => removeRow(r.key)} style={({ pressed }) => [styles.remove, { opacity: pressed ? 0.6 : 1 }]}>
-                <Text style={[styles.removeText, { color: theme.muted }]}>×</Text>
-              </Pressable>
+      {rows.map((r) => {
+        const unitG = parseCanSize(r.size);
+        const n = parseDecimal(r.cans) || 0;
+        const name = unitG ? `à ${unitG} g` : "neuer Größe";
+        const change = (d: number) => stepCans(r.key, d);
+        const step = mode === "count" ? 0.5 : 1; // counted: halves (an opened can); bought: whole cans
+        const what = mode === "count" ? "½ Dose" : "1 Dose";
+        // a known size's row keeps its id while its size is edited; an added one is named by the size typed
+        const id = r.key.startsWith("k") ? r.key.slice(1) : (unitG ?? "new");
+        return (
+          <View key={r.key} testID={`count-${id}`} style={[styles.row, { backgroundColor: theme.surface, borderColor: unitG ? "transparent" : theme.danger }]}>
+            <View style={styles.rowField}>
+              <Text style={[styles.labelText, { color: theme.muted }]}>Dosen à</Text>
+              <TapToEdit
+                label="Dosengröße in Gramm"
+                value={r.size}
+                onChange={(size) => edit(r.key, { size })}
+                startEditing={r.key.startsWith("x")}
+                warn={!unitG}
+                inputMode="numeric"
+                keyboardType="number-pad"
+                width={56}
+                style={styles.gramValue}
+              />
+              <Text style={[styles.labelText, { color: theme.muted }]}>g</Text>
             </View>
-          );
-        })}
-      </View>
+            <StepButton small label={`${what} ${name} weniger`} sign="−" disabled={n <= 0} onPress={() => change(-step)} />
+            {mode === "count" ? (
+              <TapToEdit testID={`count-${id}-value`} label={`Anzahl Dosen ${name}`} value={r.cans} onChange={(cans) => edit(r.key, { cans })} inputMode="decimal" keyboardType="decimal-pad" style={styles.rowValue} width={72} />
+            ) : (
+              <Text testID={`count-${id}-value`} style={[styles.rowValue, { color: theme.ink }]}>
+                {formatCans(n)}
+              </Text>
+            )}
+            <StepButton small label={`${what} ${name} mehr`} sign="+" disabled={n >= MAX_CANS} onPress={() => change(step)} />
+            <Pressable accessibilityRole="button" accessibilityLabel="Dosengröße entfernen" hitSlop={8} onPress={() => removeRow(r.key)} style={({ pressed }) => [styles.remove, { opacity: pressed ? 0.6 : 1 }]}>
+              <Text style={[styles.removeText, { color: theme.muted }]}>×</Text>
+            </Pressable>
+          </View>
+        );
+      })}
       {unsized ? (
         <Text testID="stock-unsized" style={[styles.warn, { color: theme.danger }]}>
           {`${unsized === 1 ? "Eine Zeile hat" : `${unsized} Zeilen haben`} keine Dosengröße: Gramm eintragen oder mit × entfernen.`}
         </Text>
       ) : null}
-      <BigButton kind="neutral" size="s" label="+ Dosengröße" a11y="Dosengröße hinzufügen" onPress={() => setExtras(extras + 1)} />
+      <BigButton kind="neutral" size="m" label="+ Dosengröße" a11y="Dosengröße hinzufügen" onPress={() => setExtras(extras + 1)} />
     </>
   );
 
-  // the title and Eintragen stay put; the cards, the choices and the size rows in between scroll when they don't fit
   return (
     <Screen
-      head={
+      top={
         <>
           <Text style={[styles.title, { color: theme.ink }]}>Vorrat</Text>
           {error && !stock ? <Text style={[styles.small, { color: theme.muted }]}>{error}</Text> : null}
-        </>
-      }
-      top={
-        <>
           <View style={styles.cards}>
             {card("wet", "Nassfutter")}
             {card("dry", "Trockenfutter")}
           </View>
+        </>
+      }
+      bottom={
+        <>
+          {message ? (
+            <Text testID="stock-message" style={[styles.message, { color: theme.ink }]}>
+              {message}
+            </Text>
+          ) : null}
           <Segments options={FOOD_KIND_OPTIONS} value={kind} onChange={pickKind} kind="food" />
           <Segments options={MODES} value={mode} onChange={pickMode} />
           {kind === "wet" ? (
@@ -225,18 +227,10 @@ export function Stock() {
               </View>
             </View>
           )}
+          <BigButton kind="food" size="l" icon="check" label="Eintragen" disabled={!ready} onPress={save} />
         </>
       }
-      bottom={
-        <>
-          {message ? (
-            <Text testID="stock-message" style={[styles.message, { color: theme.ink }]}>
-              {message}
-            </Text>
-          ) : null}
-          <BigButton kind="food" size="m" icon="check" label="Eintragen" disabled={!ready} onPress={save} />
-        </>
-      }
+      topMin={150}
     />
   );
 }
@@ -249,7 +243,6 @@ const styles = StyleSheet.create({
   small: { fontSize: 13 },
   fields: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   unit: { width: 120 },
-  gap: { gap: 8 },
   row: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.tile, borderWidth: 2, paddingVertical: 4, paddingHorizontal: 10 },
   warn: { fontSize: 14, fontWeight: "700" },
   rowLabel: { flex: 1, fontSize: 14, fontWeight: "600" },
