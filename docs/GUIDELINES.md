@@ -35,6 +35,13 @@ here in the same PR that follows it.
   next to the shared one (ADR 0006).
 - Taps are idempotent commands with client ids (ADR 0001); "during a walk" is decided by time (ADR 0002).
 
+## Screens
+
+- **Big buttons only on the go** (#68): Start, the walk and the training keep their sizes; everywhere else a page's
+  main action is `m` (52) and side actions are `s` (44). The Futter sheet is not on the go.
+- **Pages fit the screen** (#71): fixed content never scrolls (`Screen`'s `fill`); a page with a growing list keeps its
+  title (`head`) and buttons put and only the list scrolls. `e2e/fit.ts` checks each page at 360×640 and 430×932.
+
 ## Tests
 
 - Tests sit next to the code. Outside calls (`fetch`, `now`, the database) are injected, not mocked.

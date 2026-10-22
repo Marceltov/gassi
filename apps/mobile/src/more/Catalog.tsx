@@ -57,10 +57,14 @@ export function Catalog({ what }: { what: Editing["what"] }) {
   const newTreat: Editing = { what: "treat", item: null, name: "", grams: "", fromDry: false };
   return (
     <Screen
-      top={
+      head={
         <>
           <Text style={[styles.title, { color: theme.ink }]}>{what === "exercise" ? "Übungen" : "Leckerli"}</Text>
           {error && !data ? <Text style={[styles.small, { color: theme.muted }]}>{error}</Text> : null}
+        </>
+      }
+      top={
+        <>
           {data && what === "exercise" ? (
             <Group>
               {exercises.length ? null : <Row label="Noch keine" muted />}
@@ -96,9 +100,9 @@ export function Catalog({ what }: { what: Editing["what"] }) {
                   </>
                 ) : null}
                 {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-                <BigButton kind="training" size="l" icon={editing.item ? "check" : "add"} label={editing.item ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />
-                {editing.item ? <BigButton kind="neutral" size="m" label="Entfernen" onPress={() => remove(editing)} /> : null}
-                <BigButton kind="neutral" size="m" label="Abbrechen" onPress={() => setEditing(null)} />
+                <BigButton kind="training" size="m" icon={editing.item ? "check" : "add"} label={editing.item ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />
+                {editing.item ? <BigButton kind="neutral" size="s" label="Entfernen" onPress={() => remove(editing)} /> : null}
+                <BigButton kind="neutral" size="s" label="Abbrechen" onPress={() => setEditing(null)} />
               </View>
             ) : null}
           </Sheet>
@@ -106,9 +110,9 @@ export function Catalog({ what }: { what: Editing["what"] }) {
       }
       bottom={
         what === "exercise" ? (
-          <BigButton kind="training" size="l" icon="add" label="Übung dazu" onPress={() => open({ what: "exercise", item: null, name: "" })} />
+          <BigButton kind="training" size="m" icon="add" label="Übung dazu" onPress={() => open({ what: "exercise", item: null, name: "" })} />
         ) : (
-          <BigButton kind="training" size="l" icon="add" label="Leckerli dazu" onPress={() => open(newTreat)} />
+          <BigButton kind="training" size="m" icon="add" label="Leckerli dazu" onPress={() => open(newTreat)} />
         )
       }
     />

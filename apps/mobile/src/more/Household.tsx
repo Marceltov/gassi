@@ -16,9 +16,9 @@ export function Household() {
 
   return (
     <Screen
+      head={<Text style={[styles.title, { color: theme.ink }]}>Haushalt</Text>}
       top={
         <>
-          <Text style={[styles.title, { color: theme.ink }]}>Haushalt</Text>
           <View testID="members">
             <Group title="Dabei">
               {people.map((p) => (
@@ -34,7 +34,7 @@ export function Household() {
       bottom={
         <>
           {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-          {!oidc ? <BigButton kind="walk" size="l" icon="invite" label="Person einladen" onPress={create} /> : null}
+          {!oidc ? <BigButton kind="walk" size="m" icon="invite" label="Person einladen" onPress={create} /> : null}
         </>
       }
     />

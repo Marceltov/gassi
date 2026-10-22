@@ -103,13 +103,13 @@ export function Weight() {
           ) : null}
           <View style={styles.nav}>
             <View style={styles.arrow}>
-              <BigButton kind="neutral" size="m" label="‹" a11y="Monat davor" onPress={() => setMonth(addMonths(month, -1))} />
+              <BigButton kind="neutral" size="s" label="‹" a11y="Monat davor" onPress={() => setMonth(addMonths(month, -1))} />
             </View>
             <Text testID="weight-month" style={[styles.heading, { color: theme.ink }]}>
               {monthLabel(month)}
             </Text>
             <View style={styles.arrow}>
-              <BigButton kind="neutral" size="m" label="›" a11y="Monat danach" disabled={month >= thisMonth} onPress={() => setMonth(addMonths(month, 1))} />
+              <BigButton kind="neutral" size="s" label="›" a11y="Monat danach" disabled={month >= thisMonth} onPress={() => setMonth(addMonths(month, 1))} />
             </View>
           </View>
           <View style={[styles.curve, { backgroundColor: theme.surface }]}>
@@ -125,9 +125,9 @@ export function Weight() {
                 </Text>
                 <Field label="Gewicht in kg" value={day.kg} onChangeText={(v) => setDay({ ...day, kg: v })} placeholder="z. B. 12,4" inputMode="decimal" keyboardType="decimal-pad" autoFocus={!day.weight} onSubmitEditing={() => day.kg.trim() && saveDay(day)} />
                 {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-                <BigButton kind="walk" size="l" icon="check" label={day.weight ? "Speichern" : "Eintragen"} disabled={!day.kg.trim()} onPress={() => saveDay(day)} />
-                {day.weight ? <BigButton kind="neutral" size="m" label="Löschen" onPress={() => deleteDay(day)} /> : null}
-                <BigButton kind="neutral" size="m" label="Abbrechen" onPress={() => setDay(null)} />
+                <BigButton kind="walk" size="m" icon="check" label={day.weight ? "Speichern" : "Eintragen"} disabled={!day.kg.trim()} onPress={() => saveDay(day)} />
+                {day.weight ? <BigButton kind="neutral" size="s" label="Löschen" onPress={() => deleteDay(day)} /> : null}
+                <BigButton kind="neutral" size="s" label="Abbrechen" onPress={() => setDay(null)} />
               </View>
             ) : null}
           </Sheet>

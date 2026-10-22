@@ -32,8 +32,8 @@ export function SignOutSheet({ open, onClose }: { open: boolean; onClose: () => 
       <View testID="signout-sheet" style={styles.sheet}>
         <Text style={[styles.title, { color: theme.ink }]}>{TITLE}</Text>
         <Text style={[styles.small, { color: theme.muted }]}>Danach brauchst du einen neuen Link oder Code, um dich hier wieder anzumelden.</Text>
-        <BigButton kind="neutral" size="l" label="Ja, abmelden" onPress={() => void signOut()} />
-        <BigButton kind="neutral" size="m" label="Abbrechen" onPress={onClose} />
+        <BigButton kind="neutral" size="m" label="Ja, abmelden" onPress={() => void signOut()} />
+        <BigButton kind="neutral" size="s" label="Abbrechen" onPress={onClose} />
       </View>
     </Sheet>
   );
