@@ -171,5 +171,5 @@ const styles = StyleSheet.create({
   time: { fontVariant: ["tabular-nums"] },
   text: { flex: 1 },
   line: { fontSize: 15 },
-  note: { borderRadius: 12, padding: 12, minHeight: 60, fontSize: 15 },
+  note: { borderRadius: 12, padding: 12, minHeight: 60, fontSize: 16 },
 });

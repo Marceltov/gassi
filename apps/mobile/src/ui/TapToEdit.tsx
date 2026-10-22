@@ -35,6 +35,6 @@ export function TapToEdit({ label, value, onChange, placeholder = "…", startEd
 }
 
 const styles = StyleSheet.create({
-  text: { fontSize: 15, fontWeight: "700", paddingVertical: 6, paddingHorizontal: 4 },
+  text: { fontSize: 16, fontWeight: "700", paddingVertical: 6, paddingHorizontal: 4 },
   field: { borderRadius: 8, borderWidth: 1, paddingVertical: 5, paddingHorizontal: 3 },
 });

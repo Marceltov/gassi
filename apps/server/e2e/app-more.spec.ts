@@ -96,6 +96,15 @@ test("Gewicht: a day last month is added, changed and deleted from the calendar;
   await expect(month).toHaveText(thisMonth!);
 });
 
+test("Vorrat: the fields typed into are 16 px, so an iPhone doesn't zoom into them", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/mehr/vorrat");
+  await page.getByRole("tab", { name: "Nass" }).click();
+  await page.getByRole("tab", { name: "Eingekauft" }).click();
+  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
+  await expect(page.getByTestId("count-new").getByLabel("Dosengröße in Gramm")).toHaveCSS("font-size", "16px");
+});
+
 test("Vorrat: cans bought are entered per size in rows, a new size in a row of its own; one Eintragen records each", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });

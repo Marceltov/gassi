@@ -1,5 +1,6 @@
 // Pages fit the screen (#71): at a small and a big phone nothing scrolls but the part a page names (its list), nothing
-// is cut off at the bottom of a page that fills the height, and every button outside that list is on screen.
+// is cut off at the bottom of a page that fills the height, and every button outside that list is on screen. Text
+// fields are at least 16 px: an iPhone zooms into a smaller one when it gets the focus.
 import { expect, type Page } from "@playwright/test";
 
 export const PHONES = [
@@ -29,8 +30,11 @@ export async function expectFits(page: Page, path: string, ready: string | RegEx
           return r.top < 0 || r.bottom > innerHeight + 1;
         })
         .map((e) => e.getAttribute("aria-label") ?? e.textContent);
-      return { scrolling, cut, off };
+      const small = all
+        .filter((e) => ["INPUT", "TEXTAREA"].includes(e.tagName) && e.offsetParent !== null && parseFloat(getComputedStyle(e).fontSize) < 16)
+        .map((e) => e.getAttribute("aria-label") ?? e.tagName);
+      return { scrolling, cut, off, small };
     }, scrolls ?? null);
-    expect(found, `${path} at ${width}×${height}`).toEqual({ scrolling: [], cut: 0, off: [] });
+    expect(found, `${path} at ${width}×${height}`).toEqual({ scrolling: [], cut: 0, off: [], small: [] });
   }
 }

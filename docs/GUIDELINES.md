@@ -41,6 +41,8 @@ here in the same PR that follows it.
   main action is `m` (52) and side actions are `s` (44). The Futter sheet is not on the go.
 - **Pages fit the screen** (#71): fixed content never scrolls (`Screen`'s `fill`); a page with a growing list keeps its
   title (`head`) and buttons put and only the list scrolls. `e2e/fit.ts` checks each page at 360×640 and 430×932.
+- **Text fields are at least 16 px**: an iPhone zooms into a smaller one when it gets the focus. `e2e/fit.ts` checks it
+  on every page it opens.
 
 ## Tests
 
