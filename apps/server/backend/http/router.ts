@@ -15,6 +15,9 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 /** A 404 from inside a handler ("Diesen Eintrag gibt es nicht."). */
 export class NotFound extends Error {}
 
+/** A 429 from inside a handler: too many tries, with a German message. */
+export class TooMany extends Error {}
+
 export function router<D>(impls: Implementations<D>, deps: D, authenticate: (authorization: string | null) => Promise<Auth | null>) {
   const routes = (Object.keys(contract) as EndpointName[]).map((name) => ({ name, e: contract[name] }));
   return async (req: Request): Promise<Response> => {
@@ -43,6 +46,7 @@ export function router<D>(impls: Implementations<D>, deps: D, authenticate: (aut
     } catch (err) {
       if (err instanceof InputError) return json({ error: err.message }, 400);
       if (err instanceof NotFound) return json({ error: err.message || "Gibt es nicht." }, 404);
+      if (err instanceof TooMany) return json({ error: err.message }, 429);
       throw err;
     }
   };
