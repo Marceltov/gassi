@@ -244,7 +244,7 @@ test("a training reads Sitz 2/3 in the list; its repetitions are changed in its 
   await row.click();
   await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${training.id}`);
   await page.getByRole("button", { name: "Sitz klappt: eins mehr" }).click();
-  await expect(page.getByTestId("edit-training-summary")).toHaveText("Sitz 3/4");
+  await expect(page.getByTestId("fact-sub")).toHaveText("Sitz 3/4");
   await page.getByRole("button", { name: "Speichern" }).click();
 
   await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
@@ -340,10 +340,34 @@ test("an opened can shows in Verlauf and, deleted, goes back into Vorrat", async
   await expect(page.getByTestId(`entry-${opened.id}-title`)).toHaveText("Dose aufgemacht");
   await expect(page.getByTestId(`entry-${opened.id}-extra`)).toHaveText("400-g-Dose");
   await page.getByTestId(`entry-${opened.id}`).click();
-  await expect(page.getByTestId("count-line")).toHaveText("400-g-Dose"); // which can, before deleting it
+  await expect(page.getByTestId("fact-big")).toHaveText("400 g"); // which can, large, before deleting it
   await page.getByRole("button", { name: "Löschen", exact: true }).click();
   await page.getByRole("button", { name: "Ja, löschen" }).click();
   await expect(page.getByTestId(`entry-${opened.id}`)).toHaveCount(0);
   expect((await client.stock()).wet.sizes.find((s) => s.unitG === 400)?.cans).toBe(3);
   await expectFits(page, "/mehr/vorrat", "Nassfutter");
+});
+
+test("an entry's detail shows what it is about large on top: a purchase's cans, a count's rows, a pee's time and dog", async ({ page }) => {
+  const client = asHirsch();
+  const dog = await firstDog();
+  const bought = (await client.restock({ foodKind: "wet", sizes: [{ unitG: 400, cans: 12 }] })).entries;
+  const counted = (await client.correctStock({ foodKind: "wet", sizes: [{ unitG: 400, cans: "12" }, { unitG: 800, cans: "2" }] })).entries;
+  const pee = await client.logEntry({ type: "pee", dogIds: [dog.id], at: minutesAgo(30) });
+  made.push(...bought.map((e) => e.id), ...counted.map((e) => e.id), pee.id);
+
+  await signIn(page);
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${bought[0].id}`);
+  await expect(page.getByTestId("fact-big")).toHaveText("12 Dosen");
+  await expect(page.getByTestId("fact-sub")).toHaveText("à 400 g · 4,8 kg");
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${counted[0].id}`);
+  await expect(page.getByTestId("fact-row")).toHaveText(["Dosen à 400 g12", "Dosen à 800 g2"]);
+  await expect(page.getByTestId("fact-sum")).toHaveText("zusammen 6,4 kg");
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${pee.id}`);
+  await expect(page.getByTestId("fact-big")).toHaveText(/^\d\d:\d\d$/);
+  await expect(page.getByTestId("fact-sub")).toContainText(dog.name);
+  // the large fact sits above the fields, and the page still fits
+  const [big, field] = await Promise.all([page.getByTestId("fact-big").boundingBox(), page.getByText("Zeit", { exact: true }).boundingBox()]);
+  expect(big!.y).toBeLessThan(field!.y);
+  await expectFits(page, `/verlauf/eintrag/${counted[0].id}`, "Speichern");
 });

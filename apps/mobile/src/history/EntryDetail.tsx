@@ -1,10 +1,10 @@
 // One entry from Verlauf, to be put right afterwards: its time (and end), the dogs, for a walk who went, for food the
 // amount and kind, for weight the weight, for a training its repetitions per exercise and dog and its treats, a note;
-// Speichern sends it all, Löschen asks first. What it is and who entered it stay on top, the buttons at the bottom
-// (#71). A wet count (one row per can size) is one thing here: its sizes in one line,
+// Speichern sends it all, Löschen asks first. What it is, who entered it and what it is about (large, fact.ts: #81)
+// stay on top, the buttons at the bottom (#71). A wet count (one row per can size) is one thing here: its sizes as rows,
 // its time moved and its rows deleted together. Both need the server (the writes' client): they say so without
 // reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
-import { clampPortion, countLine, countTitle, describeEntry, dogRule, FOOD_MAX_G, formatKg, keepsOne, trainingSummaryLine, TYPE_LABEL } from "@gassi/domain";
+import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -21,6 +21,7 @@ import { Segments } from "../ui/Segments";
 import { Sheet } from "../ui/Sheet";
 import { AmountStepper, StepButton } from "../ui/Stepper";
 import { LAST_WALKER } from "../walk/lastOne";
+import { type Fact, factOf } from "./fact";
 import { bumpRep, bumpTreat, editInput, type Entry, type Form, formOf, pickDog, trainingInput } from "./form";
 import { TIME_ZONE } from "../time";
 import { TimeField } from "./TimeField";
@@ -108,13 +109,8 @@ export function EntryDetail({ id }: { id: number }) {
             <Icon name={TYPE_ICON[entry.type]} size={24} color={theme.muted} />
             <Text style={[styles.title, { color: theme.ink }]}>{entry.count ? countTitle(entry.at, TIME_ZONE) : TYPE_LABEL[entry.type]}</Text>
           </View>
-          {entry.count || entry.type === "opened" ? (
-            // what was counted, or which can was opened ("400-g-Dose"), to check before deleting it
-            <Text testID="count-line" style={[styles.countLine, { color: theme.ink }]}>
-              {entry.count ? countLine(entry.count) : describeEntry(entry).extra}
-            </Text>
-          ) : null}
           <Text style={[styles.small, { color: theme.muted }]}>{`eingetragen von ${entry.byName}`}</Text>
+          <FactView fact={factOf(entry, form, { dogName: (did) => dogs.find((d) => d.id === did)?.name ?? "Hund", exerciseName: (eid) => exercises.find((x) => x.id === eid)?.name ?? "Übung", timeZone: TIME_ZONE })} />
         </>
       }
       top={
@@ -194,16 +190,10 @@ function TrainingFields({ form, change, names }: { form: Form; change: (c: Parti
   const add = (eid: number) => change({ reps: [...form.reps, ...form.dogIds.map((dogId) => ({ exerciseId: eid, dogId, ok: 0, fail: 0 }))] });
   const kinds = [...names.treatKinds.map((k) => ({ id: k.id, name: k.name })), ...form.treats.filter((t) => !names.treatKinds.some((k) => k.id === t.treatKindId)).map((t) => ({ id: t.treatKindId, name: "Leckerli" }))];
   const treatCount = (kid: number) => form.treats.find((t) => t.treatKindId === kid)?.count ?? 0;
-  const summary = trainingSummaryLine(
-    reps.map((r) => ({ name: exerciseName(r.exerciseId), ok: r.ok, fail: r.fail })),
-    form.treats.reduce((n, t) => n + t.count, 0),
-  );
 
+  // what was trained is on top (the fact); here the rows to correct it
   return (
     <View style={[styles.card, { backgroundColor: theme.surface }]}>
-      <Text testID="edit-training-summary" style={[styles.summary, { color: theme.ink }]}>
-        {summary}
-      </Text>
       {exerciseIds.flatMap((eid) =>
         form.dogIds.map((did) => {
           const label = several ? `${exerciseName(eid)} ${dogName(did)}` : exerciseName(eid);
@@ -235,6 +225,36 @@ function TrainingFields({ form, change, names }: { form: Form; change: (c: Parti
   );
 }
 
+/** What the entry is about, large: one value with a line under it, or a row per can size with what they come to. */
+function FactView({ fact }: { fact: Fact | null }) {
+  const theme = useTheme();
+  if (!fact) return null;
+  if ("big" in fact)
+    return (
+      <View style={styles.fact}>
+        <Text testID="fact-big" style={[styles.big, { color: theme.ink }]}>
+          {fact.big}
+        </Text>
+        <Text testID="fact-sub" style={[styles.factSub, { color: theme.muted }]}>
+          {fact.sub}
+        </Text>
+      </View>
+    );
+  return (
+    <View style={styles.rows}>
+      {fact.rows.map((r) => (
+        <View key={r.label} testID="fact-row" style={[styles.row, { backgroundColor: theme.surface }]}>
+          <Text style={[styles.rowLabel, { color: theme.muted }]}>{r.label}</Text>
+          <Text style={[styles.rowValue, { color: theme.ink }]}>{r.value}</Text>
+        </View>
+      ))}
+      <Text testID="fact-sum" style={[styles.factSum, { color: theme.muted }]}>
+        {fact.sum}
+      </Text>
+    </View>
+  );
+}
+
 function Group({ label, children }: { label: string; children: ReactNode }) {
   const theme = useTheme();
   return (
@@ -260,7 +280,14 @@ function Counter({ sign, value, what, onStep }: { sign?: IconName; value: number
 }
 
 const styles = StyleSheet.create({
-  countLine: { fontSize: 18, fontWeight: "700" },
+  fact: { alignItems: "center", paddingVertical: 4 },
+  big: { fontSize: 34, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  factSub: { fontSize: 14, textAlign: "center" },
+  rows: { gap: 6 },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", height: 44, borderRadius: radius.tile, paddingHorizontal: 14 },
+  rowLabel: { fontSize: 15, fontWeight: "600" },
+  rowValue: { fontSize: 18, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  factSum: { fontSize: 13, textAlign: "right" },
   title: { fontSize: 22, fontWeight: "700" },
   heading: { flexDirection: "row", alignItems: "center", gap: 8 },
   small: { fontSize: 13 },
@@ -269,7 +296,6 @@ const styles = StyleSheet.create({
   group: { gap: 6 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   card: { borderRadius: radius.tile, padding: 12, gap: 8 },
-  summary: { fontSize: 15, fontWeight: "700" },
   repRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   repName: { flex: 1, fontSize: 15 },
   counter: { flexDirection: "row", alignItems: "center", gap: 4 },
