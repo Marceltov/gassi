@@ -343,6 +343,49 @@ test("Meine Geräte: Abmelden on this device removes it on the server and lands 
   await expect(createClient({ baseUrl: BASE_URL, token }).me()).rejects.toMatchObject({ status: 401 });
 });
 
+test.describe("without the service worker, so the removals can be answered (or held) here", () => {
+  test.use({ serviceWorkers: "block" });
+
+  test("Meine Geräte: Alle abmelden asks, then signs out every device of mine, this one last, and lands on /anmelden", async ({ page, context }) => {
+    await signIn(page);
+    await page.goto("/mehr/geraete");
+    await expect(page.getByTestId("device-current")).toBeVisible();
+    // every device in the list, this one included, has Abmelden
+    for (const row of await page.getByTestId(/^device-/).all()) await expect(row.getByRole("button", { name: /abmelden$/ })).toHaveCount(1);
+    const ids = (await asHirsch().devices()).devices.map((d) => d.id);
+    // the shared test server keeps its devices: the removals are answered here, and counted
+    const removed: number[] = [];
+    await context.route((url) => /^\/api\/devices\/\d+$/.test(url.pathname), async (route) => {
+      removed.push(Number(new URL(route.request().url()).pathname.split("/").pop()));
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ removed: true }) });
+    });
+    try {
+      await page.getByRole("button", { name: "Alle abmelden" }).click();
+      await expect(page.getByText("Alle Geräte abmelden?")).toBeVisible();
+      await page.getByRole("button", { name: "Ja, abmelden" }).click();
+      await expect(page).toHaveURL(/\/anmelden$/);
+      expect(removed.sort()).toEqual(ids.sort());
+    } finally {
+      await context.unrouteAll({ behavior: "ignoreErrors" });
+    }
+  });
+
+  test("Abmelden here doesn't wait for a server that doesn't answer: after a few seconds this browser signs out anyway", async ({ page, context }) => {
+    await signIn(page);
+    await page.goto("/mehr/geraete");
+    await expect(page.getByTestId("device-current")).toBeVisible();
+    await context.route((url) => /^\/api\/devices\/\d+$/.test(url.pathname), () => {}); // the removal never answers
+    try {
+      await page.getByRole("button", { name: "Auf diesem Gerät abmelden" }).click();
+      await page.getByRole("button", { name: "Ja, abmelden" }).click();
+      await expect(page).toHaveURL(/\/anmelden$/, { timeout: 6000 });
+      expect(await page.evaluate(() => localStorage.getItem("gassi.device"))).toBeNull();
+    } finally {
+      await context.unrouteAll({ behavior: "ignoreErrors" });
+    }
+  });
+});
+
 test("Abmelden, the last row in Mehr, asks and then signs this device out", async ({ page }) => {
   const token = await signIn(page);
   await page.goto("/mehr");
@@ -354,21 +397,6 @@ test("Abmelden, the last row in Mehr, asks and then signs this device out", asyn
   await page.getByRole("button", { name: "Ja, abmelden" }).click();
   await expect(page).toHaveURL(/\/anmelden$/);
   await expect(createClient({ baseUrl: BASE_URL, token }).me()).rejects.toMatchObject({ status: 401 });
-});
-
-test("Abmelden here doesn't wait for a server that doesn't answer: after a few seconds this browser signs out anyway", async ({ page, context }) => {
-  await signIn(page);
-  await page.goto("/mehr/geraete");
-  await expect(page.getByTestId("device-current")).toBeVisible();
-  await context.route((url) => /^\/api\/devices\/\d+$/.test(url.pathname), () => {}); // the removal never answers
-  try {
-    await page.getByRole("button", { name: "Auf diesem Gerät abmelden" }).click();
-    await page.getByRole("button", { name: "Ja, abmelden" }).click();
-    await expect(page).toHaveURL(/\/anmelden$/, { timeout: 6000 });
-    expect(await page.evaluate(() => localStorage.getItem("gassi.device"))).toBeNull();
-  } finally {
-    await context.unrouteAll({ behavior: "ignoreErrors" });
-  }
 });
 
 test("the manifest is served with Gassi's name, dark colors and icons; the page links it with the Apple tags", async ({ request }) => {

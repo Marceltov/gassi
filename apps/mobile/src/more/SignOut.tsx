@@ -1,5 +1,6 @@
 // Signing out on this device, asked first: the server forgets this device (when it can be reached within a few
-// seconds), then this browser forgets it and shows the sign-in. Used by Mehr's last row and by Meine Geräte.
+// seconds), then this browser forgets it and shows the sign-in. Used by Mehr's last row and by Meine Geräte, which also
+// signs out everywhere: `others` (my other devices) go first, then this one.
 import { useRouter } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import { forgetDevice } from "../data/api";
@@ -11,9 +12,11 @@ import { Sheet } from "../ui/Sheet";
 
 /** How long signing out here waits for the server before it signs out locally anyway. */
 const SIGN_OUT_WAIT_MS = 3000;
-const TITLE = "Auf diesem Gerät abmelden?";
+const TITLE = { here: "Auf diesem Gerät abmelden?", all: "Alle Geräte abmelden?" };
+const TEXT = { here: "Danach brauchst du einen neuen Link oder Code, um dich hier wieder anzumelden.", all: "Danach brauchst du überall einen neuen Link oder Code." };
 
-export function SignOutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function SignOutSheet({ open, onClose, others }: { open: boolean; onClose: () => void; others?: readonly number[] }) {
+  const which = others ? "all" : "here";
   const theme = useTheme();
   const router = useRouter();
   const { writeApi } = useGassi();
@@ -22,17 +25,20 @@ export function SignOutSheet({ open, onClose }: { open: boolean; onClose: () => 
     // without reception (or an answer within SIGN_OUT_WAIT_MS) the server keeps the device: it can be removed from
     // another one later; this browser signs out either way
     if (writeApi) {
-      const removeHere = async () => writeApi.removeDevice({ id: (await writeApi.me()).device.id });
+      const removeHere = async () => {
+        for (const id of others ?? []) await writeApi.removeDevice({ id });
+        await writeApi.removeDevice({ id: (await writeApi.me()).device.id });
+      };
       await Promise.race([removeHere().catch(() => undefined), new Promise((r) => setTimeout(r, SIGN_OUT_WAIT_MS))]);
     }
     forgetDevice();
     router.replace("/anmelden");
   };
   return (
-    <Sheet open={open} onClose={onClose} label={TITLE}>
+    <Sheet open={open} onClose={onClose} label={TITLE[which]}>
       <View testID="signout-sheet" style={styles.sheet}>
-        <Text style={[styles.title, { color: theme.ink }]}>{TITLE}</Text>
-        <Text style={[styles.small, { color: theme.muted }]}>Danach brauchst du einen neuen Link oder Code, um dich hier wieder anzumelden.</Text>
+        <Text style={[styles.title, { color: theme.ink }]}>{TITLE[which]}</Text>
+        <Text style={[styles.small, { color: theme.muted }]}>{TEXT[which]}</Text>
         <ButtonRow side={[<BigButton key="no" kind="side" size="m" label="Abbrechen" onPress={onClose} />]} main={<BigButton kind="danger" size="m" label="Ja, abmelden" onPress={() => void signOut()} />} />
       </View>
     </Sheet>
