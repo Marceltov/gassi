@@ -76,12 +76,11 @@ test("filter keeps only known types and people", () => {
 describe("food and stock", () => {
   test("suggests the last amount per food kind, per dog", async () => {
     const d = diary();
-    expect(await d.lastFoodAmounts()).toEqual({ wet: null, dry: null, wetUnitG: null });
-    await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 200, unitG: 800, at: "2026-10-20T07:00:00Z" });
+    expect(await d.lastFoodAmounts()).toEqual({ wet: null, dry: null });
+    await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 200, at: "2026-10-20T07:00:00Z" });
     await d.log(HIRSCH, { type: "food", foodKind: "wet", amountG: 180, at: "2026-10-20T08:00:00Z" });
     await d.log(HIRSCH, { type: "food", foodKind: "dry", amountG: 80, at: "2026-10-20T08:30:00Z" });
-    // the size of the newest wet feeding that named one
-    expect(await d.lastFoodAmounts()).toEqual({ wet: 180, dry: 80, wetUnitG: 800 });
+    expect(await d.lastFoodAmounts()).toEqual({ wet: 180, dry: 80 });
     // per dog: 300 g for two dogs is 150 g each
     await db().insertInto("dog").values({ name: "Bruno", color: "#3a6fc0", created_at: "2026-01-01T00:00:00.000Z" }).execute();
     await d.log(HIRSCH, { type: "food", foodKind: "dry", amountG: 300, at: "2026-10-20T09:00:00Z" }); // all dogs: both

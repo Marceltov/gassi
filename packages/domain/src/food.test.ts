@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { buyingSizes, canChoices, countWeight, clampPortion, countLine, formSizes, mergeSizes, stillHidden, countTitle, formatCanCount, perDog, portionFor, prefillFood, quickPortions, stockParts, stockSummary } from "./food";
+import { buyingSizes, countWeight, clampPortion, countLine, formSizes, mergeSizes, stillHidden, countTitle, formatCanCount, perDog, portionFor, prefillFood, quickPortions, stockParts, stockSummary } from "./food";
 import type { CanStock, Stock, WetStock } from "./stock";
 
 const can = (unitG: number, cans: number): CanStock => ({ unitG, grams: cans * unitG, cans, belowZero: false, lastAt: null });
@@ -58,19 +58,6 @@ test("a wet count comes to its cans times their sizes, as typed; not while a cou
   expect(countWeight([{ unitG: 400, cans: "2,75" }, { unitG: 800, cans: "1" }])).toBe("1,9 kg");
   expect(countWeight([{ unitG: 400, cans: "0" }])).toBe("0 g");
   expect(countWeight([{ unitG: 400, cans: "zwei" }])).toBeNull();
-});
-
-test("the can sizes to feed from: the ones with cans left, pre-set to the last used one, else the one bought last", () => {
-  const stock: Stock = { wet: wetStock([can(400, 3), can(800, 2)], { newestUnitG: 400 }), dry: { grams: null, daysLeft: null, belowZero: false } };
-  expect(canChoices(stock, { wet: 100, dry: null, wetUnitG: 800 })).toEqual({ sizes: [400, 800], preset: 800 });
-  expect(canChoices(stock, { wet: 100, dry: null, wetUnitG: null })).toEqual({ sizes: [400, 800], preset: 400 });
-  expect(canChoices(stock, { wet: 100, dry: null, wetUnitG: 200 })).toEqual({ sizes: [400, 800], preset: 400 }); // a size no longer known
-  expect(canChoices({ ...stock, wet: wetStock([can(400, 1)], { newestUnitG: null }) }, null)).toEqual({ sizes: [400], preset: 400 });
-  expect(canChoices(null, { wet: 100, dry: null, wetUnitG: 800 })).toEqual({ sizes: [800], preset: 800 }); // nothing kept from the server yet
-  expect(canChoices({ ...stock, wet: UNKNOWN_WET }, null)).toEqual({ sizes: [], preset: null });
-  // a size without cans left is not offered, while another has some; with none left, all known ones
-  expect(canChoices({ ...stock, wet: wetStock([can(400, 0), can(800, 2)], { newestUnitG: 400 }) }, { wet: 100, dry: null, wetUnitG: 400 })).toEqual({ sizes: [800], preset: 800 });
-  expect(canChoices({ ...stock, wet: wetStock([can(400, 0), can(800, 0)], { newestUnitG: 400 }) }, null)).toEqual({ sizes: [400, 800], preset: 400 });
 });
 
 test("a portion is a whole number from 1 to 5000 grams", () => {

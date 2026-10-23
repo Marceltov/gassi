@@ -86,33 +86,23 @@ test.describe("one dog", () => {
   });
 });
 
-test("a wet feeding comes out of the last used can; the sheet asks which only while two sizes have cans left", async ({ page }) => {
+test("a feeding names no can: the sheet has no can choice and the feeding no can size", async ({ page }) => {
   const client = asHirsch();
   const { entries: bought } = await client.restock({ foodKind: "wet", sizes: [{ unitG: 400, cans: 4 }, { unitG: 800, cans: 2 }] });
   try {
-    await feed(400, "wet", 800); // the last used can is 800 g
     const token = await signIn(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Futter geben" }).click();
     const sheet = page.getByTestId("food-sheet");
-    const dogs = (await client.dogs()).dogs.filter((d) => !d.archived).length;
-    await expect(sheet.getByTestId("food-amount")).toHaveText(`${400 / dogs} g`); // the server's answer is in, per dog
-    await expect(sheet.getByRole("tab", { name: "800-g-Dose" })).toHaveAttribute("aria-selected", "true");
-    await sheet.getByRole("tab", { name: "400-g-Dose" }).click();
+    await sheet.getByRole("tab", { name: "Nass" }).click();
+    await expect(sheet.getByTestId("food-amount")).toBeVisible();
+    await expect(sheet.getByRole("button", { name: /-g-Dose/ })).toHaveCount(0);
+    await expect(sheet.getByRole("tab", { name: /-g-Dose/ })).toHaveCount(0);
     await sheet.getByRole("button", { name: "Eintragen" }).click();
     await expect(sheet).toBeHidden();
     const me = createClient({ baseUrl: BASE_URL, token });
-    await expect.poll(async () => (await newest(me)).unitG).toBe(400);
-    await me.deleteEntry({ id: (await newest(me)).id });
-
-    // with only one size left the sheet doesn't ask, and the feeding comes out of it
-    const counted = await client.correctStock({ foodKind: "wet", sizes: [{ unitG: 400, cans: "0" }, { unitG: 800, cans: "2" }] });
-    bought.push(...counted.entries);
-    await page.goto("/");
-    await page.getByRole("button", { name: "Futter geben" }).click();
-    await expect(sheet.getByRole("tab", { name: /Dose/ })).toHaveCount(0); // once the server's answer is in
-    await sheet.getByRole("button", { name: "Eintragen" }).click();
-    await expect.poll(async () => (await newest(me)).unitG).toBe(800);
+    await expect.poll(async () => (await newest(me)).foodKind).toBe("wet");
+    expect((await newest(me)).unitG).toBeNull();
     await me.deleteEntry({ id: (await newest(me)).id });
   } finally {
     for (const b of bought) await client.deleteEntry({ id: b.id }).catch(() => undefined);

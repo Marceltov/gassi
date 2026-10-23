@@ -1,9 +1,8 @@
 // Futter geben: a sheet pre-filled with the newest feeding (kind and grams per dog), a switch for wet or dry, − and + in
 // 10 g steps per dog, quick amounts (recent portions per dog), the dogs, and one tap on Eintragen, which records what
-// the dogs that are on get together. A wet feeding comes out of the can size last used; only
-// when two sizes have cans left does the sheet ask which. All dogs unless some are switched off. It opens at once from
-// what was kept, and Eintragen goes through the queue, so it works without reception.
-import { canChoices, clampPortion, FOOD_MAX_G, type FoodKind, newId, perDog, portionFor, prefillFood, quickPortions } from "@gassi/domain";
+// the dogs that are on get together. A feeding names no can (Vorrat counts closed cans). All dogs unless some are
+// switched off. It opens at once from what was kept, and Eintragen goes through the queue, so it works without reception.
+import { clampPortion, FOOD_MAX_G, type FoodKind, newId, perDog, portionFor, prefillFood, quickPortions } from "@gassi/domain";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
@@ -35,8 +34,6 @@ function FoodForm({ onClose }: { onClose: () => void }) {
   const start = prefillFood(facts.recent, facts.last);
   const [kind, setKind] = useState<FoodKind>(start.foodKind);
   const [amountG, setAmountG] = useState(start.amountG); // per dog
-  const [unitG, setUnitG] = useState(() => canChoices(facts.stock, facts.last).preset); // the can it comes out of
-  const unitPicked = useRef(false); // the person chose the can: the server's answer must not change it
   const chosenKind = useRef(start.foodKind); // the kind now, for the server's answer
   const [off, setOff] = useState<number[]>([]); // dogs switched off; none: all dogs
   const kept = useRef(facts); // what was kept at the opening, for what the server doesn't answer
@@ -64,7 +61,6 @@ function FoodForm({ onClose }: { onClose: () => void }) {
         setKind(next.foodKind);
       }
       if (!edited.current) setAmountG(portionFor(nextKind, fresh.recent, fresh.last));
-      if (!unitPicked.current) setUnitG(canChoices(fresh.stock, fresh.last).preset);
     });
     return () => {
       alive = false;
@@ -95,17 +91,11 @@ function FoodForm({ onClose }: { onClose: () => void }) {
   const portion = Math.min(most, amountG); // a dog switched on can lower what each may get
   const total = portion * chosen.length;
 
-  const cans = canChoices(facts.stock, facts.last).sizes;
-  const can = kind === "wet" && unitG !== null && cans.includes(unitG) ? unitG : null;
-  const pickCan = (next: number) => {
-    unitPicked.current = true;
-    setUnitG(next);
-  };
   const quick = quickPortions(facts.recent, kind);
   const submit = () => {
-    send({ id: submitId, at: new Date().toISOString(), kind: "food", foodKind: kind, amountG: total, ...(can ? { unitG: can } : {}), ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
+    send({ id: submitId, at: new Date().toISOString(), kind: "food", foodKind: kind, amountG: total, ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
     // the next opening (maybe without reception) starts from this feeding, as it would from the server's answer
-    saveFacts(personId, withFeeding(facts, { foodKind: kind, amountG: portion }, can));
+    saveFacts(personId, withFeeding(facts, { foodKind: kind, amountG: portion }));
     onClose();
   };
 
@@ -113,9 +103,6 @@ function FoodForm({ onClose }: { onClose: () => void }) {
     <View testID="food-sheet" style={styles.form}>
       <Text style={[styles.title, { color: theme.ink }]}>{active.length === 1 ? `Futter für ${active[0].name}` : "Futter geben"}</Text>
       <Segments options={FOOD_KIND_OPTIONS} value={kind} onChange={pick} kind="food" />
-      {kind === "wet" && cans.length > 1 && can !== null ? (
-        <Segments options={cans.map((u) => ({ value: String(u), label: `${u}-g-Dose` }))} value={String(can)} onChange={(u) => pickCan(Number(u))} kind="food" />
-      ) : null}
       <AmountStepper testID="food-amount" value={`${portion} g`} sub={active.length > 1 ? "je Hund" : undefined} step={`${STEP_G} g`} onStep={(d) => set(portion + d * STEP_G)} atMin={portion <= 1} atMax={portion + STEP_G > most} />
       {quick.length ? (
         <View style={styles.chips}>

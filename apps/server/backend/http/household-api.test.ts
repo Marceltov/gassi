@@ -27,7 +27,7 @@ describe("food, weight and the week over the API", () => {
     await json("/api/stock/restock", { method: "POST", token, body: { foodKind: "wet", sizes: [{ unitG: 400, cans: 12 }] } });
     await json("/api/entries", { method: "POST", token, body: { type: "food", foodKind: "wet", amountG: 200, at: "2026-10-20T12:00:00Z" } });
     expect((await json("/api/stock", { token })).body).toMatchObject({ wet: { grams: 4600, sizes: [{ unitG: 400, cans: 11.5 }], newestUnitG: 400 }, dry: { grams: null } });
-    expect((await json("/api/food/last", { token })).body).toEqual({ wet: 200, dry: null, wetUnitG: null });
+    expect((await json("/api/food/last", { token })).body).toEqual({ wet: 200, dry: null });
     const count = await json("/api/stock/correct", { method: "POST", token, body: { foodKind: "wet", sizes: [{ unitG: 400, cans: 5 }, { unitG: 800, cans: "1,5" }] } });
     expect(count.body.entries).toHaveLength(2);
     expect((await json("/api/stock", { token })).body.wet).toMatchObject({ grams: 3200, sizes: [{ unitG: 400, cans: 5 }, { unitG: 800, cans: 1.5 }] });

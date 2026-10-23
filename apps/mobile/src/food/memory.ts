@@ -20,10 +20,9 @@ export function loadFacts(personId: string): FoodFacts {
 
 export const saveFacts = (personId: string, facts: FoodFacts): void => saveKept(key(personId), facts);
 
-/** The facts after a feeding entered here (maybe still unsent): it is the newest portion and its kind's last, and
- * the can size it came out of (`unitG`, wet food) the last used one. */
-export function withFeeding(facts: FoodFacts, p: Portion, unitG: number | null = null): FoodFacts {
+/** The facts after a feeding entered here (maybe still unsent): it is the newest portion and its kind's last. */
+export function withFeeding(facts: FoodFacts, p: Portion): FoodFacts {
   const prev = facts.last;
-  const last = { wet: prev?.wet ?? null, dry: prev?.dry ?? null, wetUnitG: (p.foodKind === "wet" ? unitG : null) ?? prev?.wetUnitG ?? null, [p.foodKind]: p.amountG };
+  const last = { wet: prev?.wet ?? null, dry: prev?.dry ?? null, [p.foodKind]: p.amountG };
   return { ...facts, recent: [p, ...facts.recent].slice(0, RECENT), last };
 }

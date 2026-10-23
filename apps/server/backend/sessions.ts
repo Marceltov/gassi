@@ -213,7 +213,7 @@ class Step {
       }
       case "food":
         // the same kind of entry the diary logs, so stock and the usual portion see it
-        await this.create("food", c.at, null, await this.dogsFor(c.dogIds), { amountG: c.amountG, foodKind: c.foodKind, unitG: c.foodKind === "wet" ? (c.unitG ?? null) : null });
+        await this.create("food", c.at, null, await this.dogsFor(c.dogIds), { amountG: c.amountG, foodKind: c.foodKind, unitG: null });
         return "applied";
     }
   }

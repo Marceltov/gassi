@@ -26,9 +26,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("training.rep"), trainingKey: key, exerciseId: z.number().int().positive(), dogId, ok: z.boolean(), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("training.treat"), trainingKey: key, treatKindId: z.number().int().positive(), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("log"), type: z.enum(["pee", "poop"]), dogId }),
-  // a feeding; the dogs left out, the server takes every active dog; wet food may name the can size it came out of
-  // (left out, it comes out of the size bought last)
-  z.object({ ...base, kind: z.literal("food"), dogIds, amountG: z.number().int().min(FOOD_MIN_G).max(FOOD_MAX_G), foodKind: z.enum(["wet", "dry"]), unitG: z.number().int().min(1).max(10_000).optional() }),
+  // a feeding; the dogs left out, the server takes every active dog
+  z.object({ ...base, kind: z.literal("food"), dogIds, amountG: z.number().int().min(FOOD_MIN_G).max(FOOD_MAX_G), foodKind: z.enum(["wet", "dry"]) }),
 ]);
 
 export type Command = z.output<typeof commandSchema>;

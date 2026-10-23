@@ -27,7 +27,7 @@ export const parseDecimal = (v: string): number => (v.trim() ? Number(v.trim().r
 
 export type Portion = { foodKind: FoodKind; amountG: number };
 /** Each kind's last portion, and the can size the last wet feeding came out of (when it said). */
-type LastFood = { wet: number | null; dry: number | null; wetUnitG?: number | null };
+type LastFood = { wet: number | null; dry: number | null };
 
 /** What the food sheet offers when nothing else is known (no feeding yet). */
 export const DEFAULT_PORTION_G: Record<FoodKind, number> = { wet: 100, dry: 50 };
@@ -54,18 +54,6 @@ export function quickPortions(recent: readonly Portion[], kind: FoodKind): { lab
 
 /** A feeding's grams for each of its dogs (a feeding is stored as what all of them got together). */
 export const perDog = (amountG: number, dogs: number): number => Math.round(amountG / Math.max(1, dogs));
-
-/** The can sizes a wet feeding can come out of (the ones with cans left, smallest first; without any the known ones;
- * without the server's stock yet the last used one), and the one to start with: the last used one while it is one of
- * them, else the one bought last, else the largest. Only with two or more to choose from does the sheet ask. */
-export function canChoices(stock: Stock | null, last: LastFood | null): { sizes: number[]; preset: number | null } {
-  const used = last?.wetUnitG ?? null;
-  if (!stock) return { sizes: used ? [used] : [], preset: used };
-  const left = stock.wet.sizes.filter((s) => s.cans > 0).map((s) => s.unitG);
-  const sizes = left.length ? left : stock.wet.sizes.map((s) => s.unitG);
-  const preset = [used, stock.wet.newestUnitG, sizes.at(-1)].find((u) => u != null && sizes.includes(u)) ?? null;
-  return { sizes, preset };
-}
 
 /** The stock of a kind in parts: what is left ("3 × 400 g · 2 × 800 g", "1,2 kg"; null when it isn't known), for wet
  * food each can size that has some left ("3 × 400 g"), the amount ("2,8 kg"; null when it isn't known), for how long

@@ -191,16 +191,15 @@ export class Diary {
     return true;
   }
 
-  /** The amount per dog of the newest feeding of each kind, offered as the usual portion, and the can size of the newest wet
-   * feeding that named one, offered as the can to feed from. */
-  async lastFoodAmounts(): Promise<Record<FoodKind, number | null> & { wetUnitG: number | null }> {
+  /** The amount per dog of the newest feeding of each kind, offered as the usual portion. */
+  async lastFoodAmounts(): Promise<Record<FoodKind, number | null>> {
     const food = await this.entries.list({ type: "food" });
     // per dog, as the food sheet asks for it
     const last = (kind: FoodKind) => {
       const e = food.find((f) => f.foodKind === kind && f.amountG !== null);
       return e ? perDog(e.amountG!, e.dogIds.length) : null;
     };
-    return { wet: last("wet"), dry: last("dry"), wetUnitG: food.find((e) => e.foodKind === "wet" && e.unitG)?.unitG ?? null };
+    return { wet: last("wet"), dry: last("dry") };
   }
 
   /** Bought food: wet as cans × grams per can, one restock per can size (together), dry in grams. */
