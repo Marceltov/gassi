@@ -43,6 +43,10 @@ export const personSchema = z.object({ id: z.string(), name: z.string() });
 export const deviceKinds = ["phone", "watch", "web", "script"] as const;
 export const deviceSchema = z.object({ id: z.number(), kind: z.enum(deviceKinds), name: z.string() });
 
+export const ISSUE_KINDS = ["wish", "bug"] as const;
+// `at`: when an open issue was opened, when a closed one was closed
+export const issueSchema = z.object({ number: z.number(), title: z.string(), open: z.boolean(), kind: z.enum(ISSUE_KINDS).nullable(), fromApp: z.boolean(), at: z.string(), url: z.string() });
+
 export const dogSchema = z.object({ id: z.number(), name: z.string(), color: z.string(), archived: z.boolean() });
 
 const exerciseTotalSchema = z.object({ name: z.string(), ok: z.number(), fail: z.number() });
@@ -279,7 +283,8 @@ export const contract = {
     method: "GET",
     path: "/api/me",
     input: none,
-    output: z.object({ person: personSchema, device: deviceSchema, household: z.object({ oidc: z.boolean(), mail: z.boolean() }) }),
+    // issues: the server files and lists Wünsche und Fehler on GitHub (#45, #39)
+    output: z.object({ person: personSchema, device: deviceSchema, household: z.object({ oidc: z.boolean(), mail: z.boolean(), issues: z.boolean() }) }),
   }),
   devices: endpoint({
     method: "GET",
@@ -288,6 +293,16 @@ export const contract = {
     output: z.object({ devices: z.array(deviceSchema.extend({ createdAt: z.string(), lastSeenAt: z.string().nullable(), current: z.boolean() })) }),
   }),
   removeDevice: endpoint({ method: "DELETE", path: "/api/devices/:id", input: z.object({ id }), output: z.object({ removed: z.literal(true) }) }),
+  // Wünsche und Fehler: the repo's GitHub issues, open first, then the recently closed (#45); 404 when not configured
+  issues: endpoint({ method: "GET", path: "/api/issues", input: none, output: z.object({ issues: z.array(issueSchema) }) }),
+  // a wish or a bug from the app, filed on GitHub as who sent it (#39)
+  reportIssue: endpoint({
+    method: "POST",
+    path: "/api/issues",
+    input: z.object({ kind: z.enum(ISSUE_KINDS), title: z.string().trim().min(1).max(120), text: z.string().trim().max(5000), version: z.string().max(20) }),
+    output: issueSchema,
+    messages: { kind: "Wunsch oder Fehler?", title: "Worum geht es? Kurz, höchstens 120 Zeichen.", text: "Höchstens 5000 Zeichen." },
+  }),
 };
 
 export type Contract = typeof contract;

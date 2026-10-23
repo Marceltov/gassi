@@ -13,7 +13,7 @@ test("a fresh server: set up, invite, walk together with two dogs, record a trac
   const hirsch = await client().redeem({ token: tokenOf(setupLink()), deviceKind: "phone", deviceName: "iPhone", personName: "Hirsch", dogName: "Toffee" });
   writeFileSync(TOKEN_FILE, hirsch.deviceToken);
   const asHirsch = client(hirsch.deviceToken);
-  expect(await asHirsch.me()).toMatchObject({ person: { name: "Hirsch" }, household: { oidc: false, mail: false } });
+  expect(await asHirsch.me()).toMatchObject({ person: { name: "Hirsch" }, household: { oidc: false, mail: false, issues: false } });
   await expect(client().redeem({ token: tokenOf(setupLink()), deviceKind: "phone", deviceName: "x", personName: "Mallory", dogName: "X" })).rejects.toEqual(new ApiError(400, "Dieser Link ist abgelaufen oder schon benutzt."));
 
   // and invites Herzii

@@ -1,10 +1,11 @@
 // Mehr: the data first (Gewicht, Vorrat), then the settings (Hunde, Übungen, Leckerli; Haushalt; Meine Geräte) and
 // the Garmin watch, which comes later. Each row says in short what is behind it; without reception the rows that need
-// the server stay without that line. Then the link to the source code, which the AGPL asks a server to offer its users,
-// and last Abmelden on this device (asked first). Its screens have no Zurück: the tab bar stays, and the Mehr tab leads back here.
+// the server stay without that line. Then Wünsche und Fehler (when the server has GitHub set up) and the link to the
+// source code, which the AGPL asks a server to offer its users, and last Abmelden on this device (asked first). Its
+// screens have no Zurück: the tab bar stays, and the Mehr tab leads back here.
 import { formatAgo, formatKg, stockSummary } from "@gassi/domain";
 import { type Href, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Linking, StyleSheet, Text } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { useNow } from "../start/useNow";
@@ -24,9 +25,15 @@ export function More() {
   const theme = useTheme();
   const router = useRouter();
   const now = useNow(60_000);
-  const { people, dogs, me } = useGassi();
+  const { people, dogs, me, household } = useGassi();
   const { data } = useServer((api) => Promise.all([api.weights(), api.stock(), api.devices(), api.exercises(), api.treatKinds()]));
   const [weights, stock, devices, exercises, treats] = data ?? [null, null, null, null, null];
+  // asked again once the household says the server has GitHub set up (a first start knows it only then)
+  const github = !!household?.issues;
+  const { data: issues, reload: reloadIssues } = useServer((api) => (github ? api.issues() : Promise.resolve(null)));
+  useEffect(() => {
+    if (github) reloadIssues();
+  }, [github, reloadIssues]);
 
   const active = dogs.filter((d) => !d.archived);
   const newest = weights?.weights[0];
@@ -57,6 +64,7 @@ export function More() {
             <Row testID="more-Garmin-Uhr" icon="watch" tone="garmin" label="Garmin-Uhr" value="kommt später" muted />
           </Group>
           <Group>
+            {github ? <Row testID="more-Wuensche" icon="feedback" label="Wünsche und Fehler" value={issues ? `${issues.issues.filter((i) => i.open).length} offen` : undefined} onPress={go("/mehr/wuensche")} /> : null}
             <Row testID="more-Quellcode" icon="code" label="Quellcode" value="AGPL-3.0 · GitHub" onPress={() => void Linking.openURL(SOURCE)} />
           </Group>
           <Group>

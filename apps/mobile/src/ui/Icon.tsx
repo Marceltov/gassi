@@ -38,6 +38,7 @@ const SYMBOLS = {
   code: sym("chevron.left.forwardslash.chevron.right", "code"),
   signIn: sym("arrow.right.circle.fill", "login"),
   signOut: sym("rectangle.portrait.and.arrow.right", "logout"),
+  feedback: sym("exclamationmark.bubble.fill", "feedback"),
 };
 
 export type IconName = keyof typeof SYMBOLS | "poop";

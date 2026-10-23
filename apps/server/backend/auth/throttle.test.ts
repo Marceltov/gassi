@@ -7,7 +7,7 @@ test("a client is blocked after its burst of wrong codes and may try again as it
   const t = new Throttle(limits);
   for (let i = 0; i < 3; i++) {
     expect(t.blocked("a", 0)).toBe(false);
-    t.failed("a", 0);
+    t.count("a", 0);
   }
   expect(t.blocked("a", 0)).toBe(true);
   expect(t.blocked("b", 0)).toBe(false); // another client isn't
@@ -17,7 +17,7 @@ test("a client is blocked after its burst of wrong codes and may try again as it
 
 test("many clients together are blocked by the shared bucket", () => {
   const t = new Throttle(limits);
-  for (let i = 0; i < 5; i++) t.failed(`c${i}`, 0);
+  for (let i = 0; i < 5; i++) t.count(`c${i}`, 0);
   expect(t.blocked("new", 0)).toBe(true);
   expect(t.blocked("new", 100)).toBe(false);
 });

@@ -17,7 +17,16 @@ describe("parseConfig", () => {
       logLevel: "info",
       setupLinkFile: null,
       corsOrigin: null,
+      github: null,
     });
+  });
+
+  test("Wünsche und Fehler need the repo (owner/name) and its token together", () => {
+    expect(parseConfig({ ...ENV, FEEDBACK_GITHUB_REPO: "Marceltov/gassi", FEEDBACK_GITHUB_TOKEN: "t" }).github).toEqual({ repo: "Marceltov/gassi", token: "t" });
+    const together = "FEEDBACK_GITHUB_REPO and FEEDBACK_GITHUB_TOKEN go together";
+    expect(() => parseConfig({ ...ENV, FEEDBACK_GITHUB_REPO: "Marceltov/gassi" })).toThrow(together);
+    expect(() => parseConfig({ ...ENV, FEEDBACK_GITHUB_TOKEN: "t" })).toThrow(together);
+    expect(() => parseConfig({ ...ENV, FEEDBACK_GITHUB_REPO: "https://github.com/Marceltov/gassi", FEEDBACK_GITHUB_TOKEN: "t" })).toThrow("FEEDBACK_GITHUB_REPO must be owner/name");
   });
 
   test("OIDC is all three or none", () => {
