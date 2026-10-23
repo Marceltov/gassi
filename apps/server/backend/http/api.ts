@@ -4,6 +4,7 @@ import { appLink, INVITE_TTL, type LinkKey, Links, WrongLink } from "../auth/lin
 import { type Mailer, sendMagicLink } from "../auth/mail";
 import type { Throttle } from "../auth/throttle";
 import { InputError } from "../errors";
+import type { Issues } from "../issues";
 import { Catalog } from "../catalog";
 import { Diary } from "../diary";
 import { DogRepository } from "../dogs";
@@ -24,6 +25,8 @@ export type ApiDeps = {
   mailer: Mailer | null;
   timeZone?: string; // default Europe/Berlin
   defaultDogName?: string | null; // DOG_NAME
+  issues?: Issues | null; // Wünsche und Fehler on GitHub, when configured
+  reportThrottle?: Throttle; // reports from the app, per device, kept across requests
 };
 
 const names = (deps: ApiDeps) => new PeopleRepository(deps.db).names();
@@ -37,6 +40,7 @@ const missing = (what: string) => {
 const linkKey = (i: { token?: string; code?: string }): LinkKey => (i.code !== undefined ? { code: i.code } : { token: i.token! });
 const links = (deps: ApiDeps) => new Links(deps.db, deps.now, deps.publicUrl, deps.codeKey, deps.defaultDogName ?? null);
 const TOO_MANY = "Zu viele falsche Codes. Bitte in ein paar Minuten nochmal.";
+const issues = (deps: ApiDeps) => deps.issues ?? missing("Wünsche und Fehler sind auf diesem Server nicht eingerichtet.");
 // A code can be guessed, a link's token can't: wrong codes count, and too many of them wait before the next is looked up.
 async function byCode<T>(deps: ApiDeps, key: LinkKey, look: (key: LinkKey) => Promise<T>): Promise<T> {
   if (!("code" in key)) return look(key);
@@ -45,7 +49,7 @@ async function byCode<T>(deps: ApiDeps, key: LinkKey, look: (key: LinkKey) => Pr
   try {
     return await look(key);
   } catch (e) {
-    if (e instanceof WrongLink) deps.codeThrottle.failed(deps.client, now);
+    if (e instanceof WrongLink) deps.codeThrottle.count(deps.client, now);
     throw e;
   }
 }
@@ -125,13 +129,22 @@ const implementations: Implementations<ApiDeps> = {
   people: async ({ deps }) => ({ people: await new PeopleRepository(deps.db).list() }),
   week: async ({ input, deps }) => (await diary(deps)).week(input.w),
   updateMe: async ({ input, auth, deps }) => ({ person: await new PeopleRepository(deps.db, deps.now).update(auth.person.id, input) }),
-  me: async ({ auth, deps }) => ({ person: auth.person, device: auth.device, household: { oidc: deps.oidc, mail: deps.mailer !== null } }),
+  me: async ({ auth, deps }) => ({ person: auth.person, device: auth.device, household: { oidc: deps.oidc, mail: deps.mailer !== null, issues: !!deps.issues } }),
   devices: async ({ auth, deps }) => ({
     devices: (await new Devices(deps.db, deps.now).list(auth.person.id)).map((d) => ({ ...d, current: d.id === auth.device.id })),
   }),
   removeDevice: async ({ input, auth, deps }) => {
     if (!(await new Devices(deps.db, deps.now).remove(auth.person.id, input.id))) throw new NotFound("Dieses Gerät gibt es nicht.");
     return { removed: true as const };
+  },
+  issues: async ({ deps }) => ({ issues: await issues(deps).list(deps.now().getTime()) }),
+  reportIssue: async ({ input, auth, deps }) => {
+    const filed = issues(deps);
+    const now = deps.now().getTime();
+    const device = `device ${auth.device.id}`;
+    if (deps.reportThrottle?.blocked(device, now)) throw new TooMany("Gerade viel gemeldet. Bitte später nochmal.");
+    deps.reportThrottle?.count(device, now);
+    return filed.report(input, auth.person.name, auth.device.name);
   },
 };
 

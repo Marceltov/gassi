@@ -33,10 +33,14 @@ const schema = z
     LOG_LEVEL: optional(z.enum(LOG_LEVELS)).default("info"),
     SETUP_LINK_FILE: optional(z.string()),
     CORS_ORIGIN: optional(z.url({ protocol: /^https?$/ })).transform((u) => u && new URL(u).origin),
+    FEEDBACK_GITHUB_REPO: optional(z.string().trim().regex(/^[\w.-]+\/[\w.-]+$/, "must be owner/name")),
+    FEEDBACK_GITHUB_TOKEN: optional(z.string().trim().min(1)),
   })
-  .refine((c) => new Set([!!c.OIDC_ISSUER, !!c.OIDC_CLIENT_ID, !!c.OIDC_CLIENT_SECRET]).size === 1, { path: ["OIDC_ISSUER"], message: "OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET go together" });
+  .refine((c) => new Set([!!c.OIDC_ISSUER, !!c.OIDC_CLIENT_ID, !!c.OIDC_CLIENT_SECRET]).size === 1, { path: ["OIDC_ISSUER"], message: "OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET go together" })
+  .refine((c) => !!c.FEEDBACK_GITHUB_REPO === !!c.FEEDBACK_GITHUB_TOKEN, { path: ["FEEDBACK_GITHUB_REPO"], message: "FEEDBACK_GITHUB_REPO and FEEDBACK_GITHUB_TOKEN go together" });
 
-/** Only PUBLIC_URL is required. OIDC (all three variables or none) and mail (SMTP_URL) are optional features. */
+/** Only PUBLIC_URL is required. OIDC (all three variables or none), mail (SMTP_URL) and Wünsche und Fehler on GitHub
+ * (repo and token) are optional features. */
 export type Config = {
   publicUrl: string;
   secret: string | null; // else one is kept in DATA_DIR (secret.ts)
@@ -48,12 +52,13 @@ export type Config = {
   logLevel: (typeof LOG_LEVELS)[number];
   setupLinkFile: string | null; // where the setup link is also written (the e2e tests read it there)
   corsOrigin: string | null; // dev only: the Expo dev server (http://localhost:8081) calling the API from another origin
+  github: { repo: string; token: string } | null; // where Wünsche und Fehler are read and filed (#45, #39)
 };
 
 export function parseConfig(env: Record<string, string | undefined>): Config {
   const parsed = schema.safeParse(env);
   if (!parsed.success) {
-    const problems = parsed.error.issues.map((i) => (i.message.startsWith("OIDC_") ? i.message : `${i.path.join(".")} ${i.message}`));
+    const problems = parsed.error.issues.map((i) => (/^(OIDC|FEEDBACK)_/.test(i.message) ? i.message : `${i.path.join(".")} ${i.message}`));
     throw new Error(`Invalid configuration: ${problems.join("; ")}`);
   }
   const c = parsed.data;
@@ -68,6 +73,7 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
     logLevel: c.LOG_LEVEL,
     setupLinkFile: c.SETUP_LINK_FILE ?? null,
     corsOrigin: c.CORS_ORIGIN ?? null,
+    github: c.FEEDBACK_GITHUB_REPO ? { repo: c.FEEDBACK_GITHUB_REPO, token: c.FEEDBACK_GITHUB_TOKEN! } : null,
   };
 }
 

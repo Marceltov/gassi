@@ -4,7 +4,7 @@
 import { contract, type Contract, type EndpointName, matchPath, type Output, type ParsedInput, sendsBody } from "@gassi/api-client";
 import { messageFor } from "@gassi/domain";
 import type { Auth } from "../auth/devices";
-import { InputError } from "../errors";
+import { InputError, Unavailable } from "../errors";
 
 type AuthFor<K extends EndpointName> = Contract[K]["auth"] extends true ? Auth : Auth | null;
 export type Handler<K extends EndpointName, D> = (ctx: { input: ParsedInput<K>; auth: AuthFor<K>; deps: D }) => Promise<Output<K>>;
@@ -47,6 +47,7 @@ export function router<D>(impls: Implementations<D>, deps: D, authenticate: (aut
       if (err instanceof InputError) return json({ error: err.message }, 400);
       if (err instanceof NotFound) return json({ error: err.message || "Gibt es nicht." }, 404);
       if (err instanceof TooMany) return json({ error: err.message }, 429);
+      if (err instanceof Unavailable) return json({ error: err.message }, 502);
       throw err;
     }
   };

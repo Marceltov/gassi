@@ -24,7 +24,7 @@ export default defineConfig({
     command: `rm -rf test-results/data ${SETUP_LINK_FILE} ${TOKEN_FILE} && next start -p 3100`,
     url: `${BASE_URL}/health`,
     reuseExistingServer: false,
-    // Empty means off: a developer's .env.local (read by next start too) must not switch OIDC or mail on here.
-    env: { PUBLIC_URL: BASE_URL, DATA_DIR: "test-results/data", SETUP_LINK_FILE, TZ: "Europe/Berlin", LOG_LEVEL: "warn", OIDC_ISSUER: "", OIDC_CLIENT_ID: "", OIDC_CLIENT_SECRET: "", SMTP_URL: "", SECRET: "" },
+    // Empty means off: a developer's .env.local (read by next start too) must not switch OIDC, mail or GitHub on here.
+    env: { PUBLIC_URL: BASE_URL, DATA_DIR: "test-results/data", SETUP_LINK_FILE, TZ: "Europe/Berlin", LOG_LEVEL: "warn", OIDC_ISSUER: "", OIDC_CLIENT_ID: "", OIDC_CLIENT_SECRET: "", SMTP_URL: "", SECRET: "", FEEDBACK_GITHUB_REPO: "", FEEDBACK_GITHUB_TOKEN: "" },
   },
 });

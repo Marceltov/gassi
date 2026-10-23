@@ -5,3 +5,6 @@ export class InputError extends Error {
     this.name = "InputError";
   }
 }
+
+/** Something the server depends on (GitHub) didn't answer or refused: a 502 with a German message. */
+export class Unavailable extends Error {}

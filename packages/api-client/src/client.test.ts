@@ -13,7 +13,7 @@ function recorder(answer: { status?: number; body: unknown }) {
   return { calls, fetch: fetch as typeof globalThis.fetch };
 }
 
-const ME = { person: { id: "marcel", name: "Hirsch" }, device: { id: 3, kind: "phone", name: "iPhone" }, household: { oidc: false, mail: false } };
+const ME = { person: { id: "marcel", name: "Hirsch" }, device: { id: 3, kind: "phone", name: "iPhone" }, household: { oidc: false, mail: false, issues: false } };
 
 describe("createClient", () => {
   test("calls method and path with the token, and returns the checked answer", async () => {

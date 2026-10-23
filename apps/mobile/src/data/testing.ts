@@ -34,7 +34,7 @@ const hirsch = HIRSCH;
 /** A household as the API shows it to Hirsch's phone: Toffee, no walk running, commands applied as they come. */
 export function household() {
   return fakeServer({
-    "GET /api/me": () => ({ person: hirsch, device: { id: 1, kind: "web", name: "iPhone (Web)" }, household: { oidc: false, mail: false } }),
+    "GET /api/me": () => ({ person: hirsch, device: { id: 1, kind: "web", name: "iPhone (Web)" }, household: { oidc: false, mail: false, issues: false } }),
     "GET /api/people": () => ({ people: [hirsch, { id: "p-herzii", name: "Herzii" }] }),
     "GET /api/dogs": () => ({ dogs: [{ id: 1, name: "Toffee", color: "#b8691a", archived: false }] }),
     "GET /api/exercises": () => ({ exercises: [{ id: 1, name: "Sitz" }] }),

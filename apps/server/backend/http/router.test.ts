@@ -24,7 +24,7 @@ describe("the API router", () => {
     const res = await call("/api/me", { token });
     expect(res.status).toBe(200);
     expect(res.headers.get("cache-control")).toBe("no-store");
-    expect(await res.json()).toEqual({ person: HIRSCH, device: { id: device.id, kind: "phone", name: "iPhone" }, household: { oidc: false, mail: false } });
+    expect(await res.json()).toEqual({ person: HIRSCH, device: { id: device.id, kind: "phone", name: "iPhone" }, household: { oidc: false, mail: false, issues: false } });
   });
 
   test("400 on invalid input, 404 on an unknown path", async () => {
