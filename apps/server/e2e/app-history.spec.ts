@@ -311,7 +311,7 @@ test("Verlauf, an entry and a walk's summary fit a small and a big phone; every 
   await expectFits(page, `/verlauf/runde/${walk.id}`, "Fertig");
 });
 
-test("a walk's small map in Verlauf shows the walk, not the city around it, and leaves the icon and the lines where they are in every row", async ({ page }) => {
+test("a walk's map in Verlauf is wide under its two lines, shows the walk, and leaves the icon and the lines where they are in every row", async ({ page }) => {
   const walk = await pastWalk(2);
   const t = (s: number) => new Date(Date.parse(walk.startedAt) + s * 1000).toISOString();
   // 1,3 km to the north and back
@@ -326,6 +326,11 @@ test("a walk's small map in Verlauf shows the walk, not the city around it, and 
   const [box, drawn] = await Promise.all([thumb.boundingBox(), line.boundingBox()]);
   // the walk reaches across most of the box, with a thin margin
   expect(Math.max(drawn!.width / box!.width, drawn!.height / box!.height)).toBeGreaterThan(0.75);
+  // under the two lines, as wide as most of the row and tall enough to see the route
+  const [row, title] = await Promise.all([page.getByTestId(`entry-${walk.id}`).boundingBox(), page.getByTestId(`entry-${walk.id}-more`).boundingBox()]);
+  expect(box!.y).toBeGreaterThanOrEqual(title!.y + title!.height);
+  expect(box!.height).toBeGreaterThanOrEqual(100);
+  expect(box!.width).toBeGreaterThan(row!.width / 2);
   // the icon and the lines start where they do in a row without a map
   const food = await asHirsch().logEntry({ type: "food", foodKind: "wet", amountG: 80 });
   made.push(food.id);
