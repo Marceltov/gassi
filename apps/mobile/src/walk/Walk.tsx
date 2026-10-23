@@ -1,12 +1,12 @@
 // The running walk ("Runde"): one hand holds the leash, the thumb taps. On top the clock, who walks with which dogs
 // (a chip taps them off, "+" adds), and what happened so far; at the bottom Pipi, Markiert (for dogs that mark, #38) and
-// Poopoo, Pause/Weiter and Training, Zuhause. A poop just tapped offers its consistency in the list (#86) until one is
-// picked or the next tap. Every tap goes through the queue and shows at once. When the walk is over (ended here or on another phone),
+// Poopoo, Pause/Weiter and Training, Zuhause; with several dogs on the walk each asks which one. A poop just tapped, or
+// tapped in the list, offers its consistency there (#86) until one is picked or the next tap. Every tap goes through the queue and shows at once. When the walk is over (ended here or on another phone),
 // the screen leaves: to the summary after Zuhause, else to Start.
 import { CONSISTENCIES, CONSISTENCY_LABEL, type Consistency, keepsOne, newId, TYPE_LABEL } from "@gassi/domain";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { walkClock } from "../start/elapsed";
 import { useNow } from "../start/useNow";
@@ -23,6 +23,7 @@ import { useLeaving } from "../ui/useLeaving";
 import { saveEnded } from "./ended";
 import { LAST_DOG, LAST_WALKER } from "./lastOne";
 import { tapLine, trainingLine, walkItems } from "./lines";
+import type { Tap } from "./taps";
 import { useWalkTaps } from "./useWalkTaps";
 
 type Kind = "pee" | "mark" | "poop";
@@ -53,8 +54,8 @@ export function Walk() {
   const dogName = (id: number) => dogs.find((d) => d.id === id)?.name ?? "Hund";
   const walkDogs = walk.dogIds;
   const several = walkDogs.length > 1;
-  const marking = walkDogs.filter((id) => dogs.find((d) => d.id === id)?.marks);
-  const dogsFor = (type: Kind) => (type === "mark" ? marking : walkDogs);
+  // the button shows when a dog on the walk marks; which dog marked is asked like for Pipi
+  const marking = walkDogs.some((id) => dogs.find((d) => d.id === id)?.marks);
 
   const log = (type: Kind, dogId: number) => {
     setChoosing(null);
@@ -62,8 +63,9 @@ export function Walk() {
     send({ id: newId(), at: time, kind: "log", type, dogId });
     setFresh(type === "poop" ? { at: time, dogId } : null);
   };
-  const tap = (type: Kind) => (dogsFor(type).length > 1 ? setChoosing(type) : dogsFor(type)[0] !== undefined && log(type, dogsFor(type)[0]));
-  const consistency = (c: Consistency) => {
+  const tap = (type: Kind) => (several ? setChoosing(type) : walkDogs[0] !== undefined && log(type, walkDogs[0]));
+  const isFresh = (t: Tap) => !!fresh && t.type === "poop" && t.at === fresh.at && t.dogId === fresh.dogId;
+  const consistency = (c: Consistency | null) => {
     if (fresh) send({ id: newId(), at: at(), kind: "log.consistency", poopAt: fresh.at, dogId: fresh.dogId, consistency: c });
     setFresh(null);
   };
@@ -131,15 +133,21 @@ export function Walk() {
             {walkItems(taps, trainings).map((item, i) =>
               item.kind === "tap" ? (
                 <View key={`${item.tap.type}${item.at}${item.tap.dogId}`}>
-                  <View style={styles.item}>
+                  <Pressable
+                    disabled={item.tap.type !== "poop"}
+                    accessibilityRole={item.tap.type === "poop" ? "button" : undefined}
+                    accessibilityLabel={`${tapLine(item.tap, several ? dogName(item.tap.dogId) : null)}, ${hhmm(item.at)}${item.tap.type === "poop" ? ", Konsistenz wählen" : ""}`}
+                    onPress={() => setFresh(isFresh(item.tap) ? null : { at: item.at, dogId: item.tap.dogId })}
+                    style={styles.item}
+                  >
                     <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(item.at)}</Text>
                     <Icon name={TYPE_ICON[item.tap.type]} size={17} color={theme[TYPE_TONE[item.tap.type]]} />
                     <Text style={[styles.line, { color: theme.ink }]}>{tapLine(item.tap, several ? dogName(item.tap.dogId) : null)}</Text>
-                  </View>
-                  {fresh && item.tap.type === "poop" && item.at === fresh.at && item.tap.dogId === fresh.dogId ? (
+                  </Pressable>
+                  {isFresh(item.tap) ? (
                     <View testID="consistency" style={styles.consistency}>
                       {CONSISTENCIES.map((c) => (
-                        <Chip key={c} label={CONSISTENCY_LABEL[c]} a11y={`Konsistenz ${CONSISTENCY_LABEL[c]}`} on={false} onPress={() => consistency(c)} />
+                        <Chip key={c} label={CONSISTENCY_LABEL[c]} a11y={`Konsistenz ${CONSISTENCY_LABEL[c]}`} accent={theme.poop} on={item.tap.consistency === c} onPress={() => consistency(item.tap.consistency === c ? null : c)} />
                       ))}
                     </View>
                   ) : null}
@@ -165,15 +173,15 @@ export function Walk() {
         <>
           <View style={styles.row}>
             <View style={styles.cell}>
-              <BigButton kind="pee" icon="pee" label={TYPE_LABEL.pee} stacked={marking.length > 0} disabled={walkDogs.length === 0} onPress={() => tap("pee")} />
+              <BigButton kind="pee" icon="pee" label={TYPE_LABEL.pee} stacked={marking} disabled={walkDogs.length === 0} onPress={() => tap("pee")} />
             </View>
-            {marking.length ? (
+            {marking ? (
               <View style={styles.cell}>
-                <BigButton kind="pee" icon="mark" label={TYPE_LABEL.mark} stacked={marking.length > 0} onPress={() => tap("mark")} />
+                <BigButton kind="pee" icon="mark" label={TYPE_LABEL.mark} stacked={marking} onPress={() => tap("mark")} />
               </View>
             ) : null}
             <View style={styles.cell}>
-              <BigButton kind="poop" icon="poop" label={TYPE_LABEL.poop} stacked={marking.length > 0} disabled={walkDogs.length === 0} onPress={() => tap("poop")} />
+              <BigButton kind="poop" icon="poop" label={TYPE_LABEL.poop} stacked={marking} disabled={walkDogs.length === 0} onPress={() => tap("poop")} />
             </View>
           </View>
           <View style={styles.row}>
@@ -189,7 +197,7 @@ export function Walk() {
           <DogChoiceSheet
             open={choosing !== null}
             title={choosing ? `${TYPE_LABEL[choosing]} – welcher Hund?` : ""}
-            dogs={(choosing ? dogsFor(choosing) : walkDogs).map((id) => ({ id, name: dogName(id), color: dogs.find((d) => d.id === id)?.color }))}
+            dogs={walkDogs.map((id) => ({ id, name: dogName(id), color: dogs.find((d) => d.id === id)?.color }))}
             onPick={(id) => choosing && log(choosing, id)}
             onClose={() => setChoosing(null)}
           />
