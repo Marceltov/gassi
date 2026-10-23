@@ -1,5 +1,5 @@
 // Which entries belong to which dogs: pee, poop and weight to exactly one; walks, trainings and feedings to one or
-// more; restocks, stock counts and notes to none (they are the household's).
+// more; restocks, stock counts, opened cans and notes to none (they are the household's).
 import type { EntryType } from "./entryTypes";
 
 export type DogRule = "one" | "some" | "none";
@@ -13,6 +13,7 @@ const RULES: Record<EntryType, DogRule> = {
   food: "some",
   restock: "none",
   stockcheck: "none",
+  opened: "none",
   note: "none",
 };
 

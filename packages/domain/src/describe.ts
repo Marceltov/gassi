@@ -58,8 +58,10 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
       const amount = e.unitG && e.amountG ? `${Math.round(e.amountG / e.unitG)} × ${e.unitG} g` : e.amountG ? grams(e.amountG) : "";
       return plain([TYPE_LABEL.restock, kind].filter(Boolean).join(" "), amount);
     }
+    case "opened":
+      return plain(TYPE_LABEL.opened, e.unitG ? `${e.unitG}-g-Dose` : "");
     case "stockcheck":
-      // a wet count is one entry per can size, in whole and half cans
+      // a wet count is one entry per can size, in whole closed cans
       return plain([TYPE_LABEL.stockcheck, kind].filter(Boolean).join(" "), e.amountG === null ? "" : e.unitG ? formatCanCount({ unitG: e.unitG, cans: cansOf(e.amountG, e.unitG) }) : grams(e.amountG));
     default:
       return plain(TYPE_LABEL[e.type], [duration, kind, e.amountG ? `${e.amountG} g` : ""].filter(Boolean).join(", "));

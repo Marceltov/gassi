@@ -4,19 +4,11 @@ import { FOOD_KINDS, FOOD_SHORT, type FoodKind } from "./entryTypes";
 import { type CanStock, cansOf, type Stock } from "./stock";
 import { utcToLocal } from "./time";
 
-const QUARTERS = ["", "¼", "½", "¾"];
-/** "11½", "2¾", "¼", "0": whole cans and quarters (the stock rounds down to quarters). */
-const halves = (cans: number): string => {
-  const whole = Math.floor(cans);
-  const part = QUARTERS[Math.round((cans - whole) * 4)] ?? "";
-  return `${whole === 0 && part ? "" : whole}${part}`;
-};
+/** "11 Dosen", "1 Dose", "0 Dosen": closed cans are whole. */
+export const formatCans = (cans: number): string => `${cans} ${cans === 1 ? "Dose" : "Dosen"}`;
 
-/** "11½ Dosen", "2¾ Dosen", "1 Dose", "½ Dose". */
-export const formatCans = (cans: number): string => `${halves(cans)} ${cans > 0 && cans <= 1 ? "Dose" : "Dosen"}`;
-
-/** One can size's count: "3 × 400 g", "2¾ × 800 g". */
-export const formatCanCount = (s: Pick<CanStock, "unitG" | "cans">): string => `${halves(s.cans)} × ${s.unitG} g`;
+/** One can size's count: "3 × 400 g". */
+export const formatCanCount = (s: Pick<CanStock, "unitG" | "cans">): string => `${s.cans} × ${s.unitG} g`;
 
 /** "4,4 kg" from 1 kg on, else "800 g". */
 export const formatWeight = (grams: number): string =>
@@ -55,6 +47,14 @@ export function quickPortions(recent: readonly Portion[], kind: FoodKind): { lab
 /** A feeding's grams for each of its dogs (a feeding is stored as what all of them got together). */
 export const perDog = (amountG: number, dogs: number): number => Math.round(amountG / Math.max(1, dogs));
 
+/** The sizes a can is opened from, with their closed cans: those with cans left (smallest first); with none left,
+ * every known size, so a can beyond the count can still be opened (the count then goes below zero). */
+export function openableSizes(stock: Stock): { unitG: number; cans: number }[] {
+  const all = stock.wet.sizes.map((s) => ({ unitG: s.unitG, cans: s.cans }));
+  const left = all.filter((s) => s.cans > 0);
+  return left.length ? left : all;
+}
+
 /** The stock of a kind in parts: what is left ("3 × 400 g · 2 × 800 g", "1,2 kg"; null when it isn't known), for wet
  * food each can size that has some left ("3 × 400 g"), the amount ("2,8 kg"; null when it isn't known), for how long
  * ("reicht etwa 12 Tage"; null without use to go by or when it ran out), and whether it ran out (or counts below zero). */
@@ -91,7 +91,7 @@ export function countTitle(at: string, timeZone: string): string {
   return `Zählung vom ${local.slice(8, 10)}.${local.slice(5, 7)}., ${local.slice(11)}`;
 }
 
-/** What a wet count comes to ("2,8 kg"): its cans per size as typed ("2,75"); null while one isn't a number. */
+/** What a wet count comes to ("2,8 kg"): its cans per size as typed ("3"); null while one isn't a number. */
 export function countWeight(sizes: readonly { unitG: number; cans: string }[]): string | null {
   const cans = sizes.map((s) => parseDecimal(s.cans));
   return cans.some((n) => !Number.isFinite(n) || n < 0) ? null : formatWeight(sizes.reduce((g, s, i) => g + s.unitG * cans[i]!, 0));

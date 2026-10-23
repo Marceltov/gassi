@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { Entry } from "./entry";
 import { formatCans, formatWeight, parseDecimal } from "./food";
-import { cansOf, computeStock } from "./stock";
+import { computeStock } from "./stock";
 
 const NOW = Date.parse("2026-10-20T12:00:00Z");
 let id = 0;
@@ -28,7 +28,29 @@ const feed = (at: string, kind: "wet" | "dry", g: number) => e("food", at, { foo
 const stock = (entries: Entry[], treats: { at: string; grams: number }[] = []) => computeStock({ entries, treats, now: NOW });
 const wetOf = (s: ReturnType<typeof stock>) => s.wet.sizes.map((x) => [x.unitG, x.cans]);
 const check = (at: string, unitG: number, cans: number) => e("stockcheck", at, { foodKind: "wet", amountG: cans * unitG, unitG });
-const feedCan = (at: string, g: number, unitG: number) => e("food", at, { foodKind: "wet", amountG: g, unitG });
+const feedCan = (at: string, g: number, unitG: number) => e("food", at, { foodKind: "wet", amountG: g, unitG }); // older data named a can
+const opened = (at: string, unitG: number) => e("opened", at, { foodKind: "wet", amountG: unitG, unitG, dogIds: [] });
+describe("wet food in closed cans", () => {
+  test("wet food counts closed cans: count + bought − opened; feedings don't count", () => {
+    const s = stock([check(day(5), 400, 3), restockWet(day(4), 2, 400), opened(day(3), 400), feedCan(day(3), 300, 400)]);
+    expect(s.wet.sizes).toMatchObject([{ unitG: 400, cans: 4 }]);
+  });
+
+  test("an old count with halves shows whole cans", () => {
+    expect(wetOf(stock([e("stockcheck", day(2), { foodKind: "wet", amountG: 1000, unitG: 400 })]))).toEqual([[400, 2]]);
+  });
+
+  test("opening a size with no cans left counts below zero", () => {
+    const s = stock([check(day(2), 400, 0), check(day(2), 800, 1), opened(day(1), 400)]);
+    expect(s.wet.sizes.find((x) => x.unitG === 400)).toMatchObject({ cans: 0, belowZero: true });
+  });
+
+  test("reicht etwa: closed cans' grams over the wet grams fed per day", () => {
+    const fed = Array.from({ length: 14 }, (_, d) => feed(day(d + 1), "wet", 400));
+    expect(stock([check(day(20), 400, 10), ...fed]).wet.daysLeft).toBe(10);
+  });
+});
+
 describe("computeStock", () => {
   test("no restock means unknown", () => {
     expect(stock([feed(day(1), "wet", 200)])).toEqual({
@@ -37,46 +59,16 @@ describe("computeStock", () => {
     });
   });
 
-  test("12 cans à 400 g minus 2 feedings of 200 g is 11 cans", () => {
-    const s = stock([feed(day(5), "wet", 200), restockWet(day(3), 12, 400), feed(day(2), "wet", 200), feed(day(1), "wet", 200), feed(day(1), "dry", 80)]);
+  test("12 cans à 400 g minus 1 opened is 11 cans; wet feedings don't count", () => {
+    const s = stock([feed(day(5), "wet", 200), restockWet(day(3), 12, 400), opened(day(2), 400), feed(day(2), "wet", 200), feed(day(1), "dry", 80)]);
     expect(s.wet).toMatchObject({ grams: 4400, sizes: [{ unitG: 400, grams: 4400, cans: 11, belowZero: false, lastAt: day(3) }], newestUnitG: 400, belowZero: false });
     expect(s.dry.grams).toBeNull();
   });
 
   test("cans of 400 g and 800 g are counted apart, with a total", () => {
-    const s = stock([restockWet(day(5), 4, 400), restockWet(day(4), 2, 800), feedCan(day(3), 400, 400), feedCan(day(2), 400, 800)]);
-    expect(wetOf(s)).toEqual([[400, 3], [800, 1.5]]);
-    expect(s.wet).toMatchObject({ grams: 1200 + 1200, newestUnitG: 800 });
-  });
-
-  test("a feeding without a can size comes out of the size bought most recently before it", () => {
-    const s = stock([restockWet(day(5), 4, 400), feed(day(4), "wet", 400), restockWet(day(3), 2, 800), feed(day(2), "wet", 400)]);
-    expect(wetOf(s)).toEqual([[400, 3], [800, 1.5]]);
-  });
-
-  test("cans are rounded down to quarters, per size", () => {
-    expect(wetOf(stock([restockWet(day(3), 2, 400), feed(day(1), "wet", 150)]))).toEqual([[400, 1.5]]);
-    expect(wetOf(stock([restockWet(day(3), 2, 400), feed(day(1), "wet", 250)]))).toEqual([[400, 1.25]]);
-    expect(wetOf(stock([restockWet(day(3), 2, 400), feed(day(1), "wet", 350)]))).toEqual([[400, 1]]);
-    expect(wetOf(stock([check(day(2), 400, 2.75)]))).toEqual([[400, 2.75]]); // a count typed as 2,75
-  });
-
-  test("half cans of any size: a few grams lost to rounding a half don't take the half away", () => {
-    // ½ Dose of 395 g is 198 g, of 425 g it is 213 g
-    expect(wetOf(stock([restockWet(day(3), 2, 395), feedCan(day(1), 198, 395)]))).toEqual([[395, 1.5]]);
-    expect(wetOf(stock([restockWet(day(3), 2, 425), feedCan(day(2), 213, 425), feedCan(day(1), 213, 425)]))).toEqual([[425, 1]]);
-    expect(wetOf(stock([restockWet(day(3), 4, 395), ...[1, 2, 3, 4, 5].map((d) => feedCan(day(d * 0.1), 198, 395))]))).toEqual([[395, 1.5]]);
-    expect(cansOf(90, 395)).toBe(0); // well short of a quarter is none
-    expect(cansOf(190, 395)).toBe(0.25);
-    expect(cansOf(395 * 2, 395)).toBe(2);
-  });
-
-  test("½ Dose and 1 Dose come out exactly, however many: 20 halves of 395 g and of 425 g", () => {
-    const halves = (unitG: number, n: number) => Array.from({ length: n }, (_, i) => feedCan(day(1 + i * 0.01), Math.round(unitG / 2), unitG));
-    expect(wetOf(stock([restockWet(day(3), 12, 395), ...halves(395, 11)]))).toEqual([[395, 6.5]]);
-    expect(wetOf(stock([restockWet(day(3), 12, 395), ...halves(395, 20)]))).toEqual([[395, 2]]);
-    expect(wetOf(stock([restockWet(day(3), 12, 425), ...halves(425, 21)]))).toEqual([[425, 1.5]]);
-    expect(wetOf(stock([restockWet(day(3), 3, 395), feedCan(day(1), 395, 395)]))).toEqual([[395, 2]]);
+    const s = stock([restockWet(day(5), 4, 400), restockWet(day(4), 2, 800), opened(day(3), 400), opened(day(2), 800)]);
+    expect(wetOf(s)).toEqual([[400, 3], [800, 1]]);
+    expect(s.wet).toMatchObject({ grams: 1200 + 800, newestUnitG: 800 });
   });
 
   test("dry treats count against dry food", () => {
@@ -89,17 +81,17 @@ describe("computeStock", () => {
     expect(s.dry.grams).toBe(1600);
   });
 
-  test("a wet count sets every size at once: a size left out is 0 (and retired), later restocks and feedings count on", () => {
-    const s = stock([restockWet(day(10), 12, 400), restockWet(day(9), 3, 800), feedCan(day(5), 2000, 400), check(day(3), 400, 5), feedCan(day(2), 400, 400), restockWet(day(1), 6, 400)]);
+  test("a wet count sets every size at once: a size left out is 0 (and retired), later restocks and opened cans count on", () => {
+    const s = stock([restockWet(day(10), 12, 400), restockWet(day(9), 3, 800), opened(day(5), 400), check(day(3), 400, 5), opened(day(2), 400), restockWet(day(1), 6, 400)]);
     expect(wetOf(s)).toEqual([[400, 10]]);
     expect(s.wet.grams).toBe(4000);
   });
 
   test("a wet count works without any purchase, and a new size starts there", () => {
     const at = day(2);
-    const s = stock([check(at, 400, 2.5), check(at, 800, 1), feedCan(day(1), 200, 800)]);
-    expect(wetOf(s)).toEqual([[400, 2.5], [800, 0.75]]);
-    expect(s.wet).toMatchObject({ grams: 1000 + 600, newestUnitG: null });
+    const s = stock([check(at, 400, 2), check(at, 800, 1), opened(day(1), 800)]);
+    expect(wetOf(s)).toEqual([[400, 2], [800, 0]]);
+    expect(s.wet).toMatchObject({ grams: 800, newestUnitG: null });
   });
 
   test("an older count is replaced by the newest one as a whole", () => {
@@ -107,21 +99,21 @@ describe("computeStock", () => {
     expect(wetOf(s)).toEqual([[400, 1]]);
   });
 
-  test("a size counted to 0 is retired; bought, counted or fed after the count it is back", () => {
+  test("a size counted to 0 is retired; bought, counted or opened after the count it is back", () => {
     const at = day(5);
     const counted = [restockWet(day(9), 1, 10_000), restockWet(day(8), 4, 400), check(at, 10_000, 0), check(at, 400, 3)];
     expect(wetOf(stock(counted))).toEqual([[400, 3]]); // the mistaken 10000 g can is gone
     expect(wetOf(stock([...counted, restockWet(day(2), 1, 10_000)]))).toEqual([[400, 3], [10_000, 1]]);
-    expect(stock([...counted, feedCan(day(2), 100, 10_000)]).wet.sizes.map((x) => x.unitG)).toEqual([400, 10_000]);
+    expect(stock([...counted, opened(day(2), 10_000)]).wet.sizes.map((x) => x.unitG)).toEqual([400, 10_000]);
   });
 
   test("each size knows when it was last bought or counted with cans", () => {
-    const s = stock([restockWet(day(5), 2, 400), check(day(3), 400, 1), check(day(3), 800, 1), restockWet(day(2), 1, 800), feedCan(day(1), 400, 800)]);
+    const s = stock([restockWet(day(5), 2, 400), check(day(3), 400, 1), check(day(3), 800, 1), restockWet(day(2), 1, 800), opened(day(1), 800)]);
     expect(s.wet.sizes.map((x) => [x.unitG, x.lastAt])).toEqual([[400, day(3)], [800, day(2)]]);
   });
 
-  test("a size eaten down to 0 without a count stays, to be bought again", () => {
-    expect(wetOf(stock([restockWet(day(5), 1, 800), restockWet(day(4), 2, 400), feedCan(day(2), 800, 800)]))).toEqual([[400, 2], [800, 0]]);
+  test("a size opened down to 0 without a count stays, to be bought again", () => {
+    expect(wetOf(stock([restockWet(day(5), 1, 800), restockWet(day(4), 2, 400), opened(day(2), 800)]))).toEqual([[400, 2], [800, 0]]);
   });
 
   test("a stockcheck of zero is a known, empty stock", () => {
@@ -130,14 +122,14 @@ describe("computeStock", () => {
   });
 
   test("negative stock is clamped, per size", () => {
-    const s = stock([restockWet(day(4), 1, 400), restockWet(day(3), 1, 800), feedCan(day(2), 300, 400), feedCan(day(1), 300, 400)]);
+    const s = stock([restockWet(day(4), 1, 400), restockWet(day(3), 1, 800), opened(day(2), 400), opened(day(1), 400)]);
     expect(s.wet.sizes).toEqual([{ unitG: 400, grams: 0, cans: 0, belowZero: true, lastAt: day(4) }, { unitG: 800, grams: 800, cans: 1, belowZero: false, lastAt: day(3) }]);
     expect(s.wet).toMatchObject({ grams: 800, belowZero: true });
   });
 
   test("in the first days, days left divide by the days covered, not by 14", () => {
-    // restocked 2 days ago, 200 g a day since: 7600 g left lasts 38 days, not 7600 / (400 / 14) = 266
-    const s = stock([restockWet(day(2, 12), 20, 400), feed(day(1), "wet", 200), feed(day(0, 9), "wet", 200)]);
+    // restocked 2 days ago, 200 g a day since: 7600 g closed lasts 38 days, not 7600 / (400 / 14) = 266
+    const s = stock([restockWet(day(2, 12), 20, 400), opened(day(1), 400), feed(day(1), "wet", 200), feed(day(0, 9), "wet", 200)]);
     expect(s.wet.grams).toBe(7600);
     expect(s.wet.daysLeft).toBe(38);
   });
@@ -146,16 +138,13 @@ describe("computeStock", () => {
     // 14 days × 200 g = 2800 g used in the window → 200 g a day; one older feeding doesn't count
     const feedings = Array.from({ length: 14 }, (_, d) => feed(day(d, 9), "wet", 200));
     const s = stock([restockWet(day(31), 10, 800), restockWet(day(30), 20, 400), feed(day(20), "wet", 1000), ...feedings]);
-    expect(s.wet.grams).toBe(8000 + 8000 - 1000 - 2800);
-    expect(s.wet.daysLeft).toBe(61);
+    expect(s.wet.grams).toBe(8000 + 8000);
+    expect(s.wet.daysLeft).toBe(80);
   });
 });
 test("formatCans", () => {
-  expect(formatCans(11.5)).toBe("11½ Dosen");
+  expect(formatCans(11)).toBe("11 Dosen");
   expect(formatCans(1)).toBe("1 Dose");
-  expect(formatCans(0.5)).toBe("½ Dose");
-  expect(formatCans(2.75)).toBe("2¾ Dosen");
-  expect(formatCans(0.25)).toBe("¼ Dose");
   expect(formatCans(0)).toBe("0 Dosen");
 });
 test("formatWeight", () => {
