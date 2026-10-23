@@ -2,7 +2,7 @@
 // under their day scroll below it, the filters (who, what, which dog) stay at the bottom for the thumb. A walk opens its summary, anything else its detail.
 // What is shown lives in the URL (/verlauf?type=pee), so a Start tile, a link or a reload can open it filtered. A tap
 // on the Verlauf tab clears every filter.
-import { byDay, ENTRY_TYPES, type EntryType, TYPE_LABEL } from "@gassi/domain";
+import { byDay, ENTRY_TYPES, type EntryType, oneRowPerCount, TYPE_LABEL } from "@gassi/domain";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
@@ -77,7 +77,7 @@ export function History() {
   };
   const filtered = !!(filter.by || filter.type || filter.dog);
 
-  const days = entries ? byDay(entries, TIME_ZONE, now) : [];
+  const days = entries ? byDay(oneRowPerCount(entries), TIME_ZONE, now) : [];
   return (
     <Screen
       head={<Text style={[styles.title, { color: theme.ink }]}>Verlauf</Text>}

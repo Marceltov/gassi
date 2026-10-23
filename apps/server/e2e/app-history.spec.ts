@@ -279,7 +279,7 @@ test("a walk's summary counts what happened, lists it by time, and a training op
   await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${walk.trainings[0].id}`);
 });
 
-test("Verlauf, an entry and a walk's summary fit a small and a big phone; every row is two lines of one height and names its dogs", async ({ page }) => {
+test("Verlauf, an entry and a walk's summary fit a small and a big phone; every row is two lines of one height (a count a line per size, taller) and names its dogs", async ({ page }) => {
   const client = asHirsch();
   const dogs = (await client.dogs()).dogs.filter((d) => !d.archived);
   const food = await client.logEntry({ type: "food", foodKind: "wet", amountG: 120 });
@@ -292,6 +292,15 @@ test("Verlauf, an entry and a walk's summary fit a small and a big phone; every 
   const height = async (id: number) => (await page.getByTestId(`entry-${id}`).boundingBox())!.height;
   expect(await height(pee.id)).toBe(await height(food.id)); // a long note is cut short
   expect(await height(walk.id)).toBe(await height(food.id)); // a walk too
+  // a count is one row, a line per size: taller, never shorter
+  const counted = (await client.correctStock({ foodKind: "wet", sizes: [{ unitG: 200, cans: "1" }, { unitG: 400, cans: "2" }, { unitG: 800, cans: "3" }] })).entries;
+  made.push(...counted.map((e) => e.id));
+  await page.reload();
+  const ids = counted.map((e) => e.id);
+  await expect(page.getByTestId(new RegExp(`^entry-(${ids.join("|")})$`))).toHaveCount(1); // one row for the count
+  const shown = ids.at(-1)!; // the newest of its rows stands for it
+  await expect(page.getByTestId(`entry-${shown}-size`)).toHaveText(["1 × 200 g", "2 × 400 g", "3 × 800 g"]);
+  expect(await height(shown)).toBeGreaterThan(await height(food.id));
   for (const d of dogs) await expect(page.getByTestId(`entry-${food.id}-more`)).toContainText(d.name); // all of them, too
   await expect(page.getByTestId(`entry-${pee.id}-more`)).toContainText(dogs[0].name);
   // what the entry says is bold, what kind it is isn't

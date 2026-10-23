@@ -1,7 +1,7 @@
 // How an entry reads in a list, the same in the apps.
 import { type EntryType, FOOD_LABEL, type FoodKind, TYPE_LABEL } from "./entryTypes";
 import { exerciseRate, type ExerciseTotal, trainingParts } from "./exerciseTotals";
-import { formatCanCount } from "./food";
+import { countLine, formatCanCount } from "./food";
 import { cansOf } from "./stock";
 import { formatMinutes } from "./time";
 
@@ -24,6 +24,8 @@ export type DescribableEntry = {
   byName: string;
   distanceM?: number | null;
   during?: WalkDuring | null;
+  /** a wet count's sizes, all of them */
+  count?: readonly { unitG: number; amountG: number }[] | null;
 };
 
 export const formatKg = (grams: number) => `${(grams / 1000).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`;
@@ -62,7 +64,7 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
       return plain(TYPE_LABEL.opened, e.unitG ? `${e.unitG}-g-Dose` : "");
     case "stockcheck":
       // a wet count is one entry per can size, in whole closed cans
-      return plain([TYPE_LABEL.stockcheck, kind].filter(Boolean).join(" "), e.amountG === null ? "" : e.unitG ? formatCanCount({ unitG: e.unitG, cans: cansOf(e.amountG, e.unitG) }) : grams(e.amountG));
+      return plain([TYPE_LABEL.stockcheck, kind].filter(Boolean).join(" "), e.count?.length ? countLine(e.count) : e.amountG === null ? "" : e.unitG ? formatCanCount({ unitG: e.unitG, cans: cansOf(e.amountG, e.unitG) }) : grams(e.amountG));
     default:
       return plain(TYPE_LABEL[e.type], [duration, kind, e.amountG ? `${e.amountG} g` : ""].filter(Boolean).join(", "));
   }
