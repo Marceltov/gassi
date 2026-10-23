@@ -1,6 +1,8 @@
 // One entry in Verlauf: the time, a small map for a tracked walk, the type's icon in a dot of its color (and a strip of it
-// on the left edge), the type in bold ("Gassi") over its details ("42 Min. · 3,1 km"), what happened on a walk or which
-// dog, and who. Tapping opens it.
+// on the left edge), two lines and who. The first line is the type in bold with its figures ("Gassi 42 Min. · 3,1 km"),
+// the second the dogs, what happened on a walk and the note. An entry without dogs (a purchase, a count) has its
+// figures on the second line, so the first isn't cut short while the second stays empty. Every row has the same height (#71): each line is cut
+// short rather than wrapping, and the second is there even when empty. Tapping opens it.
 import { describeEntry } from "@gassi/domain";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -11,16 +13,20 @@ import { Icon } from "../ui/Icon";
 import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
 import type { Entry } from "./form";
 
+const ROW_HEIGHT = 60;
+
 type Props = { entry: Entry; dogs: string; onPress: () => void };
 
-/** `dogs`: the dog names to show ("" when it is about all dogs, or the household has one). */
+/** `dogs`: the dog names ("" for an entry without dogs, such as a purchase). */
 export function EntryRow({ entry, dogs, onPress }: Props) {
   const theme = useTheme();
   const d = describeEntry(entry);
   const routeKey = JSON.stringify(entry.route);
   // the same route keeps its map (a refresh brings a new array with the same points)
   const routes = useMemo(() => (routeKey !== "null" ? [JSON.parse(routeKey) as [number, number][]] : []), [routeKey]);
-  const more = [d.during, dogs, entry.note ?? ""].filter(Boolean).join(" · ");
+  const below = !dogs; // the figures go on the second line
+  const extra = below ? "" : d.extra;
+  const more = [below ? d.extra : "", dogs, d.during, entry.note ?? ""].filter(Boolean).join(" · ");
   const tone = theme[TYPE_TONE[entry.type]];
   return (
     <Pressable
@@ -41,17 +47,11 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
       <View style={styles.main}>
         <Text style={[styles.title, { color: theme.ink }]} numberOfLines={1}>
           {d.title}
+          {extra ? <Text testID={`entry-${entry.id}-extra`} style={[styles.extra, { color: theme.ink }]}>{` ${extra}`}</Text> : null}
         </Text>
-        {d.extra ? (
-          <Text testID={`entry-${entry.id}-extra`} style={[styles.small, { color: theme.muted }]} numberOfLines={2}>
-            {d.extra}
-          </Text>
-        ) : null}
-        {more ? (
-          <Text testID={`entry-${entry.id}-more`} style={[styles.small, { color: theme.muted }]} numberOfLines={2}>
-            {more}
-          </Text>
-        ) : null}
+        <Text testID={`entry-${entry.id}-more`} style={[styles.small, { color: theme.muted }]} numberOfLines={1}>
+          {more || " "}
+        </Text>
       </View>
       <Text style={[styles.by, { color: theme.muted }]} numberOfLines={2}>
         {d.by.replace(/^von /, "")}
@@ -61,12 +61,13 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: radius.tile, paddingVertical: 10, paddingLeft: 10, paddingRight: 12, minHeight: 52, borderLeftWidth: 4 },
+  row: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: radius.tile, paddingLeft: 10, paddingRight: 12, height: ROW_HEIGHT, borderLeftWidth: 4 },
   time: { width: 40, fontSize: 13, fontVariant: ["tabular-nums"] },
   thumb: { width: 56, height: 40, borderRadius: 8, overflow: "hidden", pointerEvents: "none" },
   main: { flex: 1, gap: 2 },
   dot: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 15, fontWeight: "700" },
+  extra: { fontWeight: "400" },
   small: { fontSize: 13 },
   by: { maxWidth: 110, fontSize: 12, textAlign: "right" },
 });

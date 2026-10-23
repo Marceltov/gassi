@@ -4,6 +4,7 @@
 import { utcToLocal } from "@gassi/domain";
 import { expect, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
+import { expectFits } from "./fit";
 import { asHirsch, stopEverything } from "./sessions";
 import { signIn } from "./signed-in";
 
@@ -110,7 +111,7 @@ test("filtered by Herzii, the walk she went on stays and Hirsch's feeding goes; 
   const walkRow = page.getByTestId(`entry-${walk.id}`);
   await expect(walkRow).toContainText("Gassi");
   await expect(page.getByTestId(`entry-${walk.id}-extra`)).toContainText("28 Min.");
-  await expect(page.getByTestId(`entry-${walk.id}-more`)).toHaveText("1× Pipi");
+  await expect(page.getByTestId(`entry-${walk.id}-more`)).toContainText("1× Pipi");
   await expect(walkRow).toContainText("Hirsch + Herzii");
 
   await walkRow.click();
@@ -276,4 +277,24 @@ test("a walk's summary counts what happened, lists it by time, and a training op
   expect(tops).toEqual([...tops].sort((a, b) => a - b)); // by time
   await page.getByTestId(`summary-training-${walk.trainings[0].id}`).click();
   await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${walk.trainings[0].id}`);
+});
+
+test("Verlauf, an entry and a walk's summary fit a small and a big phone; every row is two lines of one height and names its dogs", async ({ page }) => {
+  const client = asHirsch();
+  const dogs = (await client.dogs()).dogs.filter((d) => !d.archived);
+  const food = await client.logEntry({ type: "food", foodKind: "wet", amountG: 120 });
+  const pee = await client.logEntry({ type: "pee", dogIds: [dogs[0].id], note: "eine sehr lange Notiz, die in der Zeile abgeschnitten wird statt umzubrechen" });
+  const walk = await pastWalk(7);
+  made.push(food.id, pee.id);
+
+  await signIn(page);
+  await expectFits(page, "/verlauf", "Verlauf");
+  const height = async (id: number) => (await page.getByTestId(`entry-${id}`).boundingBox())!.height;
+  expect(await height(pee.id)).toBe(await height(food.id)); // a long note is cut short
+  expect(await height(walk.id)).toBe(await height(food.id)); // a walk too
+  for (const d of dogs) await expect(page.getByTestId(`entry-${food.id}-more`)).toContainText(d.name); // all of them, too
+  await expect(page.getByTestId(`entry-${pee.id}-more`)).toContainText(dogs[0].name);
+
+  await expectFits(page, `/verlauf/eintrag/${food.id}`, "Speichern");
+  await expectFits(page, `/verlauf/runde/${walk.id}`, "Fertig");
 });

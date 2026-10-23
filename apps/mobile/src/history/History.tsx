@@ -1,5 +1,5 @@
-// Verlauf: who went when, fed how much, trained what and how well. The entries newest first under their day on top;
-// the filters (who, what, which dog) at the bottom for the thumb. A walk opens its summary, anything else its detail.
+// Verlauf: who went when, fed how much, trained what and how well. The title stays on top, the entries newest first
+// under their day scroll below it, the filters (who, what, which dog) stay at the bottom for the thumb. A walk opens its summary, anything else its detail.
 // What is shown lives in the URL (/verlauf?type=pee), so a Start tile, a link or a reload can open it filtered. A tap
 // on the Verlauf tab clears every filter.
 import { byDay, ENTRY_TYPES, type EntryType, TYPE_LABEL } from "@gassi/domain";
@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { useNow } from "../start/useNow";
-import { radius, useTheme } from "../theme";
+import { FIELD_HEIGHT, radius, useTheme } from "../theme";
 import { TIME_ZONE } from "../time";
 import { BigButton } from "../ui/BigButton";
 import { type Choice, ChoiceList } from "../ui/ChoiceList";
@@ -51,8 +51,8 @@ export function History() {
 
   const active = dogs.filter((d) => !d.archived);
   const dogName = (id: number) => dogs.find((d) => d.id === id)?.name ?? "Hund";
-  // which dogs, where it says something: not for one dog in the household, nor for all of them
-  const dogsOf = (e: Entry) => (active.length > 1 && e.dogIds.length && !active.every((d) => e.dogIds.includes(d.id)) ? e.dogIds.map(dogName).join(", ") : "");
+  // always which dogs, so every row reads the same way (#71)
+  const dogsOf = (e: Entry) => e.dogIds.map(dogName).join(", ");
 
   const set = (change: Filter) => {
     const { type: chosen, ...others } = change;
@@ -80,9 +80,9 @@ export function History() {
   const days = entries ? byDay(entries, TIME_ZONE, now) : [];
   return (
     <Screen
+      head={<Text style={[styles.title, { color: theme.ink }]}>Verlauf</Text>}
       top={
         <>
-          <Text style={[styles.title, { color: theme.ink }]}>Verlauf</Text>
           {error ? <Text style={[styles.small, { color: theme.muted }]}>{error}</Text> : null}
           {entries === null && !error ? <Text style={[styles.small, { color: theme.muted }]}>Lädt …</Text> : null}
           {entries?.length === 0 ? <Text style={[styles.small, { color: theme.muted }]}>{filtered ? "Nichts für diese Auswahl." : "Noch nichts eingetragen."}</Text> : null}
@@ -143,10 +143,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: "700" },
   small: { fontSize: 13 },
   day: { gap: 6 },
-  heading: { fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6, marginTop: 6 },
+  heading: { fontSize: 12, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.6 },
   credit: { fontSize: 12, textAlign: "center", textDecorationLine: "underline" },
   filters: { flexDirection: "row", gap: 8 },
-  filter: { flex: 1, minHeight: 48, borderRadius: radius.tile, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },
+  filter: { flex: 1, height: FIELD_HEIGHT, borderRadius: radius.tile, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 },
   filterText: { fontSize: 14, fontWeight: "600" },
   sheet: { gap: 10 },
   sheetTitle: { fontSize: 17, fontWeight: "700" },

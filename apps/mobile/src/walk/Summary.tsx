@@ -1,7 +1,8 @@
 // A walk looked back on: after Zuhause, and from Verlauf. The map when there is a track, Dauer, Strecke, Pause, who
 // went (tap a person to change it), how many Pipi, Poopoo and trainings, then each of them by time (a tap opens it),
 // a note, and a way to its detail
-// (time, end, dogs, delete); Fertig leads back. Right after Zuhause without reception it shows what this phone knows
+// (time, end, dogs, delete); Fertig leads back. The title and the figures stay on top, the way to the detail and Fertig
+// at the bottom; the map, who went, what happened and the note scroll between them (#71). Right after Zuhause without reception it shows what this phone knows
 // and says so; changes need the server (the writes' client: OFFLINE without reception, NO_ANSWER without an answer
 // in time).
 import { formatDistance, formatMinutes, keepsOne, simplify } from "@gassi/domain";
@@ -57,7 +58,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
 
   if (!shown) {
     const waitText = <Text style={[styles.line, { color: theme.muted }]}>{error ?? "Lädt …"}</Text>;
-    return <Screen top={waitText} bottom={<BigButton kind="neutral" size="l" label="Fertig" onPress={done} />} />;
+    return <Screen top={waitText} bottom={<BigButton kind="neutral" size="m" label="Fertig" onPress={done} />} />;
   }
 
   const several = new Set(shown.taps.map((t) => t.dogId)).size > 1 || dogs.filter((d) => !d.archived).length > 1;
@@ -76,16 +77,20 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
 
   return (
     <Screen
-      top={
+      head={
         <>
           <Text style={[styles.title, { color: theme.ink }]}>{`Runde ${hhmm(shown.startedAt)}${shown.endedAt ? `–${hhmm(shown.endedAt)}` : ""}`}</Text>
           {local ? <Text style={[styles.small, { color: theme.muted }]}>Noch nicht gesendet – kommt an, sobald Empfang da ist.</Text> : null}
-          {routes.length ? <TrackMap routes={routes} height={220} /> : null}
           <View style={styles.stats}>
             {stat("Dauer", formatMinutes(shown.totalMin))}
             {stat("Strecke", track ? formatDistance(track.metrics.distanceM) : "–")}
             {stat("Pause", formatMinutes(shown.pauseMin))}
           </View>
+        </>
+      }
+      top={
+        <>
+          {routes.length ? <TrackMap routes={routes} height={220} /> : null}
           <Text style={[styles.small, { color: theme.muted }]}>Wer war dabei</Text>
           <View style={styles.chips}>
             {everyone.map((p) => (
@@ -107,11 +112,15 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
             style={[styles.note, { color: theme.ink, backgroundColor: theme.surface }]}
           />
           {note !== null && note !== (shown.note ?? "") ? <BigButton kind="neutral" size="m" label="Notiz speichern" onPress={() => void saveNote(shown, note)} /> : null}
-          {message ? <Text style={[styles.small, { color: theme.muted }]}>{message}</Text> : null}
-          {shown.id !== null && !local ? <BigButton kind="neutral" size="m" label="Zeit, Hunde, Löschen …" onPress={() => router.push(tabPath(`/eintrag/${shown.id}`))} /> : null}
         </>
       }
-      bottom={<BigButton kind="walk" size="l" icon="check" label="Fertig" onPress={done} />}
+      bottom={
+        <>
+          {message ? <Text style={[styles.small, { color: theme.muted }]}>{message}</Text> : null}
+          {shown.id !== null && !local ? <BigButton kind="neutral" size="s" label="Zeit, Hunde, Löschen …" onPress={() => router.push(tabPath(`/eintrag/${shown.id}`))} /> : null}
+          <BigButton kind="walk" size="m" icon="check" label="Fertig" onPress={done} />
+        </>
+      }
     />
   );
 

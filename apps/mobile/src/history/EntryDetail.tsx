@@ -1,6 +1,7 @@
 // One entry from Verlauf, to be put right afterwards: its time (and end), the dogs, for a walk who went, for food the
 // amount and kind, for weight the weight, for a training its repetitions per exercise and dog and its treats, a note;
-// Speichern sends it all, Löschen asks first. A wet count (one row per can size) is one thing here: its sizes in one line,
+// Speichern sends it all, Löschen asks first. What it is and who entered it stay on top, the buttons at the bottom
+// (#71). A wet count (one row per can size) is one thing here: its sizes in one line,
 // its time moved and its rows deleted together. Both need the server (the writes' client): they say so without
 // reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
 import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, trainingSummaryLine, TYPE_LABEL } from "@gassi/domain";
@@ -101,7 +102,7 @@ export function EntryDetail({ id }: { id: number }) {
 
   return (
     <Screen
-      top={
+      head={
         <>
           <View style={styles.heading}>
             <Icon name={TYPE_ICON[entry.type]} size={24} color={theme.muted} />
@@ -113,6 +114,10 @@ export function EntryDetail({ id }: { id: number }) {
             </Text>
           ) : null}
           <Text style={[styles.small, { color: theme.muted }]}>{`eingetragen von ${entry.byName}`}</Text>
+        </>
+      }
+      top={
+        <>
           <View style={styles.times}>
             <TimeField label={timed ? "Beginn" : "Zeit"} value={form.at} onChange={(at) => change({ at })} />
             {form.endedAt !== null ? <TimeField label="Ende" value={form.endedAt} onChange={(endedAt) => change({ endedAt })} /> : null}
@@ -151,21 +156,21 @@ export function EntryDetail({ id }: { id: number }) {
             multiline
             style={[styles.note, { color: theme.ink, backgroundColor: theme.surface }]}
           />
-          {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
           <Sheet open={asking} onClose={() => setAsking(false)} label="Eintrag löschen?">
             <View testID="delete-sheet" style={styles.sheet}>
               <Text style={[styles.sheetTitle, { color: theme.ink }]}>Eintrag löschen?</Text>
               <Text style={[styles.small, { color: theme.muted }]}>{`${entry.count ? `Die ganze Zählung (${countLine(entry.count)})` : TYPE_LABEL[entry.type]} – das lässt sich nicht rückgängig machen.`}</Text>
-              <BigButton kind="neutral" size="l" label="Ja, löschen" onPress={() => void remove(entry)} />
-              <BigButton kind="neutral" size="m" label="Abbrechen" onPress={() => setAsking(false)} />
+              <BigButton kind="neutral" size="s" label="Abbrechen" onPress={() => setAsking(false)} />
+              <BigButton kind="neutral" size="m" label="Ja, löschen" onPress={() => void remove(entry)} />
             </View>
           </Sheet>
         </>
       }
       bottom={
         <>
-          <BigButton kind={BUTTON[entry.type] ?? "neutral"} size="l" icon="check" label="Speichern" onPress={() => void save(entry, form)} />
-          <BigButton kind="neutral" size="m" label="Löschen" onPress={() => setAsking(true)} />
+          {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
+          <BigButton kind="neutral" size="s" label="Löschen" onPress={() => setAsking(true)} />
+          <BigButton kind={BUTTON[entry.type] ?? "neutral"} size="m" icon="check" label="Speichern" onPress={() => void save(entry, form)} />
         </>
       }
     />
