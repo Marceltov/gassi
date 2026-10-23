@@ -60,7 +60,7 @@ export function Devices() {
                   tone="device"
                   label={d.name}
                   value={`${KIND[d.kind]} · ${seen(d)}`}
-                  right={d.current ? null : <Small label="Abmelden" a11y={`${d.name} abmelden`} onPress={() => setAsking(d)} />}
+                  right={d.current ? null : <Small danger label="Abmelden" a11y={`${d.name} abmelden`} onPress={() => setAsking(d)} />}
                 />
               ))}
             </Group>
@@ -81,7 +81,7 @@ export function Devices() {
         <>
           {message ?? invites.message ? <Text style={[styles.message, { color: theme.ink }]}>{message ?? invites.message}</Text> : null}
           {/* the exception to side by side (#80): signing this phone out is its own row above */}
-          <BigButton kind="side" size="m" label="Hier abmelden" a11y="Auf diesem Gerät abmelden" onPress={() => setAskingHere(true)} />
+          <BigButton kind="dangerSide" size="m" label="Hier abmelden" a11y="Auf diesem Gerät abmelden" onPress={() => setAskingHere(true)} />
           <BigButton kind="ink" size="m" icon="add" label="Gerät hinzufügen" onPress={invites.create} />
         </>
       }
