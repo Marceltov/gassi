@@ -33,7 +33,8 @@ test("Pipi with one dog logs at once; without reception Poopoo and Zuhause show 
     const key = (await client.sessions()).walk!.key;
 
     await context.setOffline(true);
-    await page.getByRole("button", { name: "Poopoo" }).click();
+    await page.getByRole("button", { name: "Poopoo", exact: true }).click();
+    await page.keyboard.press("Escape"); // no consistency
     await expect(taps).toContainText("Poopoo");
     await page.getByRole("button", { name: "Zuhause" }).click();
     await expect(page).toHaveURL(new RegExp(`/runde/${key}$`));
@@ -157,7 +158,7 @@ test("the other phone ends the walk: this one goes back to Start, and a pause qu
   await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("gassi.commands.")).map((k) => JSON.parse(localStorage.getItem(k)!).length))).toEqual([0]);
 });
 
-test("Markiert shows only for a dog set to mark; it isn't a pee; a poop just tapped takes its consistency, also later in Verlauf", async ({ page }) => {
+test("Markiert shows only for a dog set to mark; it isn't a pee; a poop asks its consistency in a sheet, also from the list and later in Verlauf", async ({ page }) => {
   const restore = await onlyOneDog();
   const client = asHirsch();
   const dog = (await client.dogs()).dogs.find((d) => !d.archived)!;
@@ -179,19 +180,21 @@ test("Markiert shows only for a dog set to mark; it isn't a pee; a poop just tap
     const taps = page.getByTestId("walk-taps");
     await page.getByRole("button", { name: "Markiert", exact: true }).click();
     await page.getByRole("button", { name: "Markiert", exact: true }).click();
+    // the poop is logged at the tap, then a sheet asks how it was
+    const sheet = page.getByTestId("consistency-choice");
     await page.getByRole("button", { name: "Poopoo", exact: true }).click();
-    await page.getByRole("button", { name: "Konsistenz weich" }).click();
-    await expect(page.getByTestId("consistency")).toHaveCount(0);
+    await sheet.getByRole("button", { name: "weich" }).click();
+    await expect(sheet).toHaveCount(0);
     await expect(taps).toContainText("Poopoo · weich");
-    // the next tap ends the choice for the poop before it
+    // closed without an answer, the poop has none; tapped in the list, it asks again
     await page.getByRole("button", { name: "Poopoo", exact: true }).click();
-    await expect(page.getByTestId("consistency")).toBeVisible();
-    await page.getByRole("button", { name: "Markiert", exact: true }).click();
-    await expect(page.getByTestId("consistency")).toHaveCount(0);
-    // a poop in the list takes one when tapped
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
     await page.getByRole("button", { name: /^Poopoo, .*Konsistenz wählen$/ }).click();
-    await page.getByRole("button", { name: "Konsistenz hart" }).click();
-    await expect(page.getByTestId("consistency")).toHaveCount(0);
+    await sheet.getByRole("button", { name: "hart" }).click();
+    await expect(taps).toContainText("Poopoo · hart");
+    await page.getByRole("button", { name: "Markiert", exact: true }).click();
 
     const key = (await client.sessions()).walk!.key;
     await expect.poll(async () => (await client.walkByKey({ key })).summary.poops.map((p) => p.consistency)).toEqual(["soft", "hard"]);
