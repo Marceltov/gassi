@@ -340,6 +340,7 @@ test("an opened can shows in Verlauf and, deleted, goes back into Vorrat", async
   await expect(page.getByTestId(`entry-${opened.id}-title`)).toHaveText("Dose aufgemacht");
   await expect(page.getByTestId(`entry-${opened.id}-extra`)).toHaveText("400-g-Dose");
   await page.getByTestId(`entry-${opened.id}`).click();
+  await expect(page.getByTestId("count-line")).toHaveText("400-g-Dose"); // which can, before deleting it
   await page.getByRole("button", { name: "Löschen", exact: true }).click();
   await page.getByRole("button", { name: "Ja, löschen" }).click();
   await expect(page.getByTestId(`entry-${opened.id}`)).toHaveCount(0);

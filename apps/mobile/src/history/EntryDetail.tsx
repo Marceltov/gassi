@@ -4,7 +4,7 @@
 // (#71). A wet count (one row per can size) is one thing here: its sizes in one line,
 // its time moved and its rows deleted together. Both need the server (the writes' client): they say so without
 // reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
-import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, trainingSummaryLine, TYPE_LABEL } from "@gassi/domain";
+import { clampPortion, countLine, countTitle, describeEntry, dogRule, FOOD_MAX_G, formatKg, keepsOne, trainingSummaryLine, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -108,9 +108,10 @@ export function EntryDetail({ id }: { id: number }) {
             <Icon name={TYPE_ICON[entry.type]} size={24} color={theme.muted} />
             <Text style={[styles.title, { color: theme.ink }]}>{entry.count ? countTitle(entry.at, TIME_ZONE) : TYPE_LABEL[entry.type]}</Text>
           </View>
-          {entry.count ? (
+          {entry.count || entry.type === "opened" ? (
+            // what was counted, or which can was opened ("400-g-Dose"), to check before deleting it
             <Text testID="count-line" style={[styles.countLine, { color: theme.ink }]}>
-              {countLine(entry.count)}
+              {entry.count ? countLine(entry.count) : describeEntry(entry).extra}
             </Text>
           ) : null}
           <Text style={[styles.small, { color: theme.muted }]}>{`eingetragen von ${entry.byName}`}</Text>
