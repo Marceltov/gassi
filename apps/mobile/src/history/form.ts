@@ -19,6 +19,7 @@ export type Form = {
   unitG: number | null; // an opened can's size
   count: CountRow[]; // a wet count's closed cans per size
   note: string;
+  details: Entry["details"]; // a poop's consistency
   reps: Rep[];
   treats: TreatCount[];
 };
@@ -33,6 +34,7 @@ export const formOf = (e: Entry): Form => ({
   unitG: e.unitG,
   count: (e.count ?? []).map((r) => ({ id: r.id, unitG: r.unitG, cans: cansOf(r.amountG, r.unitG) })),
   note: e.note ?? "",
+  details: e.details,
   reps: e.reps,
   treats: e.treatCounts,
 });
@@ -49,6 +51,7 @@ export function editInput(e: Entry, f: Form): Input<"editEntry"> {
     foodKind: f.foodKind,
     unitG: e.type === "opened" ? f.unitG : e.unitG,
     note: f.note.trim() || null,
+    details: f.details,
     ...(e.type === "walk" ? { walkers: f.walkerIds } : {}),
   };
 }

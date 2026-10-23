@@ -10,7 +10,7 @@
 //   alias of the running walk, so its later taps land there. A start arriving after the stop joins the walk that was
 //   running at its time. Trainings do the same; a training started on a walk that has since ended ends with it.
 import { sql, type Kysely } from "kysely";
-import { type Command, type Entry, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, keepsOne, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView, withinWalk } from "@gassi/domain";
+import { type Command, type Consistency, type Entry, withDetail, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, keepsOne, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView, withinWalk } from "@gassi/domain";
 import type { DB } from "./db/open";
 import type { Schema } from "./db/schema";
 import { DogRepository } from "./dogs";
@@ -31,11 +31,12 @@ export type WalkSummary = {
   pauseCount: number;
   walkers: Person[];
   trainings: TrainingSummary[];
-  pees: Mark[]; // oldest first
-  poops: Mark[];
+  pees: Tap[]; // oldest first
+  marks: Tap[];
+  poops: Tap[];
 };
-/** A pee or poop during a walk: its entry, when, and which dog. */
-export type Mark = { id: number; at: string; dogId: number };
+/** A pee, marking or poop during a walk: its entry, when, which dog, and a poop's consistency. */
+export type Tap = { id: number; at: string; dogId: number; consistency: Consistency | null };
 
 export type SessionsDeps = { db: DB; names: Names; now: () => Date };
 
@@ -98,8 +99,9 @@ export class Sessions {
       pauseCount: pauses.length,
       walkers: await this.walkers(walk.id),
       trainings: await Promise.all(trainings.map((t) => this.trainingSummary(t, end))),
-      pees: marks(during, "pee"),
-      poops: marks(during, "poop"),
+      pees: taps(during, "pee"),
+      marks: taps(during, "mark"),
+      poops: taps(during, "poop"),
     };
   }
 
@@ -146,9 +148,12 @@ export class Sessions {
   }
 }
 
-// `during` is newest first; pee and poop are for exactly one dog
-const marks = (during: readonly Entry[], type: "pee" | "poop"): Mark[] =>
-  during.filter((e) => e.type === type).reverse().map((e) => ({ id: e.id, at: e.at, dogId: e.dogIds[0] }));
+// `during` is newest first; pee, markings and poop are for exactly one dog
+const taps = (during: readonly Entry[], type: "pee" | "mark" | "poop"): Tap[] =>
+  during
+    .filter((e) => e.type === type)
+    .reverse()
+    .map((e) => ({ id: e.id, at: e.at, dogId: e.dogIds[0], consistency: e.details?.consistency ?? null }));
 
 /** The walk or training started with `key`, or the running one that a second start with `key` joined. */
 export async function findByKey(db: Tx, key: string, type: "walk" | "training"): Promise<Entry | undefined> {
@@ -209,6 +214,13 @@ class Step {
         // a dog that isn't (or is no longer) the household's: the tap can't belong anywhere
         if (!(await this.activeDogs()).includes(c.dogId)) return "dropped";
         await this.create(c.type, c.at, null, [c.dogId]);
+        return "applied";
+      }
+      case "log.consistency": {
+        // the poop may have been deleted, moved or changed into something else in Verlauf since
+        const poop = (await this.entries.list({ type: "poop", dogId: c.dogId, since: c.poopAt })).findLast((e) => e.at === c.poopAt);
+        if (!poop) return "dropped";
+        await this.entries.update(poop.id, { ...poop, details: withDetail(poop.details, "consistency", c.consistency) });
         return "applied";
       }
       case "food":

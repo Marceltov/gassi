@@ -1,8 +1,8 @@
 // An entry: who did what with which dog, when, with an optional end (walks and trainings; null while one runs), amount
-// in grams (food, restocks, weight), food kind, can size (restocks) and note. The input schemas are shared by the
-// server and its clients.
+// in grams (food, restocks, weight), food kind, can size (restocks), note and the details only some kinds have (a
+// poop's consistency). The input schemas are shared by the server and its clients.
 import { z } from "zod";
-import { ENTRY_TYPES, type EntryType, FOOD_KINDS, type FoodKind, minutesBetween } from "./entryTypes";
+import { CONSISTENCIES, ENTRY_TYPES, type EntryType, FOOD_KINDS, type FoodKind, minutesBetween } from "./entryTypes";
 
 export type Entry = {
   id: number;
@@ -16,10 +16,30 @@ export type Entry = {
   unitG: number | null; // grams per can, on wet-food restocks
   clientKey: string | null; // the key a walk or training was started with
   note: string | null;
+  details: EntryDetails | null;
   loggedBy: string; // person id
   createdAt: string;
   updatedAt: string;
 };
+
+/** What only some kinds of entries have, each optional: a poop's consistency (#86). Kept as one JSON column. */
+export const entryDetails = z.object({ consistency: z.enum(CONSISTENCIES).optional() }).strict();
+export type EntryDetails = z.output<typeof entryDetails>;
+/** The kinds that may have each detail. */
+const DETAIL_TYPES: Record<keyof EntryDetails, readonly EntryType[]> = { consistency: ["poop"] };
+
+/** A German message when `details` has one `type` can't have, else null. */
+export function checkDetails(type: EntryType, details: EntryDetails | null): string | null {
+  const wrong = Object.keys(details ?? {}).find((k) => !DETAIL_TYPES[k as keyof EntryDetails].includes(type));
+  return wrong ? "Das passt nicht zu dieser Art von Eintrag." : null;
+}
+
+/** `details` with `key` set to `value`, or taken out for null; none left is null. */
+export function withDetail<K extends keyof EntryDetails>(details: EntryDetails | null, key: K, value: EntryDetails[K] | null): EntryDetails | null {
+  const next: EntryDetails = { ...details, [key]: value ?? undefined };
+  if (value === null) delete next[key];
+  return Object.keys(next).length ? next : null;
+}
 
 const blankToNull = (v: unknown) => (v === "" || v === undefined ? null : v);
 
@@ -40,6 +60,8 @@ const fieldShape = {
   foodKind: optionalField(z.enum(FOOD_KINDS)),
   unitG: optionalField(z.coerce.number().int().min(1).max(10_000)),
   note: optionalField(z.string().trim().max(1000)).transform((v) => v || null),
+  // nothing set is null
+  details: optionalField(entryDetails).transform((v) => (v && Object.values(v).some((x) => x !== undefined) ? v : null)),
 };
 
 const endNotBeforeStart = (f: { at: string; endedAt: string | null }) => !f.endedAt || f.endedAt >= f.at;
@@ -74,6 +96,7 @@ export const ENTRY_MESSAGES: Record<string, string> = {
   foodKind: "Diese Futterart gibt es nicht.",
   unitG: "Die Dosengröße muss eine ganze Zahl Gramm sein (1 bis 10000).",
   note: "Die Notiz ist zu lang (höchstens 1000 Zeichen).",
+  details: "Diese Angabe gibt es nicht.",
   type: "Diese Art von Eintrag gibt es nicht.",
   dogIds: "Diesen Hund gibt es nicht.",
   walkers: "Eine Runde braucht mindestens einen Mitgeher.",
@@ -83,6 +106,8 @@ export const ENTRY_MESSAGES: Record<string, string> = {
 
 export type EntryFields = z.output<typeof entryFields>;
 export type NewEntryInput = z.output<typeof newEntryInput>;
-export type NewEntry = Omit<NewEntryInput, "dogIds"> & { dogIds: number[]; loggedBy: string; clientKey?: string | null };
+// details left out are none (a new entry) or unchanged (an update)
+export type NewEntry = Omit<NewEntryInput, "dogIds" | "details"> & { dogIds: number[]; loggedBy: string; clientKey?: string | null; details?: EntryDetails | null };
+export type EntryPatch = Omit<EntryFields, "details"> & { details?: EntryDetails | null };
 
 export const durationOf = (e: { at: string; endedAt: string | null }) => minutesBetween(e.at, e.endedAt);

@@ -67,6 +67,7 @@ function step(v: SessionsView, c: Command, user: Person, people: readonly Person
       return { ...v, training: { ...training, treats: { ...training.treats, [c.treatKindId]: count } } };
     }
     case "log":
+    case "log.consistency":
     case "food":
     case "can.open":
       return v;

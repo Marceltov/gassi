@@ -15,7 +15,8 @@ export function layerToday<E extends TileEntry>(today: Tiles<E> | null, pending:
   if (!me) return tiles;
   const out = { ...tiles };
   for (const c of pending) {
-    const tile = c.kind === "food" ? "food" : c.kind === "log" ? c.type : null;
+    // a marking is no pee: it has no tile
+    const tile = c.kind === "food" ? "food" : c.kind === "log" && c.type !== "mark" ? c.type : null;
     if (!tile) continue;
     const shown = out[tile];
     if (shown && c.at <= (shown.endedAt ?? shown.at)) continue;

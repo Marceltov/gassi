@@ -1,23 +1,34 @@
-// The pee and poop of one walk as the walk screen and its summary list them: what the server counted, with this
+// The pee, markings and poop of one walk as the walk screen and its summary list them: what the server counted, with this
 // phone's taps it hasn't heard back about, each once. Which taps belong to the walk is decided by time, as on the
 // server (ADR 0002). Before the server knows a just-ended walk, its summary is made from what the walk screen showed
 // at "Zuhause" (`Ended`), with the same helpers the server uses.
 import type { Output } from "@gassi/api-client";
-import { type Command, minutesBetween, type Person, pausedWithin, type WalkView, withinWalk } from "@gassi/domain";
+import { type Command, type Consistency, minutesBetween, type Person, pausedWithin, type WalkView, withinWalk } from "@gassi/domain";
 
 export type WalkSummary = Output<"walk">["summary"];
-/** A pee or poop; `id` is its entry's once the server has it (a tap still in the queue has none). */
-export type Tap = { type: "pee" | "poop"; at: string; dogId: number; id?: number };
+/** A pee, marking or poop; `id` is its entry's once the server has it (a tap still in the queue has none); a poop may
+ * have a consistency. */
+export type Tap = { type: "pee" | "mark" | "poop"; at: string; dogId: number; id?: number; consistency?: Consistency | null };
 
 const same = (a: Tap, b: Tap) => a.type === b.type && a.at === b.at && a.dogId === b.dogId;
 const byTime = (a: Tap, b: Tap) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
 
-/** The pee/poop taps among `commands`. */
+/** The pee/marking/poop taps among `commands`. */
 export const tapsOf = (commands: readonly Command[]): Tap[] => commands.flatMap((c) => (c.kind === "log" ? [{ type: c.type, at: c.at, dogId: c.dogId }] : []));
 
-/** The pee/poop a summary from the server counted. */
-export const summaryTaps = (s: Pick<WalkSummary, "pees" | "poops">): Tap[] => [
+/** `taps` with the consistencies among `commands` (not yet answered by the server) laid over their poops, the last one
+ * tapped winning. */
+export function withConsistencies(taps: readonly Tap[], commands: readonly Command[]): Tap[] {
+  return taps.map((t) => {
+    const set = commands.filter((c) => c.kind === "log.consistency" && t.type === "poop" && c.poopAt === t.at && c.dogId === t.dogId).at(-1);
+    return set?.kind === "log.consistency" ? { ...t, consistency: set.consistency } : t;
+  });
+}
+
+/** The pee, markings and poop a summary from the server counted. */
+export const summaryTaps = (s: Pick<WalkSummary, "pees" | "marks" | "poops">): Tap[] => [
   ...s.pees.map((m) => ({ type: "pee" as const, ...m })),
+  ...s.marks.map((m) => ({ type: "mark" as const, ...m })),
   ...s.poops.map((m) => ({ type: "poop" as const, ...m })),
 ];
 

@@ -208,6 +208,25 @@ describe("walks", () => {
     expect((await s.summary(walk.id)).pees.map((m) => m.id)).toEqual([await idAt("pee", at(5)), await idAt("pee", at(7))]);
     expect((await s.summary(walk.id)).poops[0].id).toBe(await idAt("poop", at(6)));
   });
+
+  test("a marking is its own kind on the walk, not a pee", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" }), cmd(3, { kind: "log", type: "mark", dogId: 1 }), cmd(4, { kind: "log", type: "mark", dogId: 1 }), cmd(30, { kind: "walk.stop", walkKey: "w" })]);
+    const walk = (await entries()).find((e) => e.type === "walk")!;
+    expect(await s.summary(walk.id)).toMatchObject({ pees: [], marks: [{ at: at(3) }, { at: at(4) }] });
+  });
+
+  test("a consistency lands on the poop of its dog and time, changes and clears; without that poop it is dropped", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" }), cmd(6, { kind: "log", type: "poop", dogId: 1 }), cmd(7, { kind: "log.consistency", poopAt: at(6), dogId: 1, consistency: "soft" })]);
+    const walk = (await entries()).find((e) => e.type === "walk")!;
+    expect((await s.summary(walk.id)).poops).toMatchObject([{ at: at(6), consistency: "soft" }]);
+    await s.apply(HIRSCH, [cmd(8, { kind: "log.consistency", poopAt: at(6), dogId: 1, consistency: "liquid" })]);
+    expect((await entries()).find((e) => e.type === "poop")!.details).toEqual({ consistency: "liquid" });
+    await s.apply(HIRSCH, [cmd(9, { kind: "log.consistency", poopAt: at(6), dogId: 1, consistency: null })]);
+    expect((await entries()).find((e) => e.type === "poop")!.details).toBeNull();
+    expect(await s.apply(HIRSCH, [cmd(10, { id: "nope", kind: "log.consistency", poopAt: at(5), dogId: 1, consistency: "hard" })])).toEqual({ applied: [], dropped: ["nope"] });
+  });
 });
 
 describe("dogs", () => {

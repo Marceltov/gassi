@@ -1,8 +1,9 @@
 // The running walk ("Runde"): one hand holds the leash, the thumb taps. On top the clock, who walks with which dogs
-// (a chip taps them off, "+" adds), and what happened so far; at the bottom Pipi and Poopoo, Pause/Weiter and Training,
-// Zuhause. Every tap goes through the queue and shows at once. When the walk is over (ended here or on another phone),
+// (a chip taps them off, "+" adds), and what happened so far; at the bottom Pipi, Markiert (for dogs that mark, #38) and
+// Poopoo, Pause/Weiter and Training, Zuhause. A poop just tapped offers its consistency in the list (#86) until one is
+// picked or the next tap. Every tap goes through the queue and shows at once. When the walk is over (ended here or on another phone),
 // the screen leaves: to the summary after Zuhause, else to Start.
-import { keepsOne, newId } from "@gassi/domain";
+import { CONSISTENCIES, CONSISTENCY_LABEL, type Consistency, keepsOne, newId, TYPE_LABEL } from "@gassi/domain";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -15,16 +16,16 @@ import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
 import { DogChoiceSheet } from "../ui/DogChoiceSheet";
 import { Icon } from "../ui/Icon";
+import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
 import { useLeaving } from "../ui/useLeaving";
 import { saveEnded } from "./ended";
 import { LAST_DOG, LAST_WALKER } from "./lastOne";
-import { trainingLine, walkItems } from "./lines";
+import { tapLine, trainingLine, walkItems } from "./lines";
 import { useWalkTaps } from "./useWalkTaps";
 
-type Kind = "pee" | "poop";
-const LABEL: Record<Kind, string> = { pee: "Pipi", poop: "Poopoo" };
+type Kind = "pee" | "mark" | "poop";
 
 export function Walk() {
   const router = useRouter();
@@ -36,6 +37,7 @@ export function Walk() {
   const [adding, setAdding] = useState(false);
   const [choosing, setChoosing] = useState<Kind | null>(null);
   const [hint, setHint] = useState<string | null>(null); // why the last person or dog can't be tapped off
+  const [fresh, setFresh] = useState<{ at: string; dogId: number } | null>(null); // the poop just tapped
 
   // Leaving (Zuhause, Training) happens once, also on a double tap. Without a walk (ended on another phone, or none
   // after a reload) the focused screen goes back to Start, down its tab's stack.
@@ -51,13 +53,24 @@ export function Walk() {
   const dogName = (id: number) => dogs.find((d) => d.id === id)?.name ?? "Hund";
   const walkDogs = walk.dogIds;
   const several = walkDogs.length > 1;
+  const marking = walkDogs.filter((id) => dogs.find((d) => d.id === id)?.marks);
+  const dogsFor = (type: Kind) => (type === "mark" ? marking : walkDogs);
 
   const log = (type: Kind, dogId: number) => {
     setChoosing(null);
-    send({ id: newId(), at: at(), kind: "log", type, dogId });
+    const time = at();
+    send({ id: newId(), at: time, kind: "log", type, dogId });
+    setFresh(type === "poop" ? { at: time, dogId } : null);
   };
-  const tap = (type: Kind) => (several ? setChoosing(type) : walkDogs[0] !== undefined && log(type, walkDogs[0]));
-  const pause = () => send({ id: newId(), at: at(), kind: walk.paused ? "walk.resume" : "walk.pause", walkKey: walk.key });
+  const tap = (type: Kind) => (dogsFor(type).length > 1 ? setChoosing(type) : dogsFor(type)[0] !== undefined && log(type, dogsFor(type)[0]));
+  const consistency = (c: Consistency) => {
+    if (fresh) send({ id: newId(), at: at(), kind: "log.consistency", poopAt: fresh.at, dogId: fresh.dogId, consistency: c });
+    setFresh(null);
+  };
+  const pause = () => {
+    setFresh(null);
+    send({ id: newId(), at: at(), kind: walk.paused ? "walk.resume" : "walk.pause", walkKey: walk.key });
+  };
   const training = () =>
     leave(() => {
       if (!view.training) send({ id: newId(), at: at(), kind: "training.start", trainingKey: newId(), walkKey: walk.key, dogIds: walk.dogIds.length ? walk.dogIds : undefined });
@@ -73,12 +86,14 @@ export function Walk() {
   const walkerIds = walk.walkers.map((w) => w.id);
   const walker = (personId: string, on: boolean) => {
     setAdding(false);
+    setFresh(null);
     if (!on && !keepsOne(walkerIds, personId)) return setHint(LAST_WALKER);
     setHint(null);
     send({ id: newId(), at: at(), kind: "walk.walker", walkKey: walk.key, personId, on });
   };
   const dog = (dogId: number, on: boolean) => {
     setAdding(false);
+    setFresh(null);
     if (!on && !keepsOne(walkDogs, dogId)) return setHint(LAST_DOG);
     setHint(null);
     send({ id: newId(), at: at(), kind: "walk.dog", walkKey: walk.key, dogId, on });
@@ -115,10 +130,19 @@ export function Walk() {
             {taps.length === 0 && trainings.length === 0 && !runningTraining ? <Text style={[styles.line, { color: theme.muted }]}>Noch nichts</Text> : null}
             {walkItems(taps, trainings).map((item, i) =>
               item.kind === "tap" ? (
-                <View key={`${item.tap.type}${item.at}${item.tap.dogId}`} style={styles.item}>
-                  <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(item.at)}</Text>
-                  <Icon name={item.tap.type} size={17} color={theme[item.tap.type]} />
-                  <Text style={[styles.line, { color: theme.ink }]}>{`${LABEL[item.tap.type]}${several ? ` · ${dogName(item.tap.dogId)}` : ""}`}</Text>
+                <View key={`${item.tap.type}${item.at}${item.tap.dogId}`}>
+                  <View style={styles.item}>
+                    <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(item.at)}</Text>
+                    <Icon name={TYPE_ICON[item.tap.type]} size={17} color={theme[TYPE_TONE[item.tap.type]]} />
+                    <Text style={[styles.line, { color: theme.ink }]}>{tapLine(item.tap, several ? dogName(item.tap.dogId) : null)}</Text>
+                  </View>
+                  {fresh && item.tap.type === "poop" && item.at === fresh.at && item.tap.dogId === fresh.dogId ? (
+                    <View testID="consistency" style={styles.consistency}>
+                      {CONSISTENCIES.map((c) => (
+                        <Chip key={c} label={CONSISTENCY_LABEL[c]} a11y={`Konsistenz ${CONSISTENCY_LABEL[c]}`} on={false} onPress={() => consistency(c)} />
+                      ))}
+                    </View>
+                  ) : null}
                 </View>
               ) : (
                 <View key={`t${i}`} style={styles.item}>
@@ -141,10 +165,15 @@ export function Walk() {
         <>
           <View style={styles.row}>
             <View style={styles.cell}>
-              <BigButton kind="pee" icon="pee" label={LABEL.pee} disabled={walkDogs.length === 0} onPress={() => tap("pee")} />
+              <BigButton kind="pee" icon="pee" label={TYPE_LABEL.pee} stacked={marking.length > 0} disabled={walkDogs.length === 0} onPress={() => tap("pee")} />
             </View>
+            {marking.length ? (
+              <View style={styles.cell}>
+                <BigButton kind="pee" icon="mark" label={TYPE_LABEL.mark} stacked={marking.length > 0} onPress={() => tap("mark")} />
+              </View>
+            ) : null}
             <View style={styles.cell}>
-              <BigButton kind="poop" icon="poop" label={LABEL.poop} disabled={walkDogs.length === 0} onPress={() => tap("poop")} />
+              <BigButton kind="poop" icon="poop" label={TYPE_LABEL.poop} stacked={marking.length > 0} disabled={walkDogs.length === 0} onPress={() => tap("poop")} />
             </View>
           </View>
           <View style={styles.row}>
@@ -159,8 +188,8 @@ export function Walk() {
 
           <DogChoiceSheet
             open={choosing !== null}
-            title={choosing ? `${LABEL[choosing]} – welcher Hund?` : ""}
-            dogs={walkDogs.map((id) => ({ id, name: dogName(id), color: dogs.find((d) => d.id === id)?.color }))}
+            title={choosing ? `${TYPE_LABEL[choosing]} – welcher Hund?` : ""}
+            dogs={(choosing ? dogsFor(choosing) : walkDogs).map((id) => ({ id, name: dogName(id), color: dogs.find((d) => d.id === id)?.color }))}
             onPick={(id) => choosing && log(choosing, id)}
             onClose={() => setChoosing(null)}
           />
@@ -197,6 +226,7 @@ const styles = StyleSheet.create({
   item: { flexDirection: "row", alignItems: "center", gap: 8 },
   time: { fontVariant: ["tabular-nums"], minWidth: 40 },
   shrink: { flexShrink: 1 },
+  consistency: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingLeft: 48, paddingVertical: 4 },
   row: { flexDirection: "row", gap: 8 },
   cell: { flex: 1 },
   sheet: { gap: 8 },

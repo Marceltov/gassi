@@ -6,6 +6,7 @@ export interface DogTable {
   name: string;
   color: string; // #rrggbb
   archived: Generated<number>;
+  marks: Generated<number>; // 1: the walk offers "Markiert" for this dog
   created_at: string;
 }
 
@@ -19,6 +20,7 @@ export interface EntryTable {
   unit_g: number | null;
   client_key: string | null;
   note: string | null;
+  details: string | null; // JSON EntryDetails
   logged_by: string; // person.id
   created_at: ColumnType<string, string, never>;
   updated_at: string;

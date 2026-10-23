@@ -10,7 +10,9 @@ describe("DogRepository", () => {
   test("add, rename, recolour and archive; archived dogs are listed only on request", async () => {
     const toffee = await dogs().add({ name: " Toffee ", color: "#c0813a" });
     const bruno = await dogs().add({ name: "Bruno", color: "#3a6fc0" });
-    expect(toffee).toEqual({ id: toffee.id, name: "Toffee", color: "#c0813a", archived: false });
+    expect(toffee).toEqual({ id: toffee.id, name: "Toffee", color: "#c0813a", archived: false, marks: false });
+    expect(await dogs().update(toffee.id, { marks: true })).toMatchObject({ name: "Toffee", marks: true });
+    await dogs().update(toffee.id, { marks: false });
     await dogs().update(bruno.id, { name: "Bruno der Große", archived: true });
     expect(await dogs().list()).toEqual([toffee]);
     expect((await dogs().list({ withArchived: true })).map((d) => d.name)).toEqual(["Bruno der Große", "Toffee"]);

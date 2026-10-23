@@ -29,12 +29,18 @@ test("a walk: duration with pause, distance and who walked", () => {
   expect(text(entry({ clientKey: "k", walkers: ["Hirsch"] }))).toBe("Gassi, läuft Hirsch");
 });
 
-test("what happened during a walk: pee, poop and the exercises with their success", () => {
+test("what happened during a walk: pee, markings, poop and the exercises with their success", () => {
   const during = (d: DescribableEntry["during"]) => describeEntry(entry({ endedAt: "x", durationMin: 40, during: d })).during;
-  expect(during({ pees: 2, poops: 1, exercises: [{ name: "Sitz", ok: 4, fail: 1 }] })).toBe("2× Pipi · 1× Poopoo · Sitz 4/5");
-  expect(during({ pees: 0, poops: 1, exercises: [] })).toBe("1× Poopoo");
-  expect(during({ pees: 0, poops: 0, exercises: [] })).toBe("");
+  expect(during({ pees: 2, marks: 5, poops: 1, exercises: [{ name: "Sitz", ok: 4, fail: 1 }] })).toBe("2× Pipi · 5× markiert · 1× Poopoo · Sitz 4/5");
+  expect(during({ pees: 0, marks: 0, poops: 1, exercises: [] })).toBe("1× Poopoo");
+  expect(during({ pees: 0, marks: 0, poops: 0, exercises: [] })).toBe("");
   expect(during(null)).toBe("");
+});
+
+test("a poop says its consistency when it has one; a marking is its own kind", () => {
+  expect(text(entry({ type: "poop", details: { consistency: "mushy" } }))).toBe("Poopoo, breiig von Hirsch");
+  expect(text(entry({ type: "poop" }))).toBe("Poopoo von Hirsch");
+  expect(text(entry({ type: "mark" }))).toBe("Markiert von Hirsch");
 });
 
 test("a training: duration, exercises with successes / repetitions, and treats", () => {

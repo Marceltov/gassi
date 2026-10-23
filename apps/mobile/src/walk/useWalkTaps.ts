@@ -1,10 +1,10 @@
-// The running walk's pee/poop and trainings: the server's summary of the walk (asked for by its key whenever the
+// The running walk's pee/markings/poop and trainings: the server's summary of the walk (asked for by its key whenever the
 // walk's view changes: a tap, an answer, a refresh), with this phone's unsent taps laid over. A tap that has just left
 // the queue stays shown until a summary from the server holds it, so nothing blinks out in between.
 import type { WalkView } from "@gassi/domain";
 import { useEffect, useRef, useState } from "react";
 import { useGassi } from "../data/GassiProvider";
-import { holds, mergeTaps, summaryTaps, type Tap, tapsOf, type WalkSummary } from "./taps";
+import { holds, mergeTaps, summaryTaps, type Tap, tapsOf, type WalkSummary, withConsistencies } from "./taps";
 
 type Known = { key: string; taps: Tap[]; trainings: WalkSummary["trainings"] };
 
@@ -38,5 +38,6 @@ export function useWalkTaps(walk: WalkView | null): { taps: Tap[]; trainings: Wa
 
   if (!walk) return { taps: [], trainings: [] };
   const mine = known?.key === walk.key ? known : null;
-  return { taps: mergeTaps(mine?.taps ?? [], [...carried, ...tapsOf(pending)], walk.startedAt, null), trainings: mine?.trainings ?? [] };
+  const taps = mergeTaps(mine?.taps ?? [], [...carried, ...tapsOf(pending)], walk.startedAt, null);
+  return { taps: withConsistencies(taps, pending), trainings: mine?.trainings ?? [] };
 }

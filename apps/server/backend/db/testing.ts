@@ -8,7 +8,7 @@ import { type DB, openDatabase } from "./open";
 
 export const HIRSCH = { id: "marcel", name: "Hirsch" };
 export const HERZII = { id: "bille", name: "Herzii" };
-export const TOFFEE = { id: 1, name: "Toffee", color: "#b8691a", archived: false };
+export const TOFFEE = { id: 1, name: "Toffee", color: "#b8691a", archived: false, marks: false };
 
 async function seed(db: DB): Promise<void> {
   const at = "2026-01-01T00:00:00.000Z";

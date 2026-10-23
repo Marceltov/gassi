@@ -10,7 +10,8 @@ describe("dogs over the API", () => {
   test("add, rename, archive; the list leaves archived dogs out unless asked", async () => {
     const token = await tokenFor(HIRSCH.id);
     const { body: bruno } = await json("/api/dogs", { method: "POST", token, body: { name: "Bruno", color: "#3a6fc0" } });
-    expect(bruno).toEqual({ id: 2, name: "Bruno", color: "#3a6fc0", archived: false });
+    expect(bruno).toEqual({ id: 2, name: "Bruno", color: "#3a6fc0", archived: false, marks: false });
+    expect((await json(`/api/dogs/${bruno.id}`, { method: "PATCH", token, body: { marks: true } })).body.marks).toBe(true);
     await json(`/api/dogs/${bruno.id}`, { method: "PATCH", token, body: { archived: true } });
     expect((await json("/api/dogs", { token })).body.dogs.map((d: { name: string }) => d.name)).toEqual(["Toffee"]);
     expect((await json("/api/dogs?archived=1", { token })).body.dogs).toHaveLength(2);
@@ -48,6 +49,14 @@ describe("entries over the API", () => {
     expect((await json(`/api/entries/${food.id}`, { method: "PATCH", token, body: { at: food.at, foodKind: "wet", amountG: 180, note: "halbe Dose" } })).body).toMatchObject({ amountG: 180, note: "halbe Dose" });
     expect((await json(`/api/entries/${food.id}`, { method: "DELETE", token })).body).toEqual({ deleted: true });
     expect((await json(`/api/entries/${food.id}`, { method: "DELETE", token })).status).toBe(404);
+  });
+
+  test("a poop keeps its consistency through an edit; a pee can't have one", async () => {
+    const token = await tokenFor(HIRSCH.id);
+    const { body: poop } = await json("/api/entries", { method: "POST", token, body: { type: "poop", at: "2026-10-20T08:00:00Z", details: { consistency: "soft" } } });
+    expect(poop.details).toEqual({ consistency: "soft" });
+    expect((await json(`/api/entries/${poop.id}`, { method: "PATCH", token, body: { at: poop.at, note: "nach dem Futterwechsel", details: { consistency: "mushy" } } })).body).toMatchObject({ note: "nach dem Futterwechsel", details: { consistency: "mushy" } });
+    expect(await json("/api/entries", { method: "POST", token, body: { type: "pee", details: { consistency: "soft" } } })).toEqual({ status: 400, body: { error: "Das passt nicht zu dieser Art von Eintrag." } });
   });
 
   test("a German message for what doesn't fit", async () => {

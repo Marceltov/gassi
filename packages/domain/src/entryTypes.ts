@@ -1,5 +1,5 @@
 // The kinds of entries and their German words. A new kind is a new value here, not a new table.
-export const ENTRY_TYPES = ["walk", "food", "pee", "poop", "note", "training", "weight", "restock", "stockcheck", "opened"] as const;
+export const ENTRY_TYPES = ["walk", "food", "pee", "mark", "poop", "note", "training", "weight", "restock", "stockcheck", "opened"] as const;
 export type EntryType = (typeof ENTRY_TYPES)[number];
 
 /** The kinds that get a tile on the today screen, in tile order. */
@@ -9,6 +9,7 @@ export const TYPE_LABEL: Record<EntryType, string> = {
   walk: "Gassi",
   food: "Futter",
   pee: "Pipi",
+  mark: "Markiert",
   poop: "Poopoo",
   note: "Notiz",
   training: "Training",
@@ -19,6 +20,11 @@ export const TYPE_LABEL: Record<EntryType, string> = {
 };
 
 export const isEntryType = (v: unknown): v is EntryType => (ENTRY_TYPES as readonly unknown[]).includes(v);
+
+/** How a poop was, firmest first (#86): an optional detail of a poop entry. */
+export const CONSISTENCIES = ["hard", "normal", "soft", "mushy", "liquid"] as const;
+export type Consistency = (typeof CONSISTENCIES)[number];
+export const CONSISTENCY_LABEL: Record<Consistency, string> = { hard: "hart", normal: "normal", soft: "weich", mushy: "breiig", liquid: "flüssig" };
 
 /** Wet food comes in cans, dry food by weight; food, restock and stockcheck entries say which (an opened can is wet). */
 export const FOOD_KINDS = ["wet", "dry"] as const;
