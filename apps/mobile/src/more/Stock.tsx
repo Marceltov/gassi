@@ -64,7 +64,7 @@ export function Stock() {
       if (dryChanged) await api.correctStock({ foodKind: "dry", amount: dryCount, unit: "kg" });
       setEdits({});
       reload();
-    }, "Zählung gespeichert.");
+    });
 
   const card = (k: FoodKind, title: string) => {
     const s = stock ? stockParts(stock, k) : null;
@@ -186,7 +186,6 @@ export function Stock() {
             stock={stock ?? null}
             onDone={() => {
               setBuying(false);
-              setMessage("Eingetragen.");
               reload();
             }}
           />

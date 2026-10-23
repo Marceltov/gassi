@@ -146,7 +146,7 @@ test("Vorrat: + Eingekauft takes cans per size from 0, a new size in a row of it
   made.push(...entries.map((e) => e.id));
   expect(entries.map((e) => [e.unitG, e.amountG]).sort()).toEqual([[1234, 1234], [800, 1600]].sort()); // sizes left at 0 stay out
   await expect(sheet).toHaveCount(0);
-  await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
+  await expect(page.getByTestId("stock-message")).toHaveCount(0); // what worked shows on the page, not in a message
   const after = (await client.stock()).wet.sizes.find((s) => s.unitG === 800)!;
   await expect(page.getByTestId("count-800-value")).toHaveText(decimal(after.cans));
 });
@@ -191,7 +191,7 @@ test("Vorrat: counting in the list changes nothing until it is saved; the count 
   made.push(...entries.map((e) => e.id));
   expect(entries.find((e) => e.unitG === 400)?.amountG).toBe(1100);
   expect(entries.map((e) => e.unitG).sort()).toEqual(before.map((s) => s.unitG).sort()); // every size at once
-  await expect(page.getByTestId("stock-message")).toHaveText("Zählung gespeichert.");
+  await expect(page.getByTestId("stock-message")).toHaveCount(0);
   await expect(page.getByTestId("count-400-value")).toHaveText("2,75");
   await expect(page.getByRole("button", { name: "Eingekauft" })).toBeVisible();
 });
@@ -275,7 +275,7 @@ test("Vorrat: dry food bought in kg with a decimal comma, counted in kg", async 
   const { entries: [{ id }] } = (await (await bought).json()) as Made;
   made.push(id);
   expect(await client.entry({ id })).toMatchObject({ foodKind: "dry", amountG: 1500 });
-  await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
+  await expect(page.getByLabel("Anzahl kg Trockenfutter")).toHaveText(decimal((await client.stock()).dry.grams! / 1000));
 
   await typeIn(page.getByLabel("Anzahl kg Trockenfutter"), "0,75");
   await page.keyboard.press("Enter");
