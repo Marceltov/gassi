@@ -106,4 +106,15 @@ test("Woche fits a small and a big phone: the week and its arrows stay on top, t
   const [map, scroll] = await Promise.all([page.getByTestId("track-map").boundingBox(), page.getByTestId("screen-scroll").boundingBox()]);
   expect(Math.round(scroll!.y + scroll!.height - (map!.y + map!.height))).toBe(Math.round(map!.x)); // the gutter
   expect(map!.height).toBeGreaterThan(200);
+
+  // the map can take the whole screen, and goes back with its button or Escape
+  await page.getByRole("button", { name: "Karte vergrößern" }).click();
+  const big = page.getByTestId("track-map-big");
+  expect((await big.boundingBox())!.height).toBe(932);
+  await expect(big.getByTestId("track-map")).toContainText("OpenStreetMap");
+  await page.keyboard.press("Escape");
+  await expect(big).toHaveCount(0);
+  await page.getByRole("button", { name: "Karte vergrößern" }).click();
+  await page.getByRole("button", { name: "Karte verkleinern" }).click();
+  await expect(big).toHaveCount(0);
 });

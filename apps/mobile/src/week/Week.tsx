@@ -5,11 +5,11 @@
 import { addDays, formatMinutes, mondayOf, type PersonWeek, successRate, weekLabel } from "@gassi/domain";
 import { useCallback, useState } from "react";
 import { useNow } from "../start/useNow";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { TrackMap } from "../map/TrackMap";
-import { space, useTheme } from "../theme";
+import { FIELD_HEIGHT, space, useTheme } from "../theme";
 import { TIME_ZONE } from "../time";
-import { BigButton } from "../ui/BigButton";
+import { Icon } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
 import { useArrowKeys } from "../ui/useArrowKeys";
 import { useSwipe } from "../ui/useSwipe";
@@ -82,15 +82,11 @@ export function Week() {
 
   const head = (
     <View style={styles.nav}>
-      <View style={styles.arrow}>
-        <BigButton kind="neutral" size="s" icon="back" label="" a11y="Vorherige Woche" onPress={before} />
-      </View>
+      <Arrow icon="back" label="Vorherige Woche" onPress={before} />
       <Text testID="week-heading" style={[styles.heading, { color: theme.ink }]}>
         {weekLabel(monday)}
       </Text>
-      <View style={styles.arrow}>
-        <BigButton kind="neutral" size="s" icon="next" label="" a11y="Nächste Woche" disabled={thisWeek} onPress={after} />
-      </View>
+      <Arrow icon="next" label="Nächste Woche" disabled={thisWeek} onPress={after} />
     </View>
   );
 
@@ -98,6 +94,16 @@ export function Week() {
     <View style={styles.screen} {...swipe}>
       <Screen head={head} top={top} />
     </View>
+  );
+}
+
+/** Just the arrow, no button around it. */
+function Arrow({ icon, label, disabled = false, onPress }: { icon: "back" | "next"; label: string; disabled?: boolean; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} hitSlop={8} style={({ pressed }) => [styles.arrow, { opacity: disabled ? 0.3 : pressed ? 0.6 : 1 }]}>
+      <Icon name={icon} size={30} color={theme.ink} />
+    </Pressable>
   );
 }
 
@@ -113,6 +119,6 @@ const styles = StyleSheet.create({
   swatch: { width: 10, height: 10, borderRadius: 3 },
   small: { fontSize: 12 },
   nav: { flexDirection: "row", alignItems: "center", gap: space.gap },
-  arrow: { width: 56 },
+  arrow: { width: FIELD_HEIGHT, height: FIELD_HEIGHT, alignItems: "center", justifyContent: "center" },
   heading: { flex: 1, textAlign: "center", fontSize: 22, fontWeight: "700" },
 });

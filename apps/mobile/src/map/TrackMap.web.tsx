@@ -1,11 +1,15 @@
 // Routes on an OpenStreetMap map (Leaflet), fitted to them: the walk summary's big map, Verlauf's thumbnails and the
 // week's routes. `height` is a number, or `{ min }` for a map that takes the height left on its screen (Woche), at
-// least `min`; it fits the routes again when its size changes. Each route is a list of [lat, lon]. Not draggable when `still` (a thumbnail in a list),
+// least `min`; it fits the routes again when its size changes. A map that isn't `still` has a button in its corner
+// that shows it on the whole screen, until the button there or Escape makes it small again. Each route is a list of [lat, lon]. Not draggable when `still` (a thumbnail in a list),
 // and then without the attribution line, which would cover the whole thumbnail (the big maps carry it).
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Pressable, StyleSheet } from "react-native";
 import { useTheme } from "../theme";
+import { Icon } from "../ui/Icon";
 
 export type TrackMapProps = { routes: [number, number][][]; height: number | { min: number }; still?: boolean };
 
@@ -13,6 +17,37 @@ const TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 export function TrackMap({ routes, height, still = false }: TrackMapProps) {
+  const theme = useTheme();
+  const [big, setBig] = useState(false);
+  useEffect(() => {
+    if (!big) return;
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setBig(false);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [big]);
+  const size = typeof height === "number" ? { height } : { flex: 1, minHeight: height.min };
+  // dragged itself: no swipe from it (useSwipe)
+  return (
+    <div data-noswipe style={{ ...size, position: "relative", width: "100%" }}>
+      <MapBox routes={routes} still={still} />
+      {still ? null : <Corner icon="expand" label="Karte vergrößern" onPress={() => setBig(true)} />}
+      {big
+        ? createPortal(
+            <div data-testid="track-map-big" data-noswipe style={{ position: "fixed", inset: 0, zIndex: 1100, display: "flex", padding: "env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)", background: theme.background }}>
+              <div style={{ position: "relative", flex: 1 }}>
+                <MapBox routes={routes} still={false} />
+                <Corner icon="shrink" label="Karte verkleinern" onPress={() => setBig(false)} />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
+  );
+}
+
+/** The map itself, filling what holds it. */
+function MapBox({ routes, still }: { routes: [number, number][][]; still: boolean }) {
   const theme = useTheme();
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -33,7 +68,19 @@ export function TrackMap({ routes, height, still = false }: TrackMapProps) {
       map.remove();
     };
   }, [routes, still, theme.walk]);
-  const size = typeof height === "number" ? { height } : { flex: 1, minHeight: height.min };
-  // dragged itself: no swipe from it (useSwipe)
-  return <div ref={box} data-testid="track-map" data-noswipe style={{ ...size, width: "100%", borderRadius: 12, overflow: "hidden", background: theme.surface }} />;
+  return <div ref={box} data-testid="track-map" style={{ position: "absolute", inset: 0, borderRadius: 12, overflow: "hidden", background: theme.surface }} />;
 }
+
+function Corner({ icon, label, onPress }: { icon: "expand" | "shrink"; label: string; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.corner, { backgroundColor: theme.surface, opacity: pressed ? 0.7 : 1 }]}>
+      <Icon name={icon} size={20} />
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  // above Leaflet's own controls (z-index 1000), in the corner they leave free
+  corner: { position: "absolute", top: 8, right: 8, zIndex: 1001, width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+});
