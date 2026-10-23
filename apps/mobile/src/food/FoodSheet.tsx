@@ -1,14 +1,17 @@
 // Futter geben: a sheet pre-filled with the newest feeding (kind and grams per dog), a switch for wet or dry, − and + in
 // 10 g steps per dog, quick amounts (recent portions per dog), the dogs, and one tap on Eintragen, which records what
-// the dogs that are on get together. A feeding names no can (Vorrat counts closed cans). All dogs unless some are
-// switched off. It opens at once from what was kept, and Eintragen goes through the queue, so it works without reception.
-import { clampPortion, FOOD_MAX_G, type FoodKind, newId, perDog, portionFor, prefillFood, quickPortions } from "@gassi/domain";
+// the dogs that are on get together. A feeding names no can: a can opened is its own entry ("+ Dose aufgemacht", a list
+// of the sizes with how many closed cans are left; several, also of different sizes), one closed can less in Vorrat.
+// All dogs unless some are switched off. It opens at once from what was kept, and Eintragen goes through the queue
+// (the feeding, then each can), so it works without reception.
+import { clampPortion, FOOD_MAX_G, type FoodKind, newId, openableSizes, perDog, portionFor, prefillFood, quickPortions } from "@gassi/domain";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
-import { useTheme } from "../theme";
+import { FIELD_HEIGHT, radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
+import { ChoiceList } from "../ui/ChoiceList";
 import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
 import { Segments } from "../ui/Segments";
 import { Sheet } from "../ui/Sheet";
@@ -36,6 +39,8 @@ function FoodForm({ onClose }: { onClose: () => void }) {
   const [amountG, setAmountG] = useState(start.amountG); // per dog
   const chosenKind = useRef(start.foodKind); // the kind now, for the server's answer
   const [off, setOff] = useState<number[]>([]); // dogs switched off; none: all dogs
+  const [opened, setOpened] = useState<number[]>([]); // the cans opened for this feeding, by size
+  const [choosingCan, setChoosingCan] = useState(false);
   const kept = useRef(facts); // what was kept at the opening, for what the server doesn't answer
   const kindPicked = useRef(false); // the person chose the kind: the server's answer must not change it
   const edited = useRef(false); // the person set the grams by hand: the server's answer must not change them
@@ -80,6 +85,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
     edited.current = false; // the new kind starts from its own last portion
     chosenKind.current = next;
     setKind(next);
+    setOpened([]); // only wet food comes in cans
     setAmountG(portionFor(next, facts.recent, facts.last));
   };
   // what they get together stays within what one feeding may have
@@ -92,13 +98,36 @@ function FoodForm({ onClose }: { onClose: () => void }) {
   const total = portion * chosen.length;
 
   const quick = quickPortions(facts.recent, kind);
+  const openable = kind === "wet" && facts.stock ? openableSizes(facts.stock) : [];
   const submit = () => {
-    send({ id: submitId, at: new Date().toISOString(), kind: "food", foodKind: kind, amountG: total, ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
+    const at = new Date().toISOString();
+    send({ id: submitId, at, kind: "food", foodKind: kind, amountG: total, ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
+    // each can its own id from the form's, so a double tap opens none twice
+    opened.forEach((unitG, i) => send({ id: `${submitId}-open-${i}`, at, kind: "can.open", unitG }));
     // the next opening (maybe without reception) starts from this feeding, as it would from the server's answer
     saveFacts(personId, withFeeding(facts, { foodKind: kind, amountG: portion }));
     onClose();
   };
 
+  // the sizes take the sheet's place until one is chosen
+  if (choosingCan)
+    return (
+      <View testID="food-sheet" style={styles.form}>
+        <Text style={[styles.title, { color: theme.ink }]}>Welche Dose aufgemacht?</Text>
+        <ChoiceList
+          accent={theme.food}
+          choices={openable.map((s) => ({
+            key: s.unitG,
+            label: `${s.unitG}-g-Dose`,
+            detail: `noch ${s.cans}`,
+            onPress: () => {
+              setOpened([...opened, s.unitG]);
+              setChoosingCan(false);
+            },
+          }))}
+        />
+      </View>
+    );
   return (
     <View testID="food-sheet" style={styles.form}>
       <Text style={[styles.title, { color: theme.ink }]}>{active.length === 1 ? `Futter für ${active[0].name}` : "Futter geben"}</Text>
@@ -120,6 +149,15 @@ function FoodForm({ onClose }: { onClose: () => void }) {
           ))}
         </View>
       ) : null}
+      {opened.map((unitG, i) => (
+        <View key={i} style={[styles.opened, { backgroundColor: theme.surface, borderColor: theme.food }]}>
+          <Text style={[styles.openedText, { color: theme.ink }]}>{`${unitG}-g-Dose aufgemacht`}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={`${unitG}-g-Dose aufgemacht entfernen`} hitSlop={8} onPress={() => setOpened(opened.filter((_, j) => j !== i))}>
+            <Text style={[styles.remove, { color: theme.muted }]}>×</Text>
+          </Pressable>
+        </View>
+      ))}
+      {openable.length ? <BigButton kind="neutral" size="s" label="+ Dose aufgemacht" onPress={() => setChoosingCan(true)} /> : null}
       <BigButton kind="food" size="m" icon="check" label="Eintragen" onPress={submit} />
     </View>
   );
@@ -131,4 +169,7 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   quick: { flexGrow: 1, alignItems: "center", borderRadius: 10, borderWidth: 1, paddingVertical: 9, paddingHorizontal: 10 },
   quickText: { fontSize: 14, fontWeight: "600" },
+  opened: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", height: FIELD_HEIGHT, borderRadius: radius.tile, borderWidth: 2, paddingHorizontal: 12 },
+  openedText: { fontSize: 14, fontWeight: "600" },
+  remove: { fontSize: 20, fontWeight: "700" },
 });

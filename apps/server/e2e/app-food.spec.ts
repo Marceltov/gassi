@@ -51,7 +51,7 @@ test.describe("one dog", () => {
     await sheet.getByRole("tab", { name: "Nass" }).click();
     await expect(sheet.getByTestId("food-amount")).toHaveText("90 g");
     await expect(sheet.getByRole("button", { name: "90 g", exact: true })).toBeVisible(); // a recent portion
-    await expect(sheet.getByRole("button", { name: /Dose/ })).toHaveCount(0); // grams only, no cans
+    await expect(sheet.getByRole("button", { name: /-g-Dose/ })).toHaveCount(0); // grams only, no can sizes
       await sheet.getByRole("button", { name: "10 g mehr" }).click();
     await expect(sheet.getByTestId("food-amount")).toHaveText("100 g");
     await sheet.getByRole("button", { name: "90 g", exact: true }).click();
@@ -126,4 +126,55 @@ test("with two dogs the grams are per dog: Eintragen records what they get toget
   const client = createClient({ baseUrl: BASE_URL, token });
   await expect.poll(async () => (await newest(client)).amountG).toBe(160);
   expect((await newest(client)).dogIds).toEqual([dogs[0].id]);
+});
+
+test("+ Dose aufgemacht: two cans in one feeding, each its own entry; × takes one back; without reception they arrive later", async ({ page, context }) => {
+  const client = asHirsch();
+  const made: number[] = [];
+  made.push(...(await client.correctStock({ foodKind: "wet", sizes: [{ unitG: 200, cans: "2" }, { unitG: 400, cans: "3" }] })).entries.map((e) => e.id));
+  try {
+    const token = await signIn(page);
+    const me = createClient({ baseUrl: BASE_URL, token });
+    const openedOf = async () => (await me.entries({ type: "opened" })).entries.filter((e) => !made.includes(e.id));
+    await page.goto("/");
+    await page.getByRole("button", { name: "Futter geben" }).click();
+    const sheet = page.getByTestId("food-sheet");
+    await sheet.getByRole("tab", { name: "Nass" }).click();
+    const add = async (unitG: number) => {
+      await sheet.getByRole("button", { name: "+ Dose aufgemacht" }).click();
+      await expect(sheet.getByText("Welche Dose aufgemacht?")).toBeVisible();
+      await sheet.getByRole("button", { name: `${unitG}-g-Dose` }).click();
+    };
+    await sheet.getByRole("button", { name: "+ Dose aufgemacht" }).click();
+    await expect(sheet.getByRole("button", { name: "400-g-Dose" })).toContainText("noch 3");
+    await sheet.getByRole("button", { name: "400-g-Dose" }).click();
+    await add(200);
+    await add(400);
+    await expect(sheet.getByText("400-g-Dose aufgemacht")).toHaveCount(2);
+    await sheet.getByRole("button", { name: "400-g-Dose aufgemacht entfernen" }).last().click();
+    await expect(sheet.getByText("400-g-Dose aufgemacht")).toHaveCount(1);
+    await expect(sheet.getByText("200-g-Dose aufgemacht")).toHaveCount(1);
+
+    await context.setOffline(true);
+    await sheet.getByRole("button", { name: "Eintragen" }).click();
+    await expect(sheet).toBeHidden();
+    await context.setOffline(false);
+    await expect.poll(async () => (await openedOf()).map((e) => e.unitG).sort()).toEqual([200, 400]);
+    made.push(...(await openedOf()).map((e) => e.id), (await newest(me)).id);
+    expect((await me.stock()).wet.sizes.map((x) => [x.unitG, x.cans])).toEqual([[200, 1], [400, 2]]);
+
+    // a double tap is one feeding and one can
+    await page.goto("/");
+    await page.getByRole("button", { name: "Futter geben" }).click();
+    await sheet.getByRole("tab", { name: "Nass" }).click();
+    await add(400);
+    await sheet.getByRole("button", { name: "Eintragen" }).dblclick();
+    await expect(sheet).toBeHidden();
+    await expect.poll(async () => (await openedOf()).filter((e) => !made.includes(e.id)).length).toBe(1);
+    await page.waitForTimeout(500);
+    expect((await openedOf()).filter((e) => !made.includes(e.id))).toHaveLength(1);
+    made.push(...(await openedOf()).map((e) => e.id), (await newest(me)).id);
+  } finally {
+    for (const id of made) await client.deleteEntry({ id }).catch(() => undefined);
+  }
 });

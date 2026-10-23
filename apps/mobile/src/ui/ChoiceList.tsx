@@ -4,7 +4,8 @@ import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } fr
 import { radius, useTheme } from "../theme";
 import { Icon, type IconName } from "./Icon";
 
-export type Choice = { key: string | number; label: string; icon?: IconName; on?: boolean; color?: string; onPress: () => void };
+/** `detail`: a word on the right, muted ("noch 12"). */
+export type Choice = { key: string | number; label: string; detail?: string; icon?: IconName; on?: boolean; color?: string; onPress: () => void };
 
 /** `accent`: the chosen one's color, the walk's unless the sheet belongs to something else (Futter). */
 export function ChoiceList({ choices, accent }: { choices: readonly Choice[]; accent?: string }) {
@@ -26,6 +27,7 @@ export function ChoiceList({ choices, accent }: { choices: readonly Choice[]; ac
           {c.color ? <View style={[styles.dot, { backgroundColor: c.color }]} /> : null}
           {c.icon ? <Icon name={c.icon} size={20} color={theme.muted} /> : null}
           <Text style={[styles.label, { color: theme.ink }]}>{c.label}</Text>
+          {c.detail ? <Text style={[styles.detail, { color: theme.muted }]}>{c.detail}</Text> : null}
           {c.on ? (
             <View testID="choice-mark" style={[styles.check, { backgroundColor: mark }]}>
               <Icon name="check" size={17} color="#fff" />
@@ -42,5 +44,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 52, borderRadius: radius.tile, borderWidth: 2, paddingHorizontal: 14 },
   dot: { width: 12, height: 12, borderRadius: 6 },
   label: { flex: 1, fontSize: 16, fontWeight: "600" },
+  detail: { fontSize: 13 },
   check: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
 });
