@@ -1,8 +1,7 @@
 // One entry in Verlauf: the time, a small map for a tracked walk, the type's icon in a dot of its color (and a strip of it
-// on the left edge), two lines and who. The first line is the type with its figures in bold ("Gassi **42 Min. · 3,1 km**"),
-// the second the dogs, what happened on a walk and the note. An entry without dogs (a purchase, a count) has its
-// figures on the second line, so the first isn't cut short while the second stays empty. Every row has the same height (#71): each line is cut
-// short rather than wrapping, and the second is there even when empty. Tapping opens it.
+// on the left edge), two lines and who. The first line is what kind it is ("Gassi"), the second what it says in bold
+// ("42 Min. · 3,1 km"), then the dogs, what happened on a walk and the note. Every row has the same height (#71): each
+// line is cut short rather than wrapping. Tapping opens it.
 import { describeEntry } from "@gassi/domain";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -24,8 +23,6 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
   const routeKey = JSON.stringify(entry.route);
   // the same route keeps its map (a refresh brings a new array with the same points)
   const routes = useMemo(() => (routeKey !== "null" ? [JSON.parse(routeKey) as [number, number][]] : []), [routeKey]);
-  const below = !dogs; // the figures go on the second line
-  const extra = below ? "" : d.extra;
   const rest = [dogs, d.during, entry.note ?? ""].filter(Boolean).join(" · ");
   const tone = theme[TYPE_TONE[entry.type]];
   return (
@@ -47,12 +44,11 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
       <View style={styles.main}>
         <Text testID={`entry-${entry.id}-title`} style={[styles.title, { color: theme.ink }]} numberOfLines={1}>
           {d.title}
-          {extra ? <Text testID={`entry-${entry.id}-extra`} style={styles.figures}>{` ${extra}`}</Text> : null}
         </Text>
         <Text testID={`entry-${entry.id}-more`} style={[styles.small, { color: theme.muted }]} numberOfLines={1}>
-          {below && d.extra ? <Text style={[styles.figures, { color: theme.ink }]}>{d.extra}</Text> : null}
-          {below && d.extra && rest ? " · " : ""}
-          {rest || (below && d.extra ? "" : " ")}
+          {d.extra ? <Text testID={`entry-${entry.id}-extra`} style={[styles.figures, { color: theme.ink }]}>{d.extra}</Text> : null}
+          {d.extra && rest ? " · " : ""}
+          {rest || (d.extra ? "" : " ")}
         </Text>
       </View>
       <Text style={[styles.by, { color: theme.muted }]} numberOfLines={2}>
