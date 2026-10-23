@@ -52,11 +52,13 @@ export function Row({ label, value, icon, tone, square, dot, onPress, testID, mu
 }
 
 /** A small button inside a row ("Zurückziehen", "Abmelden"). */
-export function Small({ label, a11y, onPress }: { label: string; a11y?: string; onPress: () => void }) {
+/** `danger`: it takes something away (a device signed out, an invite withdrawn): outlined in red (#80). */
+export function Small({ label, a11y, onPress, danger = false }: { label: string; a11y?: string; onPress: () => void; danger?: boolean }) {
   const theme = useTheme();
+  const look = danger ? { backgroundColor: "transparent", borderWidth: 1.5, borderColor: theme.danger } : { backgroundColor: theme.neutral };
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={a11y ?? label} onPress={onPress} style={({ pressed }) => [styles.small, { backgroundColor: theme.neutral, opacity: pressed ? 0.7 : 1 }]}>
-      <Text style={[styles.smallText, { color: theme.ink }]}>{label}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={a11y ?? label} onPress={onPress} style={({ pressed }) => [styles.small, look, { opacity: pressed ? 0.7 : 1 }]}>
+      <Text style={[styles.smallText, { color: danger ? theme.danger : theme.ink }]}>{label}</Text>
     </Pressable>
   );
 }

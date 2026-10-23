@@ -125,7 +125,7 @@ function RestockForm({ onDone, stock }: { onDone: () => void; stock: Stock | nul
               {`${unsized === 1 ? "Eine Zeile hat" : `${unsized} Zeilen haben`} keine Dosengröße: Gramm eintragen oder mit × entfernen.`}
             </Text>
           ) : null}
-          <BigButton kind="neutral" size="s" label="+ andere Dosengröße" a11y="Dosengröße hinzufügen" onPress={() => setExtras(extras + 1)} />
+          <BigButton kind="side" size="s" label="+ andere Dosengröße" a11y="Dosengröße hinzufügen" onPress={() => setExtras(extras + 1)} />
         </>
       ) : (
         <View style={styles.fields}>

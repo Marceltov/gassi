@@ -57,7 +57,10 @@ export const palettes = {
 };
 
 export type Palette = typeof palettes.dark;
-export type ButtonKind = keyof typeof kinds | "neutral";
+/** A kind's color (the thing it is about), "neutral" (a calm grey, on the go), "side" (outlined: a side action off
+ * the go), "ink" (dark: the main action of a page without a color, #80), "danger" (red: confirming a delete) and
+ * "dangerSide" (outlined in red: the trash button). */
+export type ButtonKind = keyof typeof kinds | "neutral" | "side" | "ink" | "danger" | "dangerSide";
 export type ListTone = keyof typeof kinds | keyof typeof listTones;
 
 /** `#rrggbb` as `rgba(...)`. */

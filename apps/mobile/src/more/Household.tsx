@@ -34,7 +34,7 @@ export function Household() {
       bottom={
         <>
           {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-          {!oidc ? <BigButton kind="walk" size="m" icon="invite" label="Person einladen" onPress={create} /> : null}
+          {!oidc ? <BigButton kind="ink" size="m" icon="invite" label="Person einladen" onPress={create} /> : null}
         </>
       }
     />

@@ -58,7 +58,7 @@ export function InviteCard({ invite, onRevoke }: { invite: Created; onRevoke: ()
             <Small label="Code kopieren" onPress={() => void copy("Code", invite.code)} />
           </>
         ) : null}
-        <Small label="Zurückziehen" onPress={onRevoke} />
+        <Small danger label="Zurückziehen" onPress={onRevoke} />
       </View>
       {copied ? <Text style={[styles.small, { color: theme.ink }]}>{copied}</Text> : null}
     </View>
@@ -70,7 +70,7 @@ export function OpenInvites({ invites, onRevoke }: { invites: { id: number; kind
   return (
     <Group title="Offene Einladungen">
       {invites.map((i) => (
-        <Row key={i.id} label={KIND_LABEL[i.kind] ?? i.kind} value={`bis ${dayTime(i.expiresAt)}`} right={<Small label="Zurückziehen" a11y={`Einladung bis ${dayTime(i.expiresAt)} zurückziehen`} onPress={() => onRevoke(i.id)} />} />
+        <Row key={i.id} label={KIND_LABEL[i.kind] ?? i.kind} value={`bis ${dayTime(i.expiresAt)}`} right={<Small danger label="Zurückziehen" a11y={`Einladung bis ${dayTime(i.expiresAt)} zurückziehen`} onPress={() => onRevoke(i.id)} />} />
       ))}
     </Group>
   );

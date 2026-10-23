@@ -40,6 +40,13 @@ here in the same PR that follows it.
 - **Big buttons only on the go** (#68): Start, the walk and the training keep their sizes; everywhere else a page's
   main action is `m` (52) and side actions are `s` (44). Buttons side by side in one row share one height (the
   larger one's). The Futter sheet is not on the go.
+- **Button colors and order** (#80): off the go, the buttons sit side by side, side actions left, the main action
+  right taking the rest, one height (`ButtonRow`); a second side action goes above the row, and so does Geräte's "Hier
+  abmelden" (Marcel). The main action has the color of the thing (Futter, Vorrat and food entries food, Pipi/Poopoo
+  theirs, Gassi walk, Übungen/Leckerli training); where a page has none (Gewicht, Hunde, Geräte, Haushalt, Anmeldung)
+  it is dark (`ink`). Side actions are outlined (`side`), Löschen and Entfernen a small trash icon outlined in red
+  (`TrashButton`), a confirming "Ja, löschen" or "Ja, abmelden" red (`danger`) next to Abbrechen. Start, the walk and
+  the training keep theirs.
 - **Three zones** (#71): a page's title and what it shows stay at the top (`Screen`'s `head`); its controls stay at
   the bottom, bottom-aligned (`bottom`: switches and filters, side actions, the main action last). What the page
   shows, with a chooser that names it (Woche's week with ‹ ›), is the title and stays on top; filters that narrow a
