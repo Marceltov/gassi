@@ -1,6 +1,6 @@
 // Vorrat (#73): on top a card per kind with the amount and how long it lasts (from the server, worked out by the
 // domain); below the stock as a list you count in, right above the controls: wet food one row per can size with − and
-// + in halves (an opened can), dry food one row in kg; a count can also be typed ("2,75"), and a size's grams
+// + in halves (an opened can; a typed 2,85 steps to 3 or 2,5 first), dry food one row in kg; a count can also be typed ("2,75"), and a size's grams
 // corrected (Ruling X: 10000 corrected to 1000 retires 10000). A count changes nothing until "Zählung speichern" (one
 // count per kind, every size at once; a size counted to 0 is retired); until then the new number shows in orange with
 // the old one under it, the card too, and "Verwerfen" takes it back. What was bought goes in through "+ Eingekauft"
@@ -48,12 +48,14 @@ export function Stock() {
     setMessage(null);
     setEdits((e) => ({ ...e, [key]: { ...e[key], ...change } }));
   };
-  // from the edits as they are when React applies them, so quick taps in a row each count
-  const step = (key: string, from: string, d: number) => {
+  // from the edits as they are when React applies them, so quick taps in a row each count; a typed 11,85 goes to the
+  // nearest half first (12 or 11,5), then on in halves
+  const step = (key: string, from: string, up: boolean) => {
     setMessage(null);
     setEdits((e) => {
-      const n = parseDecimal(e[key]?.cans ?? from) || 0;
-      return { ...e, [key]: { ...e[key], cans: decimalText(Math.min(MAX, Math.max(0, n + d))) } };
+      const halves = (parseDecimal(e[key]?.cans ?? from) || 0) * 2;
+      const next = (up ? Math.floor(halves + 1e-9) + 1 : Math.ceil(halves - 1e-9) - 1) / 2;
+      return { ...e, [key]: { ...e[key], cans: decimalText(Math.min(MAX, Math.max(0, next))) } };
     });
   };
   const save = () =>
@@ -105,13 +107,13 @@ export function Stock() {
             <Text style={[styles.labelText, { color: theme.muted }]}>Menge in kg</Text>
           )}
         </View>
-        <StepButton small label={`${what} weniger`} sign="−" disabled={!(n > 0)} onPress={() => step(key, was, -0.5)} />
+        <StepButton small label={`${what} weniger`} sign="−" disabled={!(n > 0)} onPress={() => step(key, was, false)} />
         <View style={styles.valueBox}>
           <TapToEdit testID={`count-${id}-value`} label={`Anzahl ${name}`} value={value} onChange={(cans) => edit(key, { cans })} inputMode="decimal" keyboardType="decimal-pad" style={isChanged ? { ...styles.value, color: theme.food } : styles.value} width={64} />
-          {/* under the number, outside the layout: the number stays centred and the row keeps its height */}
+          {/* under the number; the two together sit in the middle, within the row's height */}
           {isChanged ? <Text style={[styles.was, { color: theme.muted }]}>{`vorher ${was}`}</Text> : null}
         </View>
-        <StepButton small label={`${what} mehr`} sign="+" disabled={n >= MAX} onPress={() => step(key, was, 0.5)} />
+        <StepButton small label={`${what} mehr`} sign="+" disabled={n >= MAX} onPress={() => step(key, was, true)} />
       </View>
     );
   };
@@ -207,7 +209,7 @@ const styles = StyleSheet.create({
   gramValue: { textAlign: "right" },
   valueBox: { width: 64, alignItems: "center" },
   value: { textAlign: "center", fontSize: 16, fontWeight: "700" },
-  was: { position: "absolute", bottom: -7, fontSize: 11, lineHeight: 12 },
+  was: { marginTop: -6, fontSize: 11, lineHeight: 12 },
   warn: { fontSize: 14, fontWeight: "700" },
   pair: { flexDirection: "row", gap: 8 },
   side: { flex: 1 },

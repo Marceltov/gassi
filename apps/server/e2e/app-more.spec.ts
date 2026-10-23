@@ -173,7 +173,7 @@ test("Vorrat: counting in the list changes nothing until it is saved; the count 
   const height = (await page.getByTestId("count-dry").boundingBox())!.height;
   await expect(page.getByTestId("count-400").getByText(`vorher ${was}`)).toBeVisible();
   expect((await page.getByTestId("count-400").boundingBox())!.height).toBe(height); // rows keep one height
-  expect((await middle("400")).dy).toBeLessThanOrEqual(1); // the old count doesn't push the new one up
+  expect((await middle("400")).dy).toBeGreaterThan(2); // the new count moves up for the old one under it
   await expect(page.getByTestId("stock-wet")).not.toHaveText(card!); // the card shows what the count comes to
   await expect(page.getByRole("button", { name: "Eingekauft" })).toHaveCount(0);
   await page.getByRole("button", { name: "Verwerfen" }).click();
@@ -435,6 +435,15 @@ test("Vorrat: quick taps each count; a count reads out with its value; clearing 
     for (let i = 0; i < 4; i++) b.click();
   });
   await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText(decimal(from + 2));
+  // a typed count goes to the nearest half first, then on in halves
+  for (const [button, to] of [["mehr", "3"], ["weniger", "2,5"]]) {
+    await typeIn(row.getByLabel("Anzahl Dosen à 777 g"), "2,85");
+    await page.keyboard.press("Enter");
+    await row.getByRole("button", { name: `½ Dose à 777 g ${button}` }).click();
+    await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText(to);
+  }
+  await row.getByRole("button", { name: "½ Dose à 777 g weniger" }).click();
+  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText("2");
 
   await typeIn(row.getByLabel("Dosengröße in Gramm"), "");
   await page.keyboard.press("Enter");
