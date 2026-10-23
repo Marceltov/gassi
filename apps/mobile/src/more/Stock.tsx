@@ -30,6 +30,12 @@ export function Stock() {
   const [buying, setBuying] = useState(false);
   // what was changed by counting, by row ("k400" a can size, "dry" the dry food): a size's grams and its count as text
   const [edits, setEdits] = useState<Record<string, { size?: string; cans?: string }>>({});
+  // a saved count stays on screen until the stock read after it arrives, so the old numbers don't flash up in between
+  const [savedOver, setSavedOver] = useState<typeof stock>(null);
+  if (savedOver && stock !== savedOver) {
+    setSavedOver(null);
+    setEdits({});
+  }
   const known = stock?.wet.sizes ?? [];
   const wetRows = known.map((s) => ({ key: `k${s.unitG}`, unitG: s.unitG, was: decimalText(s.cans), size: String(s.unitG), cans: decimalText(s.cans), ...edits[`k${s.unitG}`] }));
   const dryWas = stock?.dry.grams == null ? "0" : decimalText(Math.max(0, stock.dry.grams) / 1000);
@@ -62,7 +68,8 @@ export function Stock() {
     void run(async (api) => {
       if (wetChanged) await api.correctStock({ foodKind: "wet", sizes });
       if (dryChanged) await api.correctStock({ foodKind: "dry", amount: dryCount, unit: "kg" });
-      setEdits({});
+      if (stock) setSavedOver(stock);
+      else setEdits({});
       reload();
     });
 

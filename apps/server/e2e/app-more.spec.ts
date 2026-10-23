@@ -185,9 +185,19 @@ test("Vorrat: counting in the list changes nothing until it is saved; the count 
   await page.getByRole("button", { name: "Zählung speichern" }).click();
   await expect(page.getByTestId("stock-message")).toHaveText("Wie viele Dosen sind noch da? Eine Zahl, z. B. 2,75.");
   await typeIn(page.getByLabel("Anzahl Dosen à 400 g"), "2,75");
+  // the stock read after saving is held back: until it arrives the saved count stays, the old one doesn't flash up
+  let release = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  await page.route("**/api/stock", async (route) => {
+    await held;
+    await route.continue();
+  });
   const counted = savedCount(page);
   await page.getByRole("button", { name: "Zählung speichern" }).click();
   const { entries } = (await (await counted).json()) as Made;
+  await page.waitForTimeout(200);
+  expect(await page.getByTestId("count-400-value").textContent()).toBe("2,75");
+  release();
   made.push(...entries.map((e) => e.id));
   expect(entries.find((e) => e.unitG === 400)?.amountG).toBe(1100);
   expect(entries.map((e) => e.unitG).sort()).toEqual(before.map((s) => s.unitG).sort()); // every size at once
