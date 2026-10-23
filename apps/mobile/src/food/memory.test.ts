@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { saveKept } from "../data/kept";
 import { loadFacts, saveFacts, withFeeding } from "./memory";
 
 test("the food sheet's facts are kept per person", () => {
@@ -7,10 +8,9 @@ test("the food sheet's facts are kept per person", () => {
   expect(loadFacts("p-herzii")).toEqual({ recent: [], last: null, stock: null });
 });
 
-test("a stock kept before the can sizes is dropped, the rest stays", () => {
-  const old = { wet: { grams: 400, cans: 1, canSizeG: 400, daysLeft: null, belowZero: false }, dry: { grams: null, daysLeft: null, belowZero: false } };
-  saveFacts("p-old", { recent: [{ foodKind: "wet", amountG: 60 }], last: { wet: 60, dry: null }, stock: old as never });
-  expect(loadFacts("p-old")).toMatchObject({ recent: [{ foodKind: "wet", amountG: 60 }], stock: null });
+test("facts kept before the grams were per dog are not read: their portions were totals", () => {
+  saveKept("food.p-before", { recent: [{ foodKind: "wet", amountG: 400 }], last: { wet: 400, dry: null }, stock: null });
+  expect(loadFacts("p-before")).toEqual({ recent: [], last: null, stock: null });
 });
 
 test("a feeding just entered is the newest portion and its kind's last, so a second one offline starts from it", () => {

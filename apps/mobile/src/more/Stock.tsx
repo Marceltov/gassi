@@ -1,10 +1,11 @@
 // Vorrat (#73): on top a card per kind with the amount and how long it lasts (from the server, worked out by the
 // domain); below the stock as a list you count in, right above the controls: wet food one row per can size with − and
-// + in halves (an opened can; a typed 2,85 steps to 3 or 2,5 first), dry food one row in kg; a count can also be typed ("2,75"), and a size's grams
-// corrected (Ruling X: 10000 corrected to 1000 retires 10000). A count changes nothing until "Zählung speichern" (one
-// count per kind, every size at once; a size counted to 0 is retired); until then the new number shows in orange with
-// the old one under it, the card too, and "Verwerfen" takes it back. What was bought goes in through "+ Eingekauft"
-// (RestockSheet): stock is the last count plus what was bought since minus what was fed since.
+// + in whole closed cans (an open can isn't counted, ADR 0011; a typed 2,85 steps to 3 or 2 first), dry food one row in
+// kg in halves; a count can also be typed, and a size's grams corrected (Ruling X: 10000 corrected to 1000 retires
+// 10000). A count changes nothing until "Zählung speichern" (one count per kind, every size at once; a size counted to
+// 0 is retired); until then the new number shows in orange with the old one under it, the card too, and "Verwerfen"
+// takes it back. What was bought goes in through "+ Eingekauft" (RestockSheet): wet stock is the last count plus what
+// was bought since minus the cans opened since, dry stock minus what was fed since.
 import type { FoodKind } from "@gassi/domain";
 import { countWeight, formatWeight, formSizes, parseCanSize, parseDecimal, stockParts } from "@gassi/domain";
 import { useState } from "react";
@@ -55,12 +56,13 @@ export function Stock() {
     setEdits((e) => ({ ...e, [key]: { ...e[key], ...change } }));
   };
   // from the edits as they are when React applies them, so quick taps in a row each count; a typed 11,85 goes to the
-  // nearest half first (12 or 11,5), then on in halves
+  // nearest step first (wet: 12 or 11; dry: 12 or 11,5), then on in steps: whole cans, half kilos
   const step = (key: string, from: string, up: boolean) => {
     setMessage(null);
+    const per = key === "dry" ? 2 : 1; // steps per unit
     setEdits((e) => {
-      const halves = (parseDecimal(e[key]?.cans ?? from) || 0) * 2;
-      const next = (up ? Math.floor(halves + 1e-9) + 1 : Math.ceil(halves - 1e-9) - 1) / 2;
+      const steps = (parseDecimal(e[key]?.cans ?? from) || 0) * per;
+      const next = (up ? Math.floor(steps + 1e-9) + 1 : Math.ceil(steps - 1e-9) - 1) / per;
       return { ...e, [key]: { ...e[key], cans: decimalText(Math.min(MAX, Math.max(0, next))) } };
     });
   };
@@ -95,7 +97,7 @@ export function Stock() {
     );
   };
 
-  /** A row you count in, named for screen readers by `name` ("Dosen à 400 g") and its steps by `what` ("½ Dose à 400
+  /** A row you count in, named for screen readers by `name` ("Dosen à 400 g") and its steps by `what` ("1 Dose à 400
    * g"); `sizeField` for a can size (its grams can be corrected), none for the dry food. */
   const row = (key: string, name: string, what: string, was: string, value: string, sizeField?: { size: string; unitG: number | null }) => {
     const n = parseDecimal(value);
@@ -139,12 +141,12 @@ export function Stock() {
       }
       top={
         <>
-          <Text style={[styles.section, { color: theme.muted }]}>Nassfutter</Text>
+          <Text style={[styles.section, { color: theme.muted }]}>Nassfutter · geschlossene Dosen</Text>
           {wetRows.length ? (
             wetRows.map((r) => {
               const unitG = parseCanSize(r.size);
               const name = unitG ? `à ${unitG} g` : "neuer Größe";
-              return row(r.key, `Dosen ${name}`, `½ Dose ${name}`, r.was, r.cans, { size: r.size, unitG });
+              return row(r.key, `Dosen ${name}`, `1 Dose ${name}`, r.was, r.cans, { size: r.size, unitG });
             })
           ) : (
             <Text style={[styles.small, { color: theme.muted }]}>Noch keine Dosen: trag einen Einkauf ein.</Text>

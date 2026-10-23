@@ -69,9 +69,9 @@ function parse<S extends z.ZodType>(schema: S, input: unknown, messages: FieldMe
   throw new InputError(messageFor(messages, result.error));
 }
 
-// Food, restocks and stock counts belong to one kind: without it they would count for neither stock.
+// Food, restocks, stock counts and opened cans belong to one kind: without it they would count for neither stock.
 const needsKind = (type: EntryType, kind: FoodKind | null) => {
-  if (!kind && (type === "food" || type === "restock" || type === "stockcheck")) throw new InputError("Welche Futterart?");
+  if (!kind && (type === "food" || type === "restock" || type === "stockcheck" || type === "opened")) throw new InputError("Welche Futterart?");
 };
 
 export type DiaryDeps = { db: DB; names: Names; timeZone: string; now: () => Date };

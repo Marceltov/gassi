@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { buyingSizes, countWeight, clampPortion, countLine, formSizes, mergeSizes, stillHidden, countTitle, formatCanCount, perDog, portionFor, prefillFood, quickPortions, stockParts, stockSummary } from "./food";
+import { buyingSizes, openableSizes, countWeight, clampPortion, countLine, formSizes, mergeSizes, stillHidden, countTitle, formatCanCount, perDog, portionFor, prefillFood, quickPortions, stockParts, stockSummary } from "./food";
 import type { CanStock, Stock, WetStock } from "./stock";
 
 const can = (unitG: number, cans: number): CanStock => ({ unitG, grams: cans * unitG, cans, belowZero: false, lastAt: null });
@@ -33,18 +33,15 @@ test("per dog: a feeding's grams shared by its dogs", () => {
   expect(perDog(120, 0)).toBe(120); // a feeding always has a dog; nothing to share by otherwise
 });
 
-test("a can size's count: whole and half cans × grams", () => {
+test("a can size's count: closed cans × grams", () => {
   expect(formatCanCount(can(400, 3))).toBe("3 × 400 g");
-  expect(formatCanCount(can(800, 2.5))).toBe("2½ × 800 g");
-  expect(formatCanCount(can(400, 0.5))).toBe("½ × 400 g");
-  expect(formatCanCount(can(400, 2.75))).toBe("2¾ × 400 g");
-  expect(formatCanCount(can(400, 1.25))).toBe("1¼ × 400 g");
+  expect(formatCanCount(can(800, 0))).toBe("0 × 800 g");
 });
 
 test("the stock in parts, for the stock screen: per can size, the total, for how long, and whether it ran out", () => {
   const stock: Stock = { wet: wetStock([can(400, 3), can(800, 2)], { daysLeft: 9.2 }), dry: { grams: 300, daysLeft: 0.4, belowZero: false } };
   expect(stockParts(stock, "wet")).toEqual({ left: "3 × 400 g · 2 × 800 g", sizes: ["3 × 400 g", "2 × 800 g"], amount: "2,8 kg", lasts: "reicht etwa 9 Tage", empty: false });
-  expect(stockParts({ ...stock, wet: wetStock([can(400, 0), can(800, 2.5)]) }, "wet")).toMatchObject({ sizes: ["2½ × 800 g"], amount: "2 kg" });
+  expect(stockParts({ ...stock, wet: wetStock([can(400, 0), can(800, 2)]) }, "wet")).toMatchObject({ sizes: ["2 × 800 g"], amount: "1,6 kg" });
   expect(stockParts(stock, "dry")).toEqual({ left: "300 g", sizes: [], amount: "300 g", lasts: "reicht weniger als einen Tag", empty: false });
   expect(stockParts({ ...stock, dry: { grams: null, daysLeft: null, belowZero: false } }, "dry")).toEqual({ left: null, sizes: [], amount: null, lasts: null, empty: false });
   expect(stockParts({ ...stock, dry: { grams: 0, daysLeft: 0, belowZero: true } }, "dry")).toMatchObject({ left: "0 g", lasts: null, empty: true });
@@ -76,7 +73,7 @@ test("both kinds' stock in one form: what is left or that it ran out; a kind nev
 test("a wet count as one thing: its title and its sizes", () => {
   expect(countTitle("2026-10-20T08:05:00.000Z", "Europe/Berlin")).toBe("Zählung vom 20.10., 10:05");
   expect(countLine([{ unitG: 400, amountG: 1200 }, { unitG: 800, amountG: 800 }])).toBe("3 × 400 g, 1 × 800 g");
-  expect(countLine([{ unitG: 395, amountG: 592 }, { unitG: 800, amountG: 0 }])).toBe("1½ × 395 g, 0 × 800 g");
+  expect(countLine([{ unitG: 395, amountG: 592 }, { unitG: 800, amountG: 0 }])).toBe("1 × 395 g, 0 × 800 g"); // an older count with halves
 });
 
 test("rows of the same can size add up (a new row typed with a known size)", () => {
@@ -111,4 +108,11 @@ test("a size hidden from the purchase rows stays hidden until it is bought or co
   // never bought or counted with cans: hidden as seen (null), and stays so
   const never: Stock = { ...stock, wet: wetStock([can(400, 1), sized(null)]) };
   expect(buyingSizes(never, [{ unitG: 800, seenLastAt: null }])).toEqual([400]);
+});
+
+test("the sizes a can is opened from: those with closed cans left; with none, every known size", () => {
+  const dry = { grams: null, daysLeft: null, belowZero: false };
+  expect(openableSizes({ wet: wetStock([can(200, 0), can(400, 3), can(800, 1)]), dry })).toEqual([{ unitG: 400, cans: 3 }, { unitG: 800, cans: 1 }]);
+  expect(openableSizes({ wet: wetStock([can(200, 0), can(400, 0)]), dry })).toEqual([{ unitG: 200, cans: 0 }, { unitG: 400, cans: 0 }]);
+  expect(openableSizes({ wet: UNKNOWN_WET, dry })).toEqual([]);
 });

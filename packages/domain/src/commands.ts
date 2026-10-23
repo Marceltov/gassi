@@ -28,6 +28,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("log"), type: z.enum(["pee", "poop"]), dogId }),
   // a feeding; the dogs left out, the server takes every active dog
   z.object({ ...base, kind: z.literal("food"), dogIds, amountG: z.number().int().min(FOOD_MIN_G).max(FOOD_MAX_G), foodKind: z.enum(["wet", "dry"]) }),
+  // a can of wet food opened: one closed can of that size less in Vorrat
+  z.object({ ...base, kind: z.literal("can.open"), unitG: z.number().int().min(1).max(10_000) }),
 ]);
 
 export type Command = z.output<typeof commandSchema>;

@@ -22,15 +22,16 @@ describe("the household's lists over the API", () => {
 });
 
 describe("food, weight and the week over the API", () => {
-  test("stock after restock and feeding; the usual portion", async () => {
+  test("stock after restock and an opened can; the usual portion", async () => {
     const token = await tokenFor(HIRSCH.id);
     await json("/api/stock/restock", { method: "POST", token, body: { foodKind: "wet", sizes: [{ unitG: 400, cans: 12 }] } });
     await json("/api/entries", { method: "POST", token, body: { type: "food", foodKind: "wet", amountG: 200, at: "2026-10-20T12:00:00Z" } });
-    expect((await json("/api/stock", { token })).body).toMatchObject({ wet: { grams: 4600, sizes: [{ unitG: 400, cans: 11.5 }], newestUnitG: 400 }, dry: { grams: null } });
+    await json("/api/entries", { method: "POST", token, body: { type: "opened", foodKind: "wet", amountG: 400, unitG: 400, at: "2026-10-20T12:00:00Z" } });
+    expect((await json("/api/stock", { token })).body).toMatchObject({ wet: { grams: 4400, sizes: [{ unitG: 400, cans: 11 }], newestUnitG: 400 }, dry: { grams: null } });
     expect((await json("/api/food/last", { token })).body).toEqual({ wet: 200, dry: null });
-    const count = await json("/api/stock/correct", { method: "POST", token, body: { foodKind: "wet", sizes: [{ unitG: 400, cans: 5 }, { unitG: 800, cans: "1,5" }] } });
+    const count = await json("/api/stock/correct", { method: "POST", token, body: { foodKind: "wet", sizes: [{ unitG: 400, cans: 5 }, { unitG: 800, cans: "1" }] } });
     expect(count.body.entries).toHaveLength(2);
-    expect((await json("/api/stock", { token })).body.wet).toMatchObject({ grams: 3200, sizes: [{ unitG: 400, cans: 5 }, { unitG: 800, cans: 1.5 }] });
+    expect((await json("/api/stock", { token })).body.wet).toMatchObject({ grams: 2800, sizes: [{ unitG: 400, cans: 5 }, { unitG: 800, cans: 1 }] });
   });
 
   test("weight in kg for the dog; the list of weights", async () => {

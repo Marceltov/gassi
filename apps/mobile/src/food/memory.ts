@@ -9,13 +9,12 @@ export type FoodFacts = { recent: Portion[]; last: Output<"lastFood"> | null; st
 /** How many of the newest feedings the portions are taken from. */
 export const RECENT = 20;
 
-const key = (personId: string) => `food.${personId}`;
+// "foodPerDog": the facts kept under "food." before #78 hold totals, not grams per dog, and are not read
+const key = (personId: string) => `foodPerDog.${personId}`;
 
 export function loadFacts(personId: string): FoodFacts {
   const s = loadKept(key(personId)) as FoodFacts | null;
-  if (!s || !Array.isArray(s.recent)) return { recent: [], last: null, stock: null };
-  // a stock kept by an older version (without can sizes) is left for the server's next answer
-  return Array.isArray(s.stock?.wet.sizes) ? s : { ...s, stock: null };
+  return s && Array.isArray(s.recent) ? s : { recent: [], last: null, stock: null };
 }
 
 export const saveFacts = (personId: string, facts: FoodFacts): void => saveKept(key(personId), facts);

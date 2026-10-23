@@ -350,6 +350,16 @@ describe("food", () => {
     const active = (await new DogRepository(db()).activeIds()).sort();
     expect([...all[0].dogIds].sort()).toEqual(active);
   });
+
+  test("a can opened is one wet entry of one can, for no dog, also when sent twice", async () => {
+    const s = sessions();
+    const open = cmd(6, { kind: "can.open", unitG: 400 });
+    await s.apply(HIRSCH, [open]);
+    expect(await s.apply(HIRSCH, [open])).toEqual({ applied: [open.id], dropped: [] });
+    const all = await new EntryRepository(db()).list({ type: "opened" });
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ type: "opened", at: at(6), foodKind: "wet", unitG: 400, amountG: 400, dogIds: [], loggedBy: "marcel" });
+  });
 });
 
 describe("changing walkers and dogs", () => {

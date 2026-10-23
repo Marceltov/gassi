@@ -18,7 +18,7 @@ const typeIn = async (value: Locator, text: string) => {
   await value.click();
   await value.fill(text);
 };
-/** A number of cans as the count field shows it ("2,75"). */
+/** A number as the count field shows it ("3", dry food "2,5"). */
 const decimal = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 2, useGrouping: false });
 const invites: number[] = [];
 test.afterEach(async () => {
@@ -110,6 +110,7 @@ test("Vorrat: a card per kind with its amount and how long it lasts; the stock a
   const dry = (await page.getByTestId("count-dry").boundingBox())!;
   const buy = (await page.getByRole("button", { name: "Eingekauft" }).boundingBox())!;
   expect(buy.y - (dry.y + dry.height)).toBeLessThan(40); // the rows you count in sit right above the controls
+  await expect(page.getByText("Nassfutter · geschlossene Dosen")).toBeVisible();
 });
 
 test("Vorrat: the fields typed into are 16 px, so an iPhone doesn't zoom into them", async ({ page }) => {
@@ -175,7 +176,7 @@ test("Vorrat: counting in the list changes nothing until it is saved; the count 
   expect(wetMiddle.dy).toBeLessThanOrEqual(1);
   expect(dryMiddle.dy).toBeLessThanOrEqual(1);
   expect(wetMiddle.x).toBe(dryMiddle.x);
-  await page.getByRole("button", { name: "½ Dose à 400 g weniger" }).click();
+  await page.getByRole("button", { name: "1 Dose à 400 g weniger" }).click();
   const height = (await page.getByTestId("count-dry").boundingBox())!.height;
   await expect(page.getByTestId("count-400").getByText(`vorher ${was}`)).toBeVisible();
   expect((await page.getByTestId("count-400").boundingBox())!.height).toBe(height); // rows keep one height
@@ -189,8 +190,12 @@ test("Vorrat: counting in the list changes nothing until it is saved; the count 
 
   await typeIn(page.getByLabel("Anzahl Dosen à 400 g"), "zwei");
   await page.getByRole("button", { name: "Zählung speichern" }).click();
-  await expect(page.getByTestId("stock-message")).toHaveText("Wie viele Dosen sind noch da? Eine Zahl, z. B. 2,75.");
-  await typeIn(page.getByLabel("Anzahl Dosen à 400 g"), "2,75");
+  const COUNT = "Wie viele geschlossene Dosen sind noch da? Eine ganze Zahl, z. B. 3.";
+  await expect(page.getByTestId("stock-message")).toHaveText(COUNT);
+  await typeIn(page.getByLabel("Anzahl Dosen à 400 g"), "2,5"); // an open can isn't counted
+  await page.getByRole("button", { name: "Zählung speichern" }).click();
+  await expect(page.getByTestId("stock-message")).toHaveText(COUNT);
+  await typeIn(page.getByLabel("Anzahl Dosen à 400 g"), "2");
   // the stock read after saving is held back: until it arrives the saved count stays, the old one doesn't flash up
   let release = () => {};
   const held = new Promise<void>((r) => (release = r));
@@ -202,13 +207,13 @@ test("Vorrat: counting in the list changes nothing until it is saved; the count 
   await page.getByRole("button", { name: "Zählung speichern" }).click();
   const { entries } = (await (await counted).json()) as Made;
   await page.waitForTimeout(200);
-  expect(await page.getByTestId("count-400-value").textContent()).toBe("2,75");
+  expect(await page.getByTestId("count-400-value").textContent()).toBe("2");
   release();
   made.push(...entries.map((e) => e.id));
-  expect(entries.find((e) => e.unitG === 400)?.amountG).toBe(1100);
+  expect(entries.find((e) => e.unitG === 400)?.amountG).toBe(800);
   expect(entries.map((e) => e.unitG).sort()).toEqual(before.map((s) => s.unitG).sort()); // every size at once
   await expect(page.getByTestId("stock-message")).toHaveCount(0);
-  await expect(page.getByTestId("count-400-value")).toHaveText("2,75");
+  await expect(page.getByTestId("count-400-value")).toHaveText("2");
   await expect(page.getByRole("button", { name: "Eingekauft" })).toBeVisible();
 });
 
@@ -217,9 +222,9 @@ test("Vorrat: a size counted to 0 is retired when the count is saved", async ({ 
   const client = createClient({ baseUrl: BASE_URL, token });
   made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9998, cans: 1 }] })).entries.map((e) => e.id));
   await page.goto("/mehr/vorrat");
-  await typeIn(page.getByLabel("Anzahl Dosen à 9998 g"), "0,5");
+  await typeIn(page.getByLabel("Anzahl Dosen à 9998 g"), "1");
   await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "½ Dose à 9998 g weniger" }).click();
+  await page.getByRole("button", { name: "1 Dose à 9998 g weniger" }).click();
   await expect(page.getByTestId("count-9998-value")).toHaveText("0");
   const counted = savedCount(page);
   await page.getByRole("button", { name: "Zählung speichern" }).click();
@@ -447,19 +452,19 @@ test("Vorrat: quick taps each count; a count reads out with its value; clearing 
   await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveAccessibleName(/^Anzahl Dosen à 777 g, \d/);
   const from = Number((await row.getByLabel("Anzahl Dosen à 777 g").textContent())!.replace(",", "."));
   // four taps faster than the screen renders
-  await row.getByRole("button", { name: "½ Dose à 777 g mehr" }).evaluate((b: HTMLElement) => {
+  await row.getByRole("button", { name: "1 Dose à 777 g mehr" }).evaluate((b: HTMLElement) => {
     for (let i = 0; i < 4; i++) b.click();
   });
-  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText(decimal(from + 2));
-  // a typed count goes to the nearest half first, then on in halves
-  for (const [button, to] of [["mehr", "3"], ["weniger", "2,5"]]) {
+  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText(decimal(from + 4));
+  // whole closed cans: a typed 2,85 goes to the nearest whole can first, then on in ones
+  for (const [button, to] of [["mehr", "3"], ["weniger", "2"]]) {
     await typeIn(row.getByLabel("Anzahl Dosen à 777 g"), "2,85");
     await page.keyboard.press("Enter");
-    await row.getByRole("button", { name: `½ Dose à 777 g ${button}` }).click();
+    await row.getByRole("button", { name: `1 Dose à 777 g ${button}` }).click();
     await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText(to);
   }
-  await row.getByRole("button", { name: "½ Dose à 777 g weniger" }).click();
-  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText("2");
+  await row.getByRole("button", { name: "1 Dose à 777 g weniger" }).click();
+  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText("1");
 
   await typeIn(row.getByLabel("Dosengröße in Gramm"), "");
   await page.keyboard.press("Enter");
