@@ -23,6 +23,7 @@ test("a dry count and a dry purchase: the kg large", () => {
 
 test("a wet purchase: the cans large, their size and weight under them", () => {
   expect(factOf(entry({ type: "restock", foodKind: "wet", unitG: 400, amountG: 4800 }), form(), names)).toEqual({ big: "12 Dosen", sub: "à 400 g · 4,8 kg" });
+  expect(factOf(entry({ type: "restock", foodKind: "wet", unitG: 900, amountG: 900 }), form(), names)).toMatchObject({ big: "1 Dose" });
 });
 
 test("pee and poop: the time large, the dog and the day under it, as edited", () => {

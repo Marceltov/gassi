@@ -2,7 +2,7 @@
 // purchase's cans and grams, a pee's or a poop's time and dog, a training's minutes and what was trained. From the form,
 // so it follows what is being changed. Food, weight, a walk and a note show theirs themselves (the amount, the summary,
 // the text).
-import { cansOf, clockTime, FOOD_LABEL, formatMinutes, formatWeight, minutesBetween, trainingSummaryLine } from "@gassi/domain";
+import { cansOf, clockTime, FOOD_LABEL, formatCans, formatMinutes, formatWeight, minutesBetween, trainingSummaryLine } from "@gassi/domain";
 import type { Entry, Form } from "./form";
 
 /** One value large with a line under it, or a row per can size with its cans and what they come to. */
@@ -21,7 +21,7 @@ export function factOf(entry: Entry, form: Form, names: Names): Fact | null {
       }
       return { big: formatWeight(entry.amountG ?? 0), sub: `${FOOD_LABEL.dry} gezählt` };
     case "restock":
-      if (entry.unitG) return { big: `${Math.round((entry.amountG ?? 0) / entry.unitG)} Dosen`, sub: `à ${entry.unitG} g · ${formatWeight(entry.amountG ?? 0)}` };
+      if (entry.unitG) return { big: formatCans(Math.round((entry.amountG ?? 0) / entry.unitG)), sub: `à ${entry.unitG} g · ${formatWeight(entry.amountG ?? 0)}` };
       return { big: formatWeight(entry.amountG ?? 0), sub: `${FOOD_LABEL.dry} gekauft` };
     case "pee":
     case "poop": {
