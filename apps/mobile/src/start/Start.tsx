@@ -2,7 +2,7 @@
 // who, the times in one column; three big tiles at the bottom: Gassi gehen across, Futter and Training side by side
 // below it, each with when it was last. A running walk or training shows its clock on its tile and is led back into. A
 // row on top opens Verlauf filtered to its type.
-import { type EntryType, formatAgo, newId, TYPE_LABEL } from "@gassi/domain";
+import { type EntryType, formatAgoShort, newId, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -35,7 +35,7 @@ export function Start() {
   const open = (path: "/runde" | "/training") => leave(() => router.push(path));
   // a row of the day at a glance: since when and who; it opens Verlauf with its type chosen
   const fact = (label: string, entry: Entry, type: Shown, icon: IconName) => {
-    const when = entry ? formatAgo(Date.parse(entry.endedAt ?? entry.at), now) : "noch nicht";
+    const when = entry ? formatAgoShort(Date.parse(entry.endedAt ?? entry.at), now) : "noch nicht";
     const show = () => leave(() => router.navigate({ pathname: "/verlauf", params: { type } }));
     return (
       <Row
@@ -113,6 +113,6 @@ const styles = StyleSheet.create({
   cell: { flex: 1 },
   // the times right-aligned in one column, who beside them
   since: { flex: 1, flexDirection: "row", justifyContent: "flex-end", alignItems: "baseline", gap: 10 },
-  when: { fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  when: { flexShrink: 0, fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] },
   by: { width: 56, fontSize: 12, textAlign: "right" },
 });

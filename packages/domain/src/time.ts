@@ -67,6 +67,12 @@ export function formatAgo(thenMs: number, nowMs: number): string {
   return days === 1 ? "vor 1 Tag" : `vor ${days} Tagen`;
 }
 
+/** formatAgo for a column of times (Start's day at a glance): past an hour only the hours ("vor 23 Std."). */
+export function formatAgoShort(thenMs: number, nowMs: number): string {
+  const minutes = Math.floor(Math.max(0, nowMs - thenMs) / 60_000);
+  return minutes >= 60 && minutes < 24 * 60 ? `vor ${Math.floor(minutes / 60)} Std.` : formatAgo(thenMs, nowMs);
+}
+
 /** A running clock for `ms` elapsed: "52:13", "1:02:05". */
 export function formatElapsed(ms: number): string {
   const s = Math.floor(Math.max(0, ms) / 1000);
