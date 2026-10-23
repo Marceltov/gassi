@@ -1,8 +1,8 @@
 // The details of an encounter, where it is logged (LogSheet) and where it is put right afterwards (Verlauf): a dog
 // encounter's reaction 0–4, attention, how we got past and distance (#37); a person encounter's who, where, how it went
-// 1–10, mood (several), insecurity 1–10 and growling (#90). Only the reaction, and who and how it went, are needed. A
+// 1–10, mood (several), insecurity 1–10 and what he said: knurrt, fiept, jault (#90). Only the reaction, and who and how it went, are needed. A
 // second tap on a chosen answer takes it back.
-import { ATTENTION_LABEL, ATTENTIONS, DISTANCE_LABEL, DISTANCES, type EntryDetails, HANDLING_LABEL, HANDLINGS, MOOD_LABEL, MOODS, PLACE_LABEL, PLACES, REACTION_LABEL, SCALE_MAX, SCALE_MIN, withDetail } from "@gassi/domain";
+import { ATTENTION_LABEL, ATTENTIONS, DISTANCE_LABEL, DISTANCES, type EntryDetails, HANDLING_LABEL, HANDLINGS, MOOD_LABEL, MOODS, PLACE_LABEL, PLACES, REACTION_LABEL, SCALE_MAX, SCALE_MIN, SOUND_LABEL, SOUNDS, withDetail } from "@gassi/domain";
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme";
@@ -64,6 +64,7 @@ export function PersonEncounterFields(props: Props & { names: readonly string[] 
   const { details: d, change, names } = props;
   const toggle = toggler(props);
   const moods = d.moods ?? [];
+  const sounds = d.sounds ?? [];
   return (
     <>
       <View style={styles.row}>
@@ -91,7 +92,9 @@ export function PersonEncounterFields(props: Props & { names: readonly string[] 
         <Segments a11y="Wie unsicher" options={SCALE.map((v) => ({ value: v, label: v }))} value={d.insecurity === undefined ? null : String(d.insecurity)} onChange={(v) => toggle("insecurity", Number(v))} kind="encounter" />
       </Labelled>
       <View style={styles.chips}>
-        <Chip label="knurrt" accent={theme.encounter} on={!!d.growled} onPress={() => change(withDetail(d, "growled", d.growled ? null : true) ?? {})} />
+        {SOUNDS.map((s) => (
+          <Chip key={s} label={SOUND_LABEL[s]} accent={theme.encounter} on={sounds.includes(s)} onPress={() => change(withDetail(d, "sounds", sounds.includes(s) ? sounds.filter((x) => x !== s) : [...sounds, s]) ?? {})} />
+        ))}
       </View>
     </>
   );

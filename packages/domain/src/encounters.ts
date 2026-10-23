@@ -30,6 +30,11 @@ export const MOODS = ["friendly", "curious", "excited", "unsure", "afraid", "agg
 export type Mood = (typeof MOODS)[number];
 export const MOOD_LABEL: Record<Mood, string> = { friendly: "freundlich", curious: "neugierig", excited: "aufgeregt", unsure: "unsicher", afraid: "ängstlich", aggressive: "aggressiv" };
 
+/** What the dog said to the person; several at once. */
+export const SOUNDS = ["growls", "whines", "howls"] as const;
+export type Sound = (typeof SOUNDS)[number];
+export const SOUND_LABEL: Record<Sound, string> = { growls: "knurrt", whines: "fiept", howls: "jault" };
+
 /** The 1-to-10 scales of a person encounter: how it went, how unsure he was. */
 export const SCALE_MIN = 1;
 export const SCALE_MAX = 10;

@@ -72,7 +72,7 @@ function LogForm({ kind, dogIds, place, onClose }: { kind: LogKind; dogIds: read
           accessibilityLabel={kind === "note" ? "Notiz" : "Notiz zur Begegnung"}
           value={note}
           onChangeText={setNote}
-          placeholder={kind === "note" ? "Was ist dir aufgefallen? (diktieren geht)" : "Auffälligkeiten, Notizen (optional)"}
+          placeholder={kind === "note" ? "Was ist dir aufgefallen?" : "Auffälligkeiten, Notizen (optional)"}
           placeholderTextColor={theme.muted}
           multiline
           maxLength={1000}

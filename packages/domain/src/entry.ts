@@ -2,7 +2,7 @@
 // in grams (food, restocks, weight), food kind, can size (restocks), note and the details only some kinds have (a
 // poop's consistency). The input schemas are shared by the server and its clients.
 import { z } from "zod";
-import { ATTENTIONS, DISTANCES, HANDLINGS, MOODS, PLACES, REACTION_MAX, SCALE_MAX, SCALE_MIN } from "./encounters";
+import { ATTENTIONS, DISTANCES, HANDLINGS, MOODS, PLACES, REACTION_MAX, SCALE_MAX, SCALE_MIN, SOUNDS } from "./encounters";
 import { CONSISTENCIES, ENTRY_TYPES, type EntryType, FOOD_KINDS, type FoodKind, minutesBetween } from "./entryTypes";
 
 export type Entry = {
@@ -25,7 +25,7 @@ export type Entry = {
 
 const scale = z.number().int().min(SCALE_MIN).max(SCALE_MAX);
 /** What only some kinds of entries have, each optional here: a poop's consistency (#86), a dog encounter's reaction,
- * attention, handling and distance (#37), a person encounter's who, place, rating, moods, growling and insecurity
+ * attention, handling and distance (#37), a person encounter's who, place, rating, moods, sounds (knurrt, fiept, jault) and insecurity
  * (#90). Kept as one JSON column (ADR 0013). */
 export const entryDetails = z
   .object({
@@ -38,7 +38,7 @@ export const entryDetails = z
     place: z.enum(PLACES).optional(),
     rating: scale.optional(),
     moods: z.array(z.enum(MOODS)).max(MOODS.length).optional(),
-    growled: z.boolean().optional(),
+    sounds: z.array(z.enum(SOUNDS)).max(SOUNDS.length).optional(),
     insecurity: scale.optional(),
   })
   .strict();
@@ -55,7 +55,7 @@ const DETAIL_TYPES: Record<Detail, readonly EntryType[]> = {
   place: ["personEncounter"],
   rating: ["personEncounter"],
   moods: ["personEncounter"],
-  growled: ["personEncounter"],
+  sounds: ["personEncounter"],
   insecurity: ["personEncounter"],
 };
 /** What a kind can't be without, with what to ask. */

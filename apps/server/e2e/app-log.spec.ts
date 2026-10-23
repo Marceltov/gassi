@@ -22,7 +22,7 @@ async function newest(token: string, type: string) {
   return entry;
 }
 
-test("Start: a note is its text; a person encounter needs who and how it went, and keeps mood, growling and where", async ({ page }) => {
+test("Start: a note is its text; a person encounter needs who and how it went, and keeps mood, sounds and where", async ({ page }) => {
   const restore = await onlyOneDog();
   try {
     const token = await signIn(page);
@@ -44,9 +44,10 @@ test("Start: a note is its text; a person encounter needs who and how it went, a
     await sheet.getByRole("button", { name: "freundlich" }).click();
     await sheet.getByRole("button", { name: "aufgeregt" }).click();
     await sheet.getByRole("button", { name: "knurrt" }).click();
+    await sheet.getByRole("button", { name: "jault" }).click();
     await sheet.getByLabel("Notiz zur Begegnung").fill("an der Tür");
     await sheet.getByRole("button", { name: "Eintragen" }).click();
-    expect(await newest(token, "personEncounter")).toMatchObject({ note: "an der Tür", details: { who: "Oma Inge", place: "home", rating: 7, moods: ["friendly", "excited"], growled: true } });
+    expect(await newest(token, "personEncounter")).toMatchObject({ note: "an der Tür", details: { who: "Oma Inge", place: "home", rating: 7, moods: ["friendly", "excited"], sounds: ["growls", "howls"] } });
   } finally {
     await restore();
   }

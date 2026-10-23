@@ -1,6 +1,6 @@
 // How an entry reads in a list, the same in the apps.
 import type { EntryDetails } from "./entry";
-import { ATTENTION_LABEL, DISTANCE_LABEL, HANDLING_LABEL, PLACE_LABEL, REACTION_LABEL } from "./encounters";
+import { ATTENTION_LABEL, DISTANCE_LABEL, HANDLING_LABEL, PLACE_LABEL, REACTION_LABEL, SOUND_LABEL } from "./encounters";
 import { CONSISTENCY_LABEL, type EntryType, FOOD_LABEL, type FoodKind, TYPE_LABEL } from "./entryTypes";
 import { exerciseRate, type ExerciseTotal, trainingParts } from "./exerciseTotals";
 import { countLine, formatCanCount } from "./food";
@@ -78,7 +78,7 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
   }
 }
 
-/** What an encounter was, in short: "2 fiept · großer Bogen · nah", "Oma Inge · 7/10 · bei uns · knurrt". */
+/** What an encounter was, in short: "2 fiept · großer Bogen · nah", "Oma Inge · 7/10 · bei uns · knurrt · fiept". */
 export function encounterLine(d: EntryDetails): string {
   return [
     d.reaction !== undefined ? `${d.reaction} ${REACTION_LABEL[d.reaction]}` : "",
@@ -88,7 +88,7 @@ export function encounterLine(d: EntryDetails): string {
     d.handling ? HANDLING_LABEL[d.handling] : "",
     d.distance ? DISTANCE_LABEL[d.distance] : "",
     d.place ? PLACE_LABEL[d.place] : "",
-    d.growled ? "knurrt" : "",
+    ...(d.sounds ?? []).map((s) => SOUND_LABEL[s]),
   ]
     .filter(Boolean)
     .join(" · ");
