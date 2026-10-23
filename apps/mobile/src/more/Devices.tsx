@@ -80,7 +80,9 @@ export function Devices() {
       bottom={
         <>
           {message ?? invites.message ? <Text style={[styles.message, { color: theme.ink }]}>{message ?? invites.message}</Text> : null}
-          <ButtonRow side={[<BigButton key="here" kind="side" size="m" label="Hier abmelden" a11y="Auf diesem Gerät abmelden" onPress={() => setAskingHere(true)} />]} main={<BigButton kind="ink" size="m" icon="add" label="Gerät hinzufügen" onPress={invites.create} />} />
+          {/* the exception to side by side (#80): signing this phone out is its own row above */}
+          <BigButton kind="side" size="m" label="Hier abmelden" a11y="Auf diesem Gerät abmelden" onPress={() => setAskingHere(true)} />
+          <BigButton kind="ink" size="m" icon="add" label="Gerät hinzufügen" onPress={invites.create} />
         </>
       }
     />
