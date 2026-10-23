@@ -1,6 +1,6 @@
 // Start: the day at a glance on top as one list (#83): Draußen, Gefressen, Trainiert, Pipi, Poopoo, each since when and
 // who, the times in one column; three big tiles at the bottom: Gassi gehen across, Futter and Training side by side
-// below it, each with when it was last; under them Begegnung and Notiz, small (#90, #37, #91). A running walk or training shows its clock on its tile and is led back into. A
+// below it, each with when it was last; under them Kommando, Leckerli, Begegnung and Notiz, small (#36, #90, #37, #91). A running walk or training shows its clock on its tile and is led back into. A
 // row on top opens Verlauf filtered to its type.
 import { type EntryType, formatAgoShort, newId, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
@@ -8,10 +8,11 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { FoodSheet } from "../food/FoodSheet";
 import { type LogStart, Logging } from "../log/LogSheet";
-import { BigButton } from "../ui/BigButton";
 import { useGassi } from "../data/GassiProvider";
 import { type TileKind, useTheme } from "../theme";
 import type { IconName } from "../ui/Icon";
+import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
+import { RoundAction } from "../ui/RoundAction";
 import { Screen } from "../ui/Screen";
 import { Group, Row } from "../ui/List";
 import { useLeaving } from "../ui/useLeaving";
@@ -22,6 +23,14 @@ import { useNow } from "./useNow";
 import { type Today, useToday } from "./useToday";
 
 type Entry = Today["walk"];
+
+// the small actions under the tiles: what they start (log/LogSheet.tsx), each in its kind's icon and color
+const SMALL: [LogStart, string, EntryType][] = [
+  ["command", "Kommando", "command"],
+  ["treat", "Leckerli", "treat"],
+  ["encounter", "Begegnung", "personEncounter"],
+  ["note", "Notiz", "note"],
+];
 type Shown = TileKind & EntryType;
 
 export function Start() {
@@ -105,12 +114,9 @@ export function Start() {
             </View>
           </View>
           <View style={styles.row}>
-            <View style={styles.cell}>
-              <BigButton kind="side" size="s" icon="people" label="Begegnung" onPress={() => setLogging("encounter")} />
-            </View>
-            <View style={styles.cell}>
-              <BigButton kind="side" size="s" icon="note" label="Notiz" onPress={() => setLogging("note")} />
-            </View>
+            {SMALL.map(([start, label, type]) => (
+              <RoundAction key={start} label={label} icon={TYPE_ICON[type]} tone={TYPE_TONE[type]} onPress={() => setLogging(start)} />
+            ))}
           </View>
           <FoodSheet open={foodOpen} onClose={() => setFoodOpen(false)} />
           <Logging start={logging} dogIds={dogs.filter((d) => !d.archived).map((d) => d.id)} place="home" onDone={() => setLogging(null)} />

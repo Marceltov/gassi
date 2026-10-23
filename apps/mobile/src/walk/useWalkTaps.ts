@@ -4,18 +4,25 @@
 import type { WalkView } from "@gassi/domain";
 import { useEffect, useRef, useState } from "react";
 import { useGassi } from "../data/GassiProvider";
-import { holds, mergeTaps, summaryTaps, type Tap, tapsOf, type WalkSummary, withConsistencies } from "./taps";
+import { holds, mergeTaps, type Names, summaryTaps, type Tap, tapsOf, type WalkSummary, withConsistencies } from "./taps";
+
+/** The household's exercise and treat names, for the commands this phone tapped. */
+export function useTapNames(): Names {
+  const { exercises, treatKinds } = useGassi();
+  return { exercise: (id) => exercises.find((e) => e.id === id)?.name ?? "Übung", treat: (id) => treatKinds.find((t) => t.id === id)?.name ?? "Leckerli" };
+}
 
 type Known = { key: string; taps: Tap[]; trainings: WalkSummary["trainings"] };
 
 export function useWalkTaps(walk: WalkView | null): { taps: Tap[]; trainings: WalkSummary["trainings"] } {
   const { api, pending } = useGassi();
+  const names = useTapNames();
   const [known, setKnown] = useState<Known | null>(null);
   const [carried, setCarried] = useState<Tap[]>([]);
   const [lastPending, setLastPending] = useState(pending);
   if (pending !== lastPending) {
     setLastPending(pending);
-    setCarried((c) => [...c, ...tapsOf(lastPending).filter((t) => !holds(c, t))]);
+    setCarried((c) => [...c, ...tapsOf(lastPending, names).filter((t) => !holds(c, t))]);
   }
 
   // only an answer newer than the one shown is applied
@@ -38,6 +45,6 @@ export function useWalkTaps(walk: WalkView | null): { taps: Tap[]; trainings: Wa
 
   if (!walk) return { taps: [], trainings: [] };
   const mine = known?.key === walk.key ? known : null;
-  const taps = mergeTaps(mine?.taps ?? [], [...carried, ...tapsOf(pending)], walk.startedAt, null);
+  const taps = mergeTaps(mine?.taps ?? [], [...carried, ...tapsOf(pending, names)], walk.startedAt, null);
   return { taps: withConsistencies(taps, pending), trainings: mine?.trainings ?? [] };
 }

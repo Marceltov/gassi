@@ -8,6 +8,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorMessage } from "../data/api";
 import { useGassi } from "../data/GassiProvider";
+import { useTapNames } from "./useWalkTaps";
 import { clearEnded, loadEnded } from "./ended";
 import { fromEnded, fromServer, type Shown, tapsOf } from "./taps";
 
@@ -16,6 +17,7 @@ export type WalkSummaryState = { shown: Shown | null; track: Answer["track"]; lo
 
 export function useWalkSummary(idOrKey: string): WalkSummaryState {
   const { api, pending, unsent, online } = useGassi();
+  const names = useTapNames();
   const [answer, setAnswer] = useState<{ for: string; data: Answer | null; error: string | null } | null>(null);
   const [asks, setAsks] = useState(0);
   const reload = useCallback(() => setAsks((n) => n + 1), []);
@@ -42,7 +44,7 @@ export function useWalkSummary(idOrKey: string): WalkSummaryState {
   }, [api, idOrKey, unsent, online, asks]);
 
   const ended = loadEnded(idOrKey);
-  const local = ended ? fromEnded(ended, tapsOf(pending)) : null;
+  const local = ended ? fromEnded(ended, tapsOf(pending, names)) : null;
   const waiting = !!ended && pending.some((c) => withinWalk(c.at, ended.startedAt, ended.endedAt));
   const server = answer?.for === idOrKey ? answer : null;
   const done = server?.data && server.data.summary.endedAt !== null ? server.data : null;

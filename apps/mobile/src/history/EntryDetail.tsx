@@ -5,7 +5,7 @@
 // stay on top, the buttons at the bottom (#71). A wet count (one row per can size) is one thing here: its sizes as rows,
 // its time moved and its rows deleted together. Both need the server (the writes' client): they say so without
 // reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
-import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, type Stock, TYPE_LABEL } from "@gassi/domain";
+import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, isPractice, keepsOne, type Stock, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -31,7 +31,7 @@ import { TIME_ZONE } from "../time";
 import { TimeField } from "./TimeField";
 
 // Speichern in the color of the thing (#80): food bought, counted and opened is food; weight and a note have none
-const BUTTON: Record<Entry["type"], ButtonKind> = { walk: "walk", food: "food", restock: "food", stockcheck: "food", opened: "food", training: "training", pee: "pee", mark: "pee", poop: "poop", weight: "ink", note: "ink", dogEncounter: "encounter", personEncounter: "encounter" };
+const BUTTON: Record<Entry["type"], ButtonKind> = { walk: "walk", food: "food", restock: "food", stockcheck: "food", opened: "food", training: "training", pee: "pee", mark: "pee", poop: "poop", weight: "ink", note: "ink", dogEncounter: "encounter", personEncounter: "encounter", command: "training", treat: "training" };
 
 export function EntryDetail({ id }: { id: number }) {
   const router = useRouter();
@@ -80,7 +80,7 @@ export function EntryDetail({ id }: { id: number }) {
       await writeApi.editEntry(editInput(e, f));
       // a count's other sizes after this one, which moves them all to its time
       for (const other of countEdits(e, f)) await writeApi.editEntry(other);
-      if (e.type === "training") await writeApi.editTraining(trainingInput(e, f));
+      if (isPractice(e.type)) await writeApi.editTraining(trainingInput(e, f));
     });
   // a deleted walk has no summary to go back to: the first screen of the tab it was opened on (Verlauf, or Start right
   // after the walk); anything else goes back to where it was opened
@@ -183,7 +183,7 @@ export function EntryDetail({ id }: { id: number }) {
               ))}
             </Group>
           ) : null}
-          {entry.type === "training" ? <TrainingFields form={form} change={change} names={{ dogs, exercises, treatKinds }} /> : null}
+          {isPractice(entry.type) ? <TrainingFields form={form} change={change} names={{ dogs, exercises, treatKinds }} /> : null}
 
           <TextInput
             value={form.note}

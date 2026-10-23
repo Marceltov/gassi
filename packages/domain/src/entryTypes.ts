@@ -1,5 +1,5 @@
 // The kinds of entries and their German words. A new kind is a new value here, not a new table.
-export const ENTRY_TYPES = ["walk", "food", "pee", "mark", "poop", "note", "dogEncounter", "personEncounter", "training", "weight", "restock", "stockcheck", "opened"] as const;
+export const ENTRY_TYPES = ["walk", "food", "pee", "mark", "poop", "note", "dogEncounter", "personEncounter", "training", "command", "treat", "weight", "restock", "stockcheck", "opened"] as const;
 export type EntryType = (typeof ENTRY_TYPES)[number];
 
 /** The kinds that get a tile on the today screen, in tile order. */
@@ -15,6 +15,8 @@ export const TYPE_LABEL: Record<EntryType, string> = {
   dogEncounter: "Hundebegegnung",
   personEncounter: "Menschenbegegnung",
   training: "Training",
+  command: "Kommando",
+  treat: "Leckerli",
   weight: "Gewicht",
   restock: "Einkauf",
   stockcheck: "Bestand",
@@ -22,6 +24,11 @@ export const TYPE_LABEL: Record<EntryType, string> = {
 };
 
 export const isEntryType = (v: unknown): v is EntryType => (ENTRY_TYPES as readonly unknown[]).includes(v);
+
+/** The kinds with repetitions and treats: a training, and a single command or treat given without one (#36). Their
+ * repetitions count in the exercises' success, their treats in the food. */
+export const PRACTICE_TYPES = ["training", "command", "treat"] as const satisfies readonly EntryType[];
+export const isPractice = (type: EntryType): boolean => (PRACTICE_TYPES as readonly EntryType[]).includes(type);
 
 /** How a poop was, firmest first (#86): an optional detail of a poop entry. */
 export const CONSISTENCIES = ["hard", "normal", "soft", "mushy", "liquid"] as const;

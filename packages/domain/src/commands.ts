@@ -32,6 +32,10 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("log.consistency"), poopAt: base.at, dogId, consistency: z.enum(CONSISTENCIES).nullable() }),
   // a note, or an encounter with a dog or a person (#91, #37, #90): for one dog except a note; checked like an entry
   z.object({ ...base, kind: z.literal("log.entry"), type: z.enum(["note", "dogEncounter", "personEncounter"]), dogId: dogId.optional(), note: z.string().trim().max(1000).optional(), details: entryDetails.optional() }),
+  // a command on the go or at home, without a training (#36): one repetition, and a treat of `treatKindId` with it
+  z.object({ ...base, kind: z.literal("quick.command"), dogId, exerciseId: z.number().int().positive(), ok: z.boolean(), treatKindId: z.number().int().positive().optional() }),
+  // one treat on its own
+  z.object({ ...base, kind: z.literal("quick.treat"), dogId, treatKindId: z.number().int().positive() }),
   // a feeding; the dogs left out, the server takes every active dog
   z.object({ ...base, kind: z.literal("food"), dogIds, amountG: z.number().int().min(FOOD_MIN_G).max(FOOD_MAX_G), foodKind: z.enum(["wet", "dry"]) }),
   // a can of wet food opened: one closed can of that size less in Vorrat

@@ -56,6 +56,10 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
     }
     case "training":
       return plain(TYPE_LABEL.training, [running ? "läuft" : duration, ...trainingParts(e.exercises, e.treats ?? 0)].filter(Boolean).join(" · "));
+    case "command":
+      return plain(TYPE_LABEL.command, commandLine(e.exercises, e.treats ?? 0));
+    case "treat":
+      return plain(TYPE_LABEL.treat, "");
     case "weight":
       return plain(TYPE_LABEL.weight, e.amountG ? formatKg(e.amountG) : "");
     case "restock": {
@@ -74,4 +78,9 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
     default:
       return plain(TYPE_LABEL[e.type], [duration, kind, e.amountG ? `${e.amountG} g` : ""].filter(Boolean).join(", "));
   }
+}
+
+/** A command without a training (#36), its one repetition and its treat: "Warten ✓ · 1 Leckerli". */
+export function commandLine(exercises: readonly ExerciseTotal[], treats: number): string {
+  return [...exercises.map((x) => `${x.name} ${x.ok ? "✓" : "✗"}`), ...trainingParts([], treats)].join(" · ");
 }
