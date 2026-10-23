@@ -8,10 +8,11 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { FoodSheet } from "../food/FoodSheet";
 import { type LogStart, Logging } from "../log/LogSheet";
-import { BigButton } from "../ui/BigButton";
 import { useGassi } from "../data/GassiProvider";
 import { type TileKind, useTheme } from "../theme";
 import type { IconName } from "../ui/Icon";
+import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
+import { RoundAction } from "../ui/RoundAction";
 import { Screen } from "../ui/Screen";
 import { Group, Row } from "../ui/List";
 import { useLeaving } from "../ui/useLeaving";
@@ -23,11 +24,11 @@ import { type Today, useToday } from "./useToday";
 
 type Entry = Today["walk"];
 
-// the small buttons under the tiles: what they start (log/LogSheet.tsx)
-const SMALL: [LogStart, string, IconName][] = [
-  ["command", "Kommando", "training"],
+// the small actions under the tiles: what they start (log/LogSheet.tsx), each in its kind's icon and color
+const SMALL: [LogStart, string, EntryType][] = [
+  ["command", "Kommando", "command"],
   ["treat", "Leckerli", "treat"],
-  ["encounter", "Begegnung", "people"],
+  ["encounter", "Begegnung", "personEncounter"],
   ["note", "Notiz", "note"],
 ];
 type Shown = TileKind & EntryType;
@@ -113,10 +114,8 @@ export function Start() {
             </View>
           </View>
           <View style={styles.row}>
-            {SMALL.map(([start, label, icon]) => (
-              <View key={start} style={styles.cell}>
-                <BigButton kind="side" size="s" icon={icon} label={label} stacked onPress={() => setLogging(start)} />
-              </View>
+            {SMALL.map(([start, label, type]) => (
+              <RoundAction key={start} label={label} icon={TYPE_ICON[type]} tone={TYPE_TONE[type]} onPress={() => setLogging(start)} />
             ))}
           </View>
           <FoodSheet open={foodOpen} onClose={() => setFoodOpen(false)} />

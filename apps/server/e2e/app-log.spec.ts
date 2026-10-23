@@ -104,6 +104,8 @@ test("Kommando and Leckerli, on a walk and at home: one or two taps, counted lik
   const api = asHirsch();
   const warten = await api.addExercise({ name: `Warten ${Date.now()}` });
   const kaese = await api.addTreatKind({ name: `Käse ${Date.now()}`, gramsPerPiece: 2, fromDry: false });
+  // a second kind, so that Leckerli asks which (with one kind it just logs it)
+  const huhn = await api.addTreatKind({ name: `Huhn ${Date.now()}`, gramsPerPiece: 1, fromDry: false });
   try {
     const token = await signIn(page);
     await page.goto("/");
@@ -111,8 +113,10 @@ test("Kommando and Leckerli, on a walk and at home: one or two taps, counted lik
     await page.getByRole("button", { name: "Kommando", exact: true }).click();
     const command = page.getByTestId("command-sheet");
     await command.getByRole("button", { name: warten.name }).click();
-    await command.getByRole("button", { name: `+ 1 ${kaese.name}` }).click();
-    await expect(command.getByRole("button", { name: `+ 1 ${kaese.name}` })).toHaveAttribute("aria-pressed", "true");
+    // the first kind is preset; this one is chosen unless it is that one
+    const withKaese = command.getByRole("button", { name: `+ 1 ${kaese.name}` });
+    if ((await withKaese.getAttribute("aria-pressed")) !== "true") await withKaese.click();
+    await expect(withKaese).toHaveAttribute("aria-pressed", "true");
     await command.getByRole("button", { name: "klappt", exact: true }).click();
     await expect(page.getByTestId("walk-taps")).toContainText(`Kommando · ${warten.name} ✓ · 1 Leckerli`);
     const entry = await newest(token, "command");
@@ -133,6 +137,7 @@ test("Kommando and Leckerli, on a walk and at home: one or two taps, counted lik
   } finally {
     await api.updateExercise({ id: warten.id, archived: true });
     await api.updateTreatKind({ id: kaese.id, archived: true });
+    await api.updateTreatKind({ id: huhn.id, archived: true });
     await restore();
   }
 });
