@@ -70,7 +70,7 @@ function lookOf(kind: ButtonKind, theme: Palette, disabled: boolean): { box: obj
 }
 
 const styles = StyleSheet.create({
-  button: { borderRadius: radius.button, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
+  button: { borderRadius: radius.button, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
   line: { flexDirection: "row", alignItems: "center", gap: 8 },
   label: { fontWeight: "700" },
   sub: { fontSize: 12, marginTop: 2, opacity: 0.8 },

@@ -1,5 +1,5 @@
-// The buttons at the bottom of a page off the go, side by side (#80): side actions left, the main action right and
-// widest, all one height. A trash button (Löschen) is square: only its icon.
+// The buttons at the bottom of a page off the go, side by side (#80): side actions left, each as wide as its label, the
+// main action right taking the rest, all one height. A trash button (Löschen) is square: only its icon.
 import { type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { BigButton } from "./BigButton";
@@ -33,6 +33,6 @@ const isTrash = (n: ReactNode) => typeof n === "object" && n !== null && "type" 
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 8 },
-  side: { flex: 1 },
-  main: { flex: 2 },
+  side: { flexShrink: 0, minWidth: 96 },
+  main: { flex: 1 },
 });
