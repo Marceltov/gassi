@@ -1,4 +1,5 @@
-// Start: the day at a glance on top, three big tiles at the bottom: Gassi gehen across, Futter and Training side by side
+// Start: the day at a glance on top (Draußen, Gefressen and Trainiert in a row, Pipi and Poopoo below, #83), three big
+// tiles at the bottom: Gassi gehen across, Futter and Training side by side
 // below it, each with when it was last. A running walk or training shows its clock on its tile and is led back into. A
 // tile on top opens Verlauf filtered to its type.
 import { type EntryType, formatAgo, newId, TYPE_LABEL } from "@gassi/domain";
@@ -55,6 +56,7 @@ export function Start() {
           <View style={styles.row}>
             {tile("Draußen", today.walk, "walk", "walk")}
             {tile("Gefressen", today.food, "food", "food")}
+            {tile("Trainiert", today.training, "training", "training")}
           </View>
           <View style={styles.row}>
             {tile("Pipi", today.pee, "pee", "pee")}

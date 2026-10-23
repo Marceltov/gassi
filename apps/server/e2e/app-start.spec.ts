@@ -11,11 +11,11 @@ import { signIn } from "./signed-in";
 test.beforeEach(stopEverything);
 test.afterEach(stopEverything);
 
-test("Start shows the four tiles and three big ones; one tap on Gassi gehen starts the walk with a running clock", async ({ page }) => {
+test("Start shows the five tiles and three big ones; one tap on Gassi gehen starts the walk with a running clock", async ({ page }) => {
   const token = await signIn(page);
   await page.goto("/");
 
-  for (const label of ["Draußen", "Gefressen", "Pipi", "Poopoo"]) await expect(page.getByTestId(`tile-${label}`)).toBeVisible();
+  for (const label of ["Draußen", "Gefressen", "Trainiert", "Pipi", "Poopoo"]) await expect(page.getByTestId(`tile-${label}`)).toBeVisible();
   await expect(page.getByRole("button", { name: "Futter geben" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Training starten" })).toBeVisible();
   await page.getByRole("button", { name: "Gassi gehen" }).dblclick(); // a double tap starts one walk
@@ -101,4 +101,18 @@ test("on the go fits a small and a big phone with its big buttons: Start, a walk
   await expect(page.getByRole("button", { name: "Fertig" })).toBeVisible();
   await expectFits(page, new URL(page.url()).pathname, "Fertig");
   expect(await height("Fertig")).toBe(72);
+});
+
+test("the last training has a tile: Draußen, Gefressen and Trainiert in a row, Pipi and Poopoo below; it opens Verlauf with Training", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/");
+  const y = async (label: string) => (await page.getByTestId(`tile-${label}`).boundingBox())!.y;
+  const top = await y("Draußen");
+  expect(await y("Gefressen")).toBe(top);
+  expect(await y("Trainiert")).toBe(top);
+  expect(await y("Pipi")).toBeGreaterThan(top);
+  expect(await y("Poopoo")).toBe(await y("Pipi"));
+  await page.getByTestId("tile-Trainiert").click();
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf?type=training`);
+  await expectFits(page, "/", "Gassi gehen");
 });
