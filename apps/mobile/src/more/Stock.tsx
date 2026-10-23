@@ -108,8 +108,8 @@ export function Stock() {
         <StepButton small label={`${what} weniger`} sign="−" disabled={!(n > 0)} onPress={() => step(key, was, -0.5)} />
         <View style={styles.valueBox}>
           <TapToEdit testID={`count-${id}-value`} label={`Anzahl ${name}`} value={value} onChange={(cans) => edit(key, { cans })} inputMode="decimal" keyboardType="decimal-pad" style={isChanged ? { ...styles.value, color: theme.food } : styles.value} width={64} />
-          {/* always there, so every row keeps its height; seen only once the count changed */}
-          <Text style={[styles.was, { color: theme.muted, opacity: isChanged ? 1 : 0 }]} aria-hidden={!isChanged}>{`vorher ${was}`}</Text>
+          {/* under the number, outside the layout: the number stays centred and the row keeps its height */}
+          {isChanged ? <Text style={[styles.was, { color: theme.muted }]}>{`vorher ${was}`}</Text> : null}
         </View>
         <StepButton small label={`${what} mehr`} sign="+" disabled={n >= MAX} onPress={() => step(key, was, 0.5)} />
       </View>
@@ -205,9 +205,9 @@ const styles = StyleSheet.create({
   rowField: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   labelText: { fontSize: 14, fontWeight: "600" },
   gramValue: { textAlign: "right" },
-  valueBox: { alignItems: "center" },
+  valueBox: { width: 64, alignItems: "center" },
   value: { textAlign: "center", fontSize: 16, fontWeight: "700" },
-  was: { fontSize: 11 },
+  was: { position: "absolute", bottom: -7, fontSize: 11, lineHeight: 12 },
   warn: { fontSize: 14, fontWeight: "700" },
   pair: { flexDirection: "row", gap: 8 },
   side: { flex: 1 },

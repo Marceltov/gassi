@@ -160,15 +160,25 @@ test("Vorrat: counting in the list changes nothing until it is saved; the count 
   await page.goto("/mehr/vorrat");
   for (const s of before) await expect(page.getByTestId(`count-${s.unitG}-value`)).toHaveText(decimal(s.cans)); // one row per known size, from the stock
   const card = await page.getByTestId("stock-wet").textContent();
+  // every count sits in the middle of its row, one under the other
+  const middle = async (id: string) => {
+    const [row, value] = await Promise.all([page.getByTestId(`count-${id}`).boundingBox(), page.getByTestId(`count-${id}-value`).boundingBox()]);
+    return { dy: Math.abs(row!.y + row!.height / 2 - (value!.y + value!.height / 2)), x: Math.round(value!.x + value!.width / 2) };
+  };
+  const [wetMiddle, dryMiddle] = [await middle("400"), await middle("dry")];
+  expect(wetMiddle.dy).toBeLessThanOrEqual(1);
+  expect(dryMiddle.dy).toBeLessThanOrEqual(1);
+  expect(wetMiddle.x).toBe(dryMiddle.x);
   await page.getByRole("button", { name: "½ Dose à 400 g weniger" }).click();
   const height = (await page.getByTestId("count-dry").boundingBox())!.height;
-  await expect(page.getByTestId("count-400").getByText(`vorher ${was}`)).toHaveCSS("opacity", "1");
+  await expect(page.getByTestId("count-400").getByText(`vorher ${was}`)).toBeVisible();
   expect((await page.getByTestId("count-400").boundingBox())!.height).toBe(height); // rows keep one height
+  expect((await middle("400")).dy).toBeLessThanOrEqual(1); // the old count doesn't push the new one up
   await expect(page.getByTestId("stock-wet")).not.toHaveText(card!); // the card shows what the count comes to
   await expect(page.getByRole("button", { name: "Eingekauft" })).toHaveCount(0);
   await page.getByRole("button", { name: "Verwerfen" }).click();
   await expect(page.getByTestId("count-400-value")).toHaveText(was);
-  await expect(page.getByTestId("count-400").getByText(`vorher ${was}`)).toHaveCSS("opacity", "0");
+  await expect(page.getByTestId("count-400").getByText(`vorher ${was}`)).toHaveCount(0);
   await expect(page.getByTestId("stock-wet")).toHaveText(card!);
 
   await typeIn(page.getByLabel("Anzahl Dosen à 400 g"), "zwei");
