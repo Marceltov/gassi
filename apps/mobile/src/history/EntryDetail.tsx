@@ -1,6 +1,6 @@
 // One entry from Verlauf, to be put right afterwards: its time (and end), the dogs, for a walk who went, for food the
-// amount and kind, for weight the weight, for a poop its consistency, for a training its repetitions per exercise and
-// dog and its treats, a note;
+// amount and kind, for weight the weight, for a poop its consistency, for an encounter its details, for a training its
+// repetitions per exercise and dog and its treats, a note;
 // Speichern sends it all, Löschen asks first. What it is, who entered it and what it is about (large, fact.ts: #81)
 // stay on top, the buttons at the bottom (#71). A wet count (one row per can size) is one thing here: its sizes as rows,
 // its time moved and its rows deleted together. Both need the server (the writes' client): they say so without
@@ -24,13 +24,14 @@ import { Segments } from "../ui/Segments";
 import { Sheet } from "../ui/Sheet";
 import { AmountStepper, StepButton } from "../ui/Stepper";
 import { LAST_WALKER } from "../walk/lastOne";
+import { DogEncounterFields, PersonEncounterFields } from "../log/EncounterFields";
 import { factOf } from "./fact";
 import { bumpRep, bumpTreat, countEdits, editInput, type Entry, type Form, formOf, pickDog, trainingInput } from "./form";
 import { TIME_ZONE } from "../time";
 import { TimeField } from "./TimeField";
 
 // Speichern in the color of the thing (#80): food bought, counted and opened is food; weight and a note have none
-const BUTTON: Record<Entry["type"], ButtonKind> = { walk: "walk", food: "food", restock: "food", stockcheck: "food", opened: "food", training: "training", pee: "pee", mark: "pee", poop: "poop", weight: "ink", note: "ink" };
+const BUTTON: Record<Entry["type"], ButtonKind> = { walk: "walk", food: "food", restock: "food", stockcheck: "food", opened: "food", training: "training", pee: "pee", mark: "pee", poop: "poop", weight: "ink", note: "ink", dogEncounter: "encounter", personEncounter: "encounter" };
 
 export function EntryDetail({ id }: { id: number }) {
   const router = useRouter();
@@ -172,6 +173,8 @@ export function EntryDetail({ id }: { id: number }) {
               ))}
             </Group>
           ) : null}
+          {entry.type === "dogEncounter" ? <DogEncounterFields details={form.details ?? {}} change={(d) => change({ details: Object.keys(d).length ? d : null })} /> : null}
+          {entry.type === "personEncounter" ? <PersonEncounterFields details={form.details ?? {}} change={(d) => change({ details: Object.keys(d).length ? d : null })} names={[]} /> : null}
           {entry.type === "weight" ? <AmountStepper testID="edit-amount" value={formatKg(form.amountG ?? 0)} step="100 g" onStep={(d) => change({ amountG: Math.max(100, (form.amountG ?? 0) + d * 100) })} atMin={(form.amountG ?? 0) <= 100} atMax={false} /> : null}
 
           {rule !== "none" && shownDogs.length > 1 ? (

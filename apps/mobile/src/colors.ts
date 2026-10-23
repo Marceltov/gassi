@@ -6,6 +6,7 @@ export const kinds = {
   training: "#3b5ba5",
   pee: "#8e6a00", // a dark gold: the lighter yellows fail with white text
   poop: "#6b4a2b",
+  encounter: "#7a3e8e", // dog and person encounters (#37, #90)
 };
 
 // Start's big tiles and every colored button: each kind's color as a diagonal from lighter (top left) to darker
@@ -16,6 +17,7 @@ export const gradients = {
   training: ["#4566bf", "#263f8a"],
   pee: ["#8e6a00", "#5f4600"],
   poop: ["#7a5535", "#45301a"],
+  encounter: ["#86469b", "#552463"],
 } as const;
 
 // Something that needs fixing before it can be saved (a can size without grams): red as text and as an outline, on the

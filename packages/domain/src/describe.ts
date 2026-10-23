@@ -1,5 +1,6 @@
 // How an entry reads in a list, the same in the apps.
 import type { EntryDetails } from "./entry";
+import { ATTENTION_LABEL, DISTANCE_LABEL, HANDLING_LABEL, PLACE_LABEL, REACTION_LABEL } from "./encounters";
 import { CONSISTENCY_LABEL, type EntryType, FOOD_LABEL, type FoodKind, TYPE_LABEL } from "./entryTypes";
 import { exerciseRate, type ExerciseTotal, trainingParts } from "./exerciseTotals";
 import { countLine, formatCanCount } from "./food";
@@ -64,6 +65,9 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
     }
     case "poop":
       return plain(TYPE_LABEL.poop, e.details?.consistency ? CONSISTENCY_LABEL[e.details.consistency] : "");
+    case "dogEncounter":
+    case "personEncounter":
+      return plain(TYPE_LABEL[e.type], encounterLine(e.details ?? {}));
     case "opened":
       return plain(TYPE_LABEL.opened, e.unitG ? `${e.unitG}-g-Dose` : "");
     case "stockcheck":
@@ -72,4 +76,20 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
     default:
       return plain(TYPE_LABEL[e.type], [duration, kind, e.amountG ? `${e.amountG} g` : ""].filter(Boolean).join(", "));
   }
+}
+
+/** What an encounter was, in short: "2 fiept · großer Bogen · nah", "Oma Inge · 7/10 · bei uns · knurrt". */
+export function encounterLine(d: EntryDetails): string {
+  return [
+    d.reaction !== undefined ? `${d.reaction} ${REACTION_LABEL[d.reaction]}` : "",
+    d.who ?? "",
+    d.rating !== undefined ? `${d.rating}/10` : "",
+    d.attention ? `ansprechbar: ${ATTENTION_LABEL[d.attention]}` : "",
+    d.handling ? HANDLING_LABEL[d.handling] : "",
+    d.distance ? DISTANCE_LABEL[d.distance] : "",
+    d.place ? PLACE_LABEL[d.place] : "",
+    d.growled ? "knurrt" : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }

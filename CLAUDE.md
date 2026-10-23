@@ -62,7 +62,7 @@ layers or redirects, where code goes, tests, shipping). When Marcel makes a new 
 
 - **Rebuild plan:** `docs/PLAN.md` in five steps (foundation, web app, Android app, Garmin app, release); each step
   gets its own design and plan. No iOS app from us (ADR 0005). Nobody depends on 0.2; no compatibility layers.
-- **One model:** an `Entry` for one or more dogs (`dogIds`; pee/mark/poop/weight exactly one,
+- **One model:** an `Entry` for one or more dogs (`dogIds`; pee/mark/poop/weight/encounters exactly one,
   restock/stockcheck/opened/note none), with optional `endedAt`/`amountG`/`foodKind`/`note`, and `details` (JSON) for
   what only some kinds have (ADR 0013). Walkers, pauses, exercises, treats and GPS tracks are child rows. "During a
   walk" is decided by time (ADR 0002). Taps are idempotent commands with client ids (ADR 0001). A feeding names no can;

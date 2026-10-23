@@ -1,5 +1,5 @@
 // The kinds of entries and their German words. A new kind is a new value here, not a new table.
-export const ENTRY_TYPES = ["walk", "food", "pee", "mark", "poop", "note", "training", "weight", "restock", "stockcheck", "opened"] as const;
+export const ENTRY_TYPES = ["walk", "food", "pee", "mark", "poop", "note", "dogEncounter", "personEncounter", "training", "weight", "restock", "stockcheck", "opened"] as const;
 export type EntryType = (typeof ENTRY_TYPES)[number];
 
 /** The kinds that get a tile on the today screen, in tile order. */
@@ -12,6 +12,8 @@ export const TYPE_LABEL: Record<EntryType, string> = {
   mark: "Markiert",
   poop: "Poopoo",
   note: "Notiz",
+  dogEncounter: "Hundebegegnung",
+  personEncounter: "Menschenbegegnung",
   training: "Training",
   weight: "Gewicht",
   restock: "Einkauf",

@@ -229,6 +229,27 @@ describe("walks", () => {
   });
 });
 
+describe("notes and encounters", () => {
+  test("logged as commands, at home or on a walk, where the summary lists them; what doesn't fit is dropped", async () => {
+    const s = sessions();
+    await s.apply(HIRSCH, [
+      cmd(0, { kind: "walk.start", walkKey: "w" }),
+      cmd(5, { kind: "log.entry", type: "dogEncounter", dogId: 1, details: { reaction: 2, handling: "wideBerth" } }),
+      cmd(6, { kind: "log.entry", type: "note", note: "Matsch am Bach" }),
+      cmd(30, { kind: "walk.stop", walkKey: "w" }),
+      cmd(40, { kind: "log.entry", type: "personEncounter", dogId: 1, details: { who: "Oma Inge", rating: 8, place: "home" } }),
+    ]);
+    const walk = (await entries()).find((e) => e.type === "walk")!;
+    expect((await s.summary(walk.id)).logged).toMatchObject([
+      { at: at(5), type: "dogEncounter", dogId: 1, details: { reaction: 2, handling: "wideBerth" } },
+      { at: at(6), type: "note", dogId: null, note: "Matsch am Bach" },
+    ]);
+    expect((await entries()).find((e) => e.type === "personEncounter")).toMatchObject({ dogIds: [1], details: { who: "Oma Inge", rating: 8 } });
+    const bad = [cmd(41, { id: "no-reaction", kind: "log.entry", type: "dogEncounter", dogId: 1, details: {} }), cmd(42, { id: "no-dog", kind: "log.entry", type: "personEncounter", details: { who: "X", rating: 1 } })];
+    expect(await s.apply(HIRSCH, bad)).toEqual({ applied: [], dropped: ["no-reaction", "no-dog"] });
+  });
+});
+
 describe("dogs", () => {
   const addDog = async (name: string, archived = false) =>
     (await db().insertInto("dog").values({ name, color: "#3a6fc0", archived: archived ? 1 : 0, created_at: "2026-01-01T00:00:00.000Z" }).returning("id").executeTakeFirstOrThrow()).id;

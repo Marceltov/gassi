@@ -2,6 +2,7 @@
 // in grams (food, restocks, weight), food kind, can size (restocks), note and the details only some kinds have (a
 // poop's consistency). The input schemas are shared by the server and its clients.
 import { z } from "zod";
+import { ATTENTIONS, DISTANCES, HANDLINGS, MOODS, PLACES, REACTION_MAX, SCALE_MAX, SCALE_MIN } from "./encounters";
 import { CONSISTENCIES, ENTRY_TYPES, type EntryType, FOOD_KINDS, type FoodKind, minutesBetween } from "./entryTypes";
 
 export type Entry = {
@@ -22,16 +23,55 @@ export type Entry = {
   updatedAt: string;
 };
 
-/** What only some kinds of entries have, each optional: a poop's consistency (#86). Kept as one JSON column. */
-export const entryDetails = z.object({ consistency: z.enum(CONSISTENCIES).optional() }).strict();
+const scale = z.number().int().min(SCALE_MIN).max(SCALE_MAX);
+/** What only some kinds of entries have, each optional here: a poop's consistency (#86), a dog encounter's reaction,
+ * attention, handling and distance (#37), a person encounter's who, place, rating, moods, growling and insecurity
+ * (#90). Kept as one JSON column (ADR 0013). */
+export const entryDetails = z
+  .object({
+    consistency: z.enum(CONSISTENCIES).optional(),
+    reaction: z.number().int().min(0).max(REACTION_MAX).optional(),
+    attention: z.enum(ATTENTIONS).optional(),
+    handling: z.enum(HANDLINGS).optional(),
+    distance: z.enum(DISTANCES).optional(),
+    who: z.string().trim().min(1).max(60).optional(),
+    place: z.enum(PLACES).optional(),
+    rating: scale.optional(),
+    moods: z.array(z.enum(MOODS)).max(MOODS.length).optional(),
+    growled: z.boolean().optional(),
+    insecurity: scale.optional(),
+  })
+  .strict();
 export type EntryDetails = z.output<typeof entryDetails>;
+type Detail = keyof EntryDetails;
 /** The kinds that may have each detail. */
-const DETAIL_TYPES: Record<keyof EntryDetails, readonly EntryType[]> = { consistency: ["poop"] };
+const DETAIL_TYPES: Record<Detail, readonly EntryType[]> = {
+  consistency: ["poop"],
+  reaction: ["dogEncounter"],
+  attention: ["dogEncounter"],
+  handling: ["dogEncounter"],
+  distance: ["dogEncounter"],
+  who: ["personEncounter"],
+  place: ["personEncounter"],
+  rating: ["personEncounter"],
+  moods: ["personEncounter"],
+  growled: ["personEncounter"],
+  insecurity: ["personEncounter"],
+};
+/** What a kind can't be without, with what to ask. */
+const NEEDED: Partial<Record<EntryType, [Detail, string][]>> = {
+  dogEncounter: [["reaction", "Wie stark hat er reagiert?"]],
+  personEncounter: [
+    ["who", "Wen habt ihr getroffen?"],
+    ["rating", "Wie lief es?"],
+  ],
+};
 
-/** A German message when `details` has one `type` can't have, else null. */
+/** A German message when `details` has one `type` can't have, or lacks one it needs; else null. */
 export function checkDetails(type: EntryType, details: EntryDetails | null): string | null {
-  const wrong = Object.keys(details ?? {}).find((k) => !DETAIL_TYPES[k as keyof EntryDetails].includes(type));
-  return wrong ? "Das passt nicht zu dieser Art von Eintrag." : null;
+  const wrong = Object.keys(details ?? {}).find((k) => !DETAIL_TYPES[k as Detail].includes(type));
+  if (wrong) return "Das passt nicht zu dieser Art von Eintrag.";
+  return NEEDED[type]?.find(([k]) => details?.[k] === undefined)?.[1] ?? null;
 }
 
 /** `details` with `key` set to `value`, or taken out for null; none left is null. */

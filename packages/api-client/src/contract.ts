@@ -140,6 +140,8 @@ export const walkSummarySchema = z.object({
   pees: z.array(tapSchema),
   marks: z.array(tapSchema),
   poops: z.array(tapSchema),
+  // its notes and encounters (#91, #37, #90), oldest first
+  logged: z.array(z.object({ id: z.number(), at: z.string(), type: z.enum(["note", "dogEncounter", "personEncounter"]), dogId: z.number().nullable(), note: z.string().nullable(), details: entryDetails.nullable() })),
 });
 const walkOutput = z.object({ summary: walkSummarySchema, track: z.object({ source: z.enum(["phone", "watch"]), points: z.array(trackPointSchema), metrics: metricsSchema }).nullable() });
 
