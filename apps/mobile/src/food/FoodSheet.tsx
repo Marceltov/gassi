@@ -134,7 +134,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
         </View>
       ) : null}
       {stock ? <Text testID="food-stock" style={[styles.stock, { color: theme.muted }]}>{stock}</Text> : null}
-      <BigButton kind="food" size="l" icon="check" label="Eintragen" onPress={submit} />
+      <BigButton kind="food" size="m" icon="check" label="Eintragen" onPress={submit} />
     </View>
   );
 }

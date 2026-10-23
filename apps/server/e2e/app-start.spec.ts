@@ -4,6 +4,7 @@
 import { createClient } from "@gassi/api-client";
 import { expect, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
+import { expectFits, PHONES } from "./fit";
 import { asHirsch, stopEverything } from "./sessions";
 import { signIn } from "./signed-in";
 
@@ -71,4 +72,33 @@ test("the Gassi tile says when the last walk was and who went; the Training tile
   await expect(page.getByRole("button", { name: /^Training läuft · \d+:\d\d$/ })).toBeVisible();
   await page.getByRole("button", { name: /^Training läuft/ }).click();
   await expect(page).toHaveURL(`${BASE_URL}/training`);
+});
+
+test("on the go fits a small and a big phone with its big buttons: Start, a walk, a training; the Futter sheet's button is not big", async ({ page }) => {
+  await signIn(page);
+  const height = async (name: string) => (await page.getByRole("button", { name, exact: true }).boundingBox())!.height;
+  await expectFits(page, "/", "Gassi gehen");
+
+  for (const [width, h] of PHONES) {
+    await page.setViewportSize({ width, height: h });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Futter geben" }).click();
+    const submit = page.getByTestId("food-sheet").getByRole("button", { name: "Eintragen" });
+    await expect(submit).toBeInViewport({ ratio: 1 });
+    expect((await submit.boundingBox())!.height).toBe(52);
+  }
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Gassi gehen" }).click();
+  await expect(page).toHaveURL(`${BASE_URL}/runde`);
+  await expectFits(page, "/runde", "Zuhause");
+  expect(await height("Zuhause")).toBe(72);
+  expect(await height("Pipi")).toBeGreaterThan(72);
+  await stopEverything();
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Training starten/ }).click();
+  await expect(page.getByRole("button", { name: "Fertig" })).toBeVisible();
+  await expectFits(page, new URL(page.url()).pathname, "Fertig");
+  expect(await height("Fertig")).toBe(72);
 });
