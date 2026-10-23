@@ -301,3 +301,26 @@ test("Verlauf, an entry and a walk's summary fit a small and a big phone; every 
   await expectFits(page, `/verlauf/eintrag/${food.id}`, "Speichern");
   await expectFits(page, `/verlauf/runde/${walk.id}`, "Fertig");
 });
+
+test("a walk's small map in Verlauf shows the walk, not the city around it, and leaves the icon and the lines where they are in every row", async ({ page }) => {
+  const walk = await pastWalk(2);
+  const t = (s: number) => new Date(Date.parse(walk.startedAt) + s * 1000).toISOString();
+  // 1,3 km to the north and back
+  const points = [0, 650, 1300, 650, 0].map((north, i) => ({ t: t(i * 60), lat: 48.137 + north / 111_195, lon: 11.575 + (i % 2) * 0.004, ele: null, acc: 5 }));
+  await asHirsch().uploadTrack({ trackId: `walk-${walk.id}`, walkKey: (await asHirsch().entry({ id: walk.id })).clientKey!, source: "phone", seq: 0, points });
+
+  await signIn(page);
+  await page.goto(`${BASE_URL}/verlauf`);
+  const thumb = page.getByTestId(`entry-${walk.id}`).getByTestId("track-map");
+  const line = thumb.locator("path.leaflet-interactive, path").first();
+  await expect(line).toBeVisible();
+  const [box, drawn] = await Promise.all([thumb.boundingBox(), line.boundingBox()]);
+  // the walk reaches across most of the box, with a thin margin
+  expect(Math.max(drawn!.width / box!.width, drawn!.height / box!.height)).toBeGreaterThan(0.75);
+  // the icon and the lines start where they do in a row without a map
+  const food = await asHirsch().logEntry({ type: "food", foodKind: "wet", amountG: 80 });
+  made.push(food.id);
+  await page.reload();
+  const left = async (id: number) => (await page.getByTestId(`entry-${id}-title`).boundingBox())!.x;
+  expect(await left(walk.id)).toBe(await left(food.id));
+});

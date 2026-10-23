@@ -1,7 +1,7 @@
-// One entry in Verlauf: the time, a small map for a tracked walk, the type's icon in a dot of its color (and a strip of it
-// on the left edge), two lines and who. The first line is what kind it is ("Gassi"), the second what it says in bold
-// ("42 Min. · 3,1 km"), then the dogs, what happened on a walk and the note. Every row has the same height (#71): each
-// line is cut short rather than wrapping. Tapping opens it.
+// One entry in Verlauf: the time, the type's icon in a dot of its color (and a strip of it on the left edge), two lines,
+// a small map for a tracked walk and who. The icon and the lines start at the same place in every row. The first line is
+// what kind it is ("Gassi"), the second what it says in bold ("42 Min. · 3,1 km"), then the dogs, what happened on a
+// walk and the note. Every row has the same height (#71): each line is cut short rather than wrapping. Tapping opens it.
 import { describeEntry } from "@gassi/domain";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -33,11 +33,6 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
       style={({ pressed }) => [styles.row, { backgroundColor: theme.surface, borderLeftColor: tone, opacity: pressed ? 0.7 : 1 }]}
     >
       <Text style={[styles.time, { color: theme.muted }]}>{hhmm(entry.at)}</Text>
-      {routes.length ? (
-        <View style={styles.thumb}>
-          <TrackMap routes={routes} height={40} still />
-        </View>
-      ) : null}
       <View style={[styles.dot, { backgroundColor: tone }]}>
         <Icon name={TYPE_ICON[entry.type]} size={14} color="#fff" />
       </View>
@@ -51,6 +46,11 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
           {rest || (d.extra ? "" : " ")}
         </Text>
       </View>
+      {routes.length ? (
+        <View style={styles.thumb}>
+          <TrackMap routes={routes} height={40} still />
+        </View>
+      ) : null}
       <Text style={[styles.by, { color: theme.muted }]} numberOfLines={2}>
         {d.by.replace(/^von /, "")}
       </Text>
