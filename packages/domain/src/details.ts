@@ -57,11 +57,12 @@ export const DETAILS = {
 
 export type Detail = keyof typeof DETAILS;
 
-/** Which kind has which details, in the order its form asks them and its line says them. */
+/** Which kind has which details, in the order its form asks them and its line says them; both encounters ask Laute
+ * right after their main scale (#95). */
 export const KIND_DETAILS: Partial<Record<EntryType, readonly Detail[]>> = {
   poop: ["consistency"],
   dogEncounter: ["reaction", "sounds", "attention", "handling", "distance"],
-  personEncounter: ["who", "place", "rating", "moods", "insecurity", "sounds"],
+  personEncounter: ["who", "place", "rating", "sounds", "moods", "insecurity"],
 };
 
 /** All details, each optional; what a kind needs is checked by checkDetails. Kept as one JSON column (ADR 0013). */
