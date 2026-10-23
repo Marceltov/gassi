@@ -222,6 +222,7 @@ test("from a walk's summary: its pee is deleted, its start moved, then the walk 
 test("a training reads Sitz 2/3 in the list; its repetitions are changed in its detail", async ({ page }) => {
   const client = asHirsch();
   const sitz = (await client.exercises()).exercises.find((e) => e.name === "Sitz") ?? (await client.addExercise({ name: "Sitz" }));
+  if (!(await client.treatKinds()).treatKinds.length) await client.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false });
   const dog = await firstDog();
   const key = `history-training-${Date.now()}`;
   const rep = (n: number, ok: boolean) => ({ id: `${key}-${n}`, at: minutesAgo(10 - n), kind: "training.rep" as const, trainingKey: key, exerciseId: sitz.id, dogId: dog.id, ok, delta: 1 as const });
@@ -245,6 +246,9 @@ test("a training reads Sitz 2/3 in the list; its repetitions are changed in its 
   await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${training.id}`);
   await page.getByRole("button", { name: "Sitz klappt: eins mehr" }).click();
   await expect(page.getByTestId("fact-sub")).toHaveText("Sitz 3/4");
+  // exercises and treats in sections of their own
+  await expect(page.getByTestId("training-exercises").getByText("Übungen", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("training-treats").getByText("Leckerli", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Speichern" }).click();
 
   await expect(page).toHaveURL(`${BASE_URL}/verlauf`);

@@ -211,8 +211,8 @@ export function EntryDetail({ id }: { id: number }) {
 
 type Names = Pick<Gassi, "dogs" | "exercises" | "treatKinds">;
 
-// A training's repetitions per exercise (and dog, when several train) as counts of "klappt" and "klappt nicht", more exercises from the
-// household's list, and the treats per kind.
+// A training's repetitions per exercise (and dog, when several train) as counts of "klappt" and "klappt nicht", more
+// exercises from the household's list ("Übungen"), and the treats per kind ("Leckerli"), each a section of its own.
 function TrainingFields({ form, change, names }: { form: Form; change: (c: Partial<Form>) => void; names: Names }) {
   const theme = useTheme();
   const reps = form.reps.filter((r) => form.dogIds.includes(r.dogId));
@@ -228,35 +228,43 @@ function TrainingFields({ form, change, names }: { form: Form; change: (c: Parti
 
   // what was trained is on top (the fact); here the rows to correct it
   return (
-    <View style={[styles.card, { backgroundColor: theme.surface }]}>
-      {exerciseIds.flatMap((eid) =>
-        form.dogIds.map((did) => {
-          const label = several ? `${exerciseName(eid)} ${dogName(did)}` : exerciseName(eid);
-          return (
-            <View key={`${eid}/${did}`} style={styles.repRow}>
-              <Text style={[styles.repName, { color: theme.ink }]} numberOfLines={2}>
-                {label}
-              </Text>
-              <Counter sign="check" value={count(eid, did, "ok")} what={`${label} klappt`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "ok", d) })} />
-              <Counter sign="cross" value={count(eid, did, "fail")} what={`${label} klappt nicht`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "fail", d) })} />
-            </View>
-          );
-        }),
-      )}
-      {addable.length ? (
-        <View style={styles.chips}>
-          {addable.map((x) => (
-            <Chip key={x.id} label={`+ ${x.name}`} a11y={`Übung ${x.name} dazu`} on={false} onPress={() => add(x.id)} />
-          ))}
-        </View>
+    <>
+      <View testID="training-exercises" style={[styles.card, { backgroundColor: theme.surface }]}>
+        <Text style={[styles.section, { color: theme.muted }]}>Übungen</Text>
+        {exerciseIds.flatMap((eid) =>
+          form.dogIds.map((did) => {
+            const label = several ? `${exerciseName(eid)} ${dogName(did)}` : exerciseName(eid);
+            return (
+              <View key={`${eid}/${did}`} style={styles.repRow}>
+                <Text style={[styles.repName, { color: theme.ink }]} numberOfLines={2}>
+                  {label}
+                </Text>
+                <Counter sign="check" value={count(eid, did, "ok")} what={`${label} klappt`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "ok", d) })} />
+                <Counter sign="cross" value={count(eid, did, "fail")} what={`${label} klappt nicht`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "fail", d) })} />
+              </View>
+            );
+          }),
+        )}
+        {addable.length ? (
+          <View style={styles.chips}>
+            {addable.map((x) => (
+              <Chip key={x.id} label={`+ ${x.name}`} a11y={`Übung ${x.name} dazu`} on={false} onPress={() => add(x.id)} />
+            ))}
+          </View>
+        ) : null}
+      </View>
+      {kinds.length ? (
+      <View testID="training-treats" style={[styles.card, { backgroundColor: theme.surface }]}>
+        <Text style={[styles.section, { color: theme.muted }]}>Leckerli</Text>
+        {kinds.map((k) => (
+          <View key={k.id} style={styles.repRow}>
+            <Text style={[styles.repName, { color: theme.ink }]}>{k.name}</Text>
+            <Counter value={treatCount(k.id)} what={k.name} onStep={(d) => change({ treats: bumpTreat(form.treats, k.id, d) })} />
+          </View>
+        ))}
+      </View>
       ) : null}
-      {kinds.map((k) => (
-        <View key={k.id} style={styles.repRow}>
-          <Text style={[styles.repName, { color: theme.ink }]}>{k.name}</Text>
-          <Counter value={treatCount(k.id)} what={k.name} onStep={(d) => change({ treats: bumpTreat(form.treats, k.id, d) })} />
-        </View>
-      ))}
-    </View>
+    </>
   );
 }
 
@@ -315,6 +323,7 @@ const styles = StyleSheet.create({
   group: { gap: 6 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   card: { borderRadius: radius.tile, padding: 12, gap: 8 },
+  section: { fontSize: 13, fontWeight: "700" },
   repRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   repName: { flex: 1, fontSize: 15 },
   counter: { flexDirection: "row", alignItems: "center", gap: 4 },
