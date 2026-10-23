@@ -37,9 +37,14 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
       style={({ pressed }) => [styles.row, { backgroundColor: theme.surface, borderLeftColor: tone, opacity: pressed ? 0.7 : 1 }]}
     >
       <View style={styles.line}>
-        <Text style={[styles.time, { color: theme.muted }]}>{hhmm(entry.at)}</Text>
-        <View style={[styles.dot, { backgroundColor: tone }]}>
-          <Icon name={TYPE_ICON[entry.type]} size={14} color="#fff" />
+        {/* the time, the icon and who stay at the height of the first two lines, also in a taller row */}
+        <View style={styles.band}>
+          <Text style={[styles.time, { color: theme.muted }]}>{hhmm(entry.at)}</Text>
+        </View>
+        <View style={styles.band}>
+          <View testID={`entry-${entry.id}-dot`} style={[styles.dot, { backgroundColor: tone }]}>
+            <Icon name={TYPE_ICON[entry.type]} size={14} color="#fff" />
+          </View>
         </View>
         <View style={styles.main}>
           <Text testID={`entry-${entry.id}-title`} style={[styles.title, { color: theme.ink }]} numberOfLines={1}>
@@ -59,9 +64,11 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
             </Text>
           )}
         </View>
-        <Text style={[styles.by, { color: theme.muted }]} numberOfLines={2}>
-          {d.by.replace(/^von /, "")}
-        </Text>
+        <View style={styles.band}>
+          <Text style={[styles.by, { color: theme.muted }]} numberOfLines={2}>
+            {d.by.replace(/^von /, "")}
+          </Text>
+        </View>
       </View>
       {routes.length ? (
         <View style={styles.map}>
@@ -74,10 +81,11 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
 
 const styles = StyleSheet.create({
   row: { gap: 8, borderRadius: radius.tile, paddingLeft: 10, paddingRight: 12, paddingVertical: 8, borderLeftWidth: 4 },
-  line: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: ROW_HEIGHT - 16 },
+  line: { flexDirection: "row", alignItems: "flex-start", gap: 10, minHeight: ROW_HEIGHT - 16 },
+  band: { height: ROW_HEIGHT - 16, justifyContent: "center" },
+  main: { flex: 1, gap: 2, minHeight: ROW_HEIGHT - 16, justifyContent: "center" },
   time: { width: 40, fontSize: 13, fontVariant: ["tabular-nums"] },
   map: { marginLeft: LINES_LEFT, height: MAP_HEIGHT, borderRadius: 10, overflow: "hidden", pointerEvents: "none" },
-  main: { flex: 1, gap: 2 },
   dot: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 15 },
   figures: { fontWeight: "700" }, // what the entry says, not what kind it is

@@ -301,6 +301,9 @@ test("Verlauf, an entry and a walk's summary fit a small and a big phone; every 
   const shown = ids.at(-1)!; // the newest of its rows stands for it
   await expect(page.getByTestId(`entry-${shown}-size`)).toHaveText(["1 × 200 g", "2 × 400 g", "3 × 800 g"]);
   expect(await height(shown)).toBeGreaterThan(await height(food.id));
+  // its icon stays at the top, next to its heading and first line, not in the middle of the row
+  const [dot, title] = await Promise.all([page.getByTestId(`entry-${shown}-dot`).boundingBox(), page.getByTestId(`entry-${shown}-title`).boundingBox()]);
+  expect(dot!.y).toBeLessThan(title!.y + title!.height);
   for (const d of dogs) await expect(page.getByTestId(`entry-${food.id}-more`)).toContainText(d.name); // all of them, too
   await expect(page.getByTestId(`entry-${pee.id}-more`)).toContainText(dogs[0].name);
   // what the entry says is bold, what kind it is isn't
