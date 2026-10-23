@@ -2,8 +2,9 @@
 // and who; a tracked walk its map under them, as wide as the lines. The icon and the lines start at the same place in every row. The first line is
 // what kind it is ("Gassi"), the second what it says in bold ("42 Min. · 3,1 km"), then the dogs, what happened on a
 // walk and the note. A row is that high and its lines are cut short rather than wrapping (#71), unless it has more to
-// show: a wet count has a line per size, a tracked walk its map. Taller, never shorter. Tapping opens it.
-import { cansOf, describeEntry, formatCanCount } from "@gassi/domain";
+// show: a wet count has a line per size, a training a line per exercise (and its treats), a tracked walk its map.
+// Taller, never shorter. Tapping opens it.
+import { cansOf, describeEntry, formatCanCount, formatMinutes, trainingParts } from "@gassi/domain";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { TrackMap } from "../map/TrackMap";
@@ -29,6 +30,9 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
   const rest = [dogs, d.during, entry.note ?? ""].filter(Boolean).join(" · ");
   const tone = theme[TYPE_TONE[entry.type]];
   const sizes = entry.type === "stockcheck" && entry.count?.length ? entry.count : null; // a wet count: a line each
+  // a training: its minutes on the second line, then each exercise (and the treats) on a line of its own
+  const lines = entry.type === "training" ? trainingParts(entry.exercises, entry.treats ?? 0) : [];
+  const figures = lines.length ? (entry.clientKey && !entry.endedAt ? "läuft" : formatMinutes(entry.durationMin ?? 0)) : d.extra;
   return (
     <Pressable
       testID={`entry-${entry.id}`}
@@ -57,11 +61,18 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
               </Text>
             ))
           ) : (
-            <Text testID={`entry-${entry.id}-more`} style={[styles.small, { color: theme.muted }]} numberOfLines={1}>
-              {d.extra ? <Text testID={`entry-${entry.id}-extra`} style={[styles.figures, { color: theme.ink }]}>{d.extra}</Text> : null}
-              {d.extra && rest ? " · " : ""}
-              {rest || (d.extra ? "" : " ")}
-            </Text>
+            <>
+              <Text testID={`entry-${entry.id}-more`} style={[styles.small, { color: theme.muted }]} numberOfLines={1}>
+                {figures ? <Text testID={`entry-${entry.id}-extra`} style={[styles.figures, { color: theme.ink }]}>{figures}</Text> : null}
+                {figures && rest ? " · " : ""}
+                {rest || (figures ? "" : " ")}
+              </Text>
+              {lines.map((l) => (
+                <Text key={l} testID={`entry-${entry.id}-line`} style={[styles.small, styles.figures, { color: theme.ink }]} numberOfLines={1}>
+                  {l}
+                </Text>
+              ))}
+            </>
           )}
         </View>
         <View style={styles.band}>
