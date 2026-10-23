@@ -7,7 +7,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { FoodSheet } from "../food/FoodSheet";
-import { EncounterChoice, type LogKind, LogSheet } from "../log/LogSheet";
+import { type LogStart, Logging } from "../log/LogSheet";
 import { BigButton } from "../ui/BigButton";
 import { useGassi } from "../data/GassiProvider";
 import { type TileKind, useTheme } from "../theme";
@@ -27,8 +27,7 @@ type Shown = TileKind & EntryType;
 export function Start() {
   const router = useRouter();
   const { view, send, dogs } = useGassi();
-  const [encounter, setEncounter] = useState(false);
-  const [logging, setLogging] = useState<LogKind | null>(null);
+  const [logging, setLogging] = useState<LogStart | null>(null);
   const today = useToday();
   const theme = useTheme();
   const now = useNow(view.walk || view.training ? 1000 : 30_000);
@@ -107,22 +106,14 @@ export function Start() {
           </View>
           <View style={styles.row}>
             <View style={styles.cell}>
-              <BigButton kind="side" size="s" icon="people" label="Begegnung" onPress={() => setEncounter(true)} />
+              <BigButton kind="side" size="s" icon="people" label="Begegnung" onPress={() => setLogging("encounter")} />
             </View>
             <View style={styles.cell}>
               <BigButton kind="side" size="s" icon="note" label="Notiz" onPress={() => setLogging("note")} />
             </View>
           </View>
           <FoodSheet open={foodOpen} onClose={() => setFoodOpen(false)} />
-          <EncounterChoice
-            open={encounter}
-            onPick={(kind) => {
-              setEncounter(false);
-              setLogging(kind);
-            }}
-            onClose={() => setEncounter(false)}
-          />
-          <LogSheet kind={logging} dogIds={dogs.filter((d) => !d.archived).map((d) => d.id)} place="home" onClose={() => setLogging(null)} />
+          <Logging start={logging} dogIds={dogs.filter((d) => !d.archived).map((d) => d.id)} place="home" onDone={() => setLogging(null)} />
         </>
       }
     />

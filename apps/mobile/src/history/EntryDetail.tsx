@@ -5,7 +5,7 @@
 // stay on top, the buttons at the bottom (#71). A wet count (one row per can size) is one thing here: its sizes as rows,
 // its time moved and its rows deleted together. Both need the server (the writes' client): they say so without
 // reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
-import { clampPortion, CONSISTENCIES, CONSISTENCY_LABEL, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, type Stock, TYPE_LABEL, withDetail } from "@gassi/domain";
+import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, type Stock, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -24,7 +24,7 @@ import { Segments } from "../ui/Segments";
 import { Sheet } from "../ui/Sheet";
 import { AmountStepper, StepButton } from "../ui/Stepper";
 import { LAST_WALKER } from "../walk/lastOne";
-import { DogEncounterFields, PersonEncounterFields } from "../log/EncounterFields";
+import { DetailFields } from "../log/DetailFields";
 import { factOf } from "./fact";
 import { bumpRep, bumpTreat, countEdits, editInput, type Entry, type Form, formOf, pickDog, trainingInput } from "./form";
 import { TIME_ZONE } from "../time";
@@ -166,15 +166,7 @@ export function EntryDetail({ id }: { id: number }) {
               <AmountStepper testID="edit-amount" value={`${form.amountG ?? 0} g`} step="10 g" onStep={(d) => change({ amountG: clampPortion((form.amountG ?? 0) + d * 10) })} atMin={(form.amountG ?? 0) <= 1} atMax={(form.amountG ?? 0) >= FOOD_MAX_G} />
             </>
           ) : null}
-          {entry.type === "poop" ? (
-            <Group label="Konsistenz">
-              {CONSISTENCIES.map((c) => (
-                <Chip key={c} label={CONSISTENCY_LABEL[c]} accent={theme.poop} on={form.details?.consistency === c} onPress={() => change({ details: withDetail(form.details, "consistency", form.details?.consistency === c ? null : c) })} />
-              ))}
-            </Group>
-          ) : null}
-          {entry.type === "dogEncounter" ? <DogEncounterFields details={form.details ?? {}} change={(d) => change({ details: Object.keys(d).length ? d : null })} /> : null}
-          {entry.type === "personEncounter" ? <PersonEncounterFields details={form.details ?? {}} change={(d) => change({ details: Object.keys(d).length ? d : null })} names={[]} /> : null}
+          <DetailFields type={entry.type} details={form.details ?? {}} change={(d) => change({ details: Object.keys(d).length ? d : null })} />
           {entry.type === "weight" ? <AmountStepper testID="edit-amount" value={formatKg(form.amountG ?? 0)} step="100 g" onStep={(d) => change({ amountG: Math.max(100, (form.amountG ?? 0) + d * 100) })} atMin={(form.amountG ?? 0) <= 100} atMax={false} /> : null}
 
           {rule !== "none" && shownDogs.length > 1 ? (

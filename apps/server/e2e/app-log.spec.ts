@@ -37,9 +37,8 @@ test("Start: a note is its text; a person encounter needs who and how it went, a
 
     await page.getByRole("button", { name: "Begegnung", exact: true }).click();
     await page.getByTestId("encounter-choice").getByRole("button", { name: "Mensch" }).click();
-    await expect(sheet.getByText("Wen habt ihr getroffen?")).toBeVisible();
     await sheet.getByLabel("Wer?").fill("Oma Inge");
-    await expect(sheet.getByText("Wie lief es?")).toBeVisible();
+    await expect(sheet.getByRole("button", { name: "Eintragen" })).toBeDisabled(); // how it went is still missing
     await sheet.getByRole("tab", { name: "7", exact: true }).first().click();
     await sheet.getByRole("button", { name: "freundlich" }).click();
     await sheet.getByRole("button", { name: "aufgeregt" }).click();
@@ -65,21 +64,37 @@ test("on a walk without reception: a dog encounter shows in the walk's list at o
     await page.getByTestId("encounter-choice").getByRole("button", { name: "Hund" }).click();
     const sheet = page.getByTestId("log-sheet");
     await sheet.getByRole("tab", { name: "2 fiept" }).click();
+    await sheet.getByRole("button", { name: "kreischt" }).click();
     await sheet.getByRole("button", { name: "großer Bogen" }).click();
     await sheet.getByRole("tab", { name: "nah" }).click();
     await sheet.getByRole("button", { name: "Eintragen" }).click();
-    await expect(page.getByTestId("walk-taps")).toContainText("Hundebegegnung · 2 fiept · großer Bogen · nah");
+    await expect(page.getByTestId("walk-taps")).toContainText("Hundebegegnung · 2 fiept · kreischt · großer Bogen · nah");
     await context.setOffline(false);
     const entry = await newest(token, "dogEncounter");
-    expect(entry.details).toEqual({ reaction: 2, handling: "wideBerth", distance: "near" });
+    expect(entry.details).toEqual({ reaction: 2, sounds: ["screeches"], handling: "wideBerth", distance: "near" });
     await page.getByRole("button", { name: "Zuhause" }).click();
     await expect(page.getByTestId("summary-counts")).toHaveText("1 Begegnung");
 
     await page.goto(`/verlauf/eintrag/${entry.id}`);
     await page.getByRole("tab", { name: "4 explodiert" }).click();
     await page.getByRole("button", { name: "Speichern" }).click();
-    await expect.poll(async () => (await createClient({ baseUrl: BASE_URL, token }).entry({ id: entry.id })).details).toEqual({ reaction: 4, handling: "wideBerth", distance: "near" });
+    await expect.poll(async () => (await createClient({ baseUrl: BASE_URL, token }).entry({ id: entry.id })).details).toEqual({ reaction: 4, sounds: ["screeches"], handling: "wideBerth", distance: "near" });
   } finally {
     await restore();
   }
+});
+
+test("with two dogs, Begegnung asks the dog first, like Pipi, and the form is about that dog", async ({ page }) => {
+  const token = await signIn(page);
+  const dogs = (await asHirsch().dogs()).dogs.filter((d) => !d.archived);
+  expect(dogs.length).toBeGreaterThan(1);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Begegnung", exact: true }).click();
+  await page.getByTestId("encounter-choice").getByRole("button", { name: "Hund" }).click();
+  await page.getByTestId("dog-choice").getByRole("button", { name: dogs[1].name }).click();
+  const sheet = page.getByTestId("log-sheet");
+  await expect(sheet.getByRole("button", { name: dogs[0].name })).toHaveCount(0);
+  await sheet.getByRole("tab", { name: "0 ruhig" }).click();
+  await sheet.getByRole("button", { name: "Eintragen" }).click();
+  expect((await newest(token, "dogEncounter")).dogIds).toEqual([dogs[1].id]);
 });

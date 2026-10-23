@@ -15,7 +15,7 @@ import { useTheme } from "../theme";
 import { hhmm } from "../time";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
-import { EncounterChoice, type LogKind, LogSheet } from "../log/LogSheet";
+import { type LogStart, Logging } from "../log/LogSheet";
 import { ChoiceSheet, dogChoices } from "../ui/ChoiceSheet";
 import { Icon } from "../ui/Icon";
 import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
@@ -41,8 +41,7 @@ export function Walk() {
   const [choosing, setChoosing] = useState<Kind | null>(null);
   const [hint, setHint] = useState<string | null>(null); // why the last person or dog can't be tapped off
   const [asking, setAsking] = useState<Tap | null>(null); // the poop whose consistency is asked
-  const [encounter, setEncounter] = useState(false);
-  const [logging, setLogging] = useState<LogKind | null>(null);
+  const [logging, setLogging] = useState<LogStart | null>(null);
 
   // Leaving (Zuhause, Training) happens once, also on a double tap. Without a walk (ended on another phone, or none
   // after a reload) the focused screen goes back to Start, down its tab's stack.
@@ -223,7 +222,7 @@ export function Walk() {
               <BigButton kind="poop" icon="poop" label={TYPE_LABEL.poop} stacked={marking} disabled={walkDogs.length === 0} onPress={() => tap("poop")} />
             </View>
           </View>
-          <BigButton kind="encounter" size="m" icon="people" label="Begegnung" onPress={() => setEncounter(true)} />
+          <BigButton kind="encounter" size="m" icon="people" label="Begegnung" disabled={walkDogs.length === 0} onPress={() => setLogging("encounter")} />
           <View style={styles.row}>
             <View style={styles.cell}>
               <BigButton kind="neutral" size="m" icon={walk.paused ? "resume" : "pause"} label={walk.paused ? "Weiter" : "Pause"} onPress={pause} />
@@ -234,15 +233,7 @@ export function Walk() {
           </View>
           <BigButton kind="walk" size="l" icon="home" label="Zuhause" onPress={home} />
 
-          <EncounterChoice
-            open={encounter}
-            onPick={(kind) => {
-              setEncounter(false);
-              setLogging(kind);
-            }}
-            onClose={() => setEncounter(false)}
-          />
-          <LogSheet kind={logging} dogIds={walkDogs} place="outside" onClose={() => setLogging(null)} />
+          <Logging start={logging} dogIds={walkDogs} place="outside" onDone={() => setLogging(null)} />
           <ChoiceSheet
             testID="dog-choice"
             open={choosing !== null}

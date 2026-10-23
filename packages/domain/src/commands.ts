@@ -1,7 +1,7 @@
 // What the walk and training screens send: one command per tap, with a client-made id (so a resend is harmless) and
 // the time of the tap (so taps queued without reception keep their real time). Runs in the browser too.
 import { z } from "zod";
-import { entryDetails } from "./entry";
+import { entryDetails } from "./details";
 import { CONSISTENCIES } from "./entryTypes";
 
 /** The grams one feeding may have. */
