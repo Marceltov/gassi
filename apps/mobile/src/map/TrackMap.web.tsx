@@ -53,10 +53,12 @@ function MapBox({ routes, still }: { routes: [number, number][][]; still: boolea
   useEffect(() => {
     const drawn = routes.filter((r) => r.length > 0);
     if (!box.current || drawn.length === 0) return;
-    const map = L.map(box.current, { zoomControl: !still, dragging: !still, scrollWheelZoom: false, touchZoom: !still, doubleClickZoom: !still, keyboard: !still, boxZoom: !still, attributionControl: !still });
+    const map = L.map(box.current, { zoomSnap: still ? 0.25 : 1, zoomControl: !still, dragging: !still, scrollWheelZoom: false, touchZoom: !still, doubleClickZoom: !still, keyboard: !still, boxZoom: !still, attributionControl: !still });
     L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map);
-    const lines = drawn.map((r) => L.polyline(r, { color: theme.walk, weight: 4 }).addTo(map));
-    const fit = () => map.fitBounds(L.featureGroup(lines).getBounds(), { padding: [16, 16], maxZoom: 17 });
+    // a thumbnail (56 × 40) keeps a thin margin and a thin line, so the walk fills it instead of the city around it
+    const lines = drawn.map((r) => L.polyline(r, { color: theme.walk, weight: still ? 3 : 4, interactive: false }).addTo(map));
+    const pad = still ? 4 : 16;
+    const fit = () => map.fitBounds(L.featureGroup(lines).getBounds(), { padding: [pad, pad], maxZoom: 17 });
     fit();
     const resized = new ResizeObserver(() => {
       map.invalidateSize();
