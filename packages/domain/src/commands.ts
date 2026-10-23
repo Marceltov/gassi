@@ -1,6 +1,7 @@
 // What the walk and training screens send: one command per tap, with a client-made id (so a resend is harmless) and
 // the time of the tap (so taps queued without reception keep their real time). Runs in the browser too.
 import { z } from "zod";
+import { CONSISTENCIES } from "./entryTypes";
 
 /** The grams one feeding may have. */
 export const FOOD_MIN_G = 1;
@@ -25,7 +26,9 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("training.stop"), trainingKey: key }),
   z.object({ ...base, kind: z.literal("training.rep"), trainingKey: key, exerciseId: z.number().int().positive(), dogId, ok: z.boolean(), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("training.treat"), trainingKey: key, treatKindId: z.number().int().positive(), delta: z.union([z.literal(1), z.literal(-1)]) }),
-  z.object({ ...base, kind: z.literal("log"), type: z.enum(["pee", "poop"]), dogId }),
+  z.object({ ...base, kind: z.literal("log"), type: z.enum(["pee", "mark", "poop"]), dogId }),
+  // how a poop was (#86), set right after its tap; the poop is the one of `dogId` at `poopAt` (its log's time)
+  z.object({ ...base, kind: z.literal("log.consistency"), poopAt: base.at, dogId, consistency: z.enum(CONSISTENCIES).nullable() }),
   // a feeding; the dogs left out, the server takes every active dog
   z.object({ ...base, kind: z.literal("food"), dogIds, amountG: z.number().int().min(FOOD_MIN_G).max(FOOD_MAX_G), foodKind: z.enum(["wet", "dry"]) }),
   // a can of wet food opened: one closed can of that size less in Vorrat

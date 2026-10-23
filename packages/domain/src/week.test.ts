@@ -16,6 +16,7 @@ const e = (type: Entry["type"], at: string, more: Partial<Entry> = {}): Entry =>
   unitG: null,
   clientKey: null,
   note: null,
+  details: null,
   loggedBy: "marcel",
   createdAt: at,
   updatedAt: at,

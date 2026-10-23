@@ -1,5 +1,5 @@
 // A walk looked back on: after Zuhause, and from Verlauf. The map when there is a track, Dauer, Strecke, Pause, who
-// went (tap a person to change it), how many Pipi, Poopoo and trainings, then each of them by time (a tap opens it),
+// went (tap a person to change it), how many Pipi, Markiert, Poopoo and trainings, then each of them by time (a tap opens it),
 // a note, and a way to its detail
 // (time, end, dogs, delete); Fertig leads back. The title and the figures stay on top, the way to the detail and Fertig
 // at the bottom; the map, who went, what happened and the note scroll between them (#71). Right after Zuhause without reception it shows what this phone knows
@@ -21,7 +21,8 @@ import { Icon } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
 import { useTabPath } from "../ui/tabPath";
 import { LAST_WALKER } from "./lastOne";
-import { countLine, trainingLine, type WalkItem, walkItems } from "./lines";
+import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
+import { countLine, tapLine, trainingLine, type WalkItem, walkItems } from "./lines";
 import type { Shown } from "./taps";
 import { useWalkSummary } from "./useWalkSummary";
 
@@ -64,9 +65,8 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
 
   const several = new Set(shown.taps.map((t) => t.dogId)).size > 1 || dogs.filter((d) => !d.archived).length > 1;
   const dogName = (id: number) => dogs.find((d) => d.id === id)?.name ?? "Hund";
-  const LABEL = { pee: "Pipi", poop: "Poopoo" } as const;
-  // what a row says after its time: "Pipi", "Pipi · Toffee", "Training · 4 Min. · Sitz 4/5"
-  const itemText = (i: WalkItem) => (i.kind === "tap" ? `${LABEL[i.tap.type]}${several ? ` · ${dogName(i.tap.dogId)}` : ""}` : trainingLine(i.training));
+  // what a row says after its time: "Pipi", "Poopoo · weich · Toffee", "Training · 4 Min. · Sitz 4/5"
+  const itemText = (i: WalkItem) => (i.kind === "tap" ? tapLine(i.tap, several ? dogName(i.tap.dogId) : null) : trainingLine(i.training));
   const everyone = [...people, ...shown.walkers.filter((w) => !people.some((p) => p.id === w.id))];
   const walkerIds = shown.walkers.map((w) => w.id);
   const toggle = (id: string) => {
@@ -136,16 +136,16 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
       </View>
     );
   }
-  // one pee, poop or training by its time: one the server has opens its detail (time, dog, delete; a training's
+  // one pee, marking, poop or training by its time: one the server has opens its detail (time, dog, delete; a training's
   // exercises), one only this phone has waits for reception
   function row(i: WalkItem) {
     const id = i.kind === "tap" ? i.tap.id : i.training.id;
-    const icon = i.kind === "tap" ? i.tap.type : "training";
+    const type = i.kind === "tap" ? i.tap.type : "training";
     const text = itemText(i);
     const content = (
       <>
         <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(i.at)}</Text>
-        <Icon name={icon} size={17} color={theme[icon]} />
+        <Icon name={TYPE_ICON[type]} size={17} color={theme[TYPE_TONE[type]]} />
         <Text style={[styles.line, styles.text, { color: id !== undefined && !local ? theme.ink : theme.muted }]}>{id !== undefined && !local ? text : `${text} · wartet auf Empfang`}</Text>
       </>
     );

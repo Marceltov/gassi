@@ -13,6 +13,7 @@ const SYMBOLS = {
   walk: sym("figure.walk", "directions_walk"),
   dog: sym("pawprint.fill", "pets"),
   pee: sym("drop.fill", "water_drop"),
+  mark: sym("flag.fill", "flag"),
   food: sym("fork.knife", "restaurant"),
   training: sym("target", "target"),
   pause: sym("pause.fill", "pause"),

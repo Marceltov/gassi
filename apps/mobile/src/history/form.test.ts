@@ -15,6 +15,7 @@ const entry = (more: Partial<Entry>): Entry => ({
   unitG: null,
   clientKey: null,
   note: null,
+  details: null,
   loggedBy: "marcel",
   byName: "Hirsch",
   walkers: [],
@@ -36,7 +37,7 @@ const entry = (more: Partial<Entry>): Entry => ({
 test("an edit sends every field as the form has it, the note trimmed or null; walkers only for a walk", () => {
   const food = entry({ unitG: null });
   const form = { ...formOf(food), amountG: 90, note: "  " };
-  expect(editInput(food, form)).toEqual({ id: 7, at: food.at, endedAt: null, dogIds: [1], amountG: 90, foodKind: "wet", unitG: null, note: null });
+  expect(editInput(food, form)).toEqual({ id: 7, at: food.at, endedAt: null, dogIds: [1], amountG: 90, foodKind: "wet", unitG: null, note: null, details: null });
   const walk = entry({ type: "walk", amountG: null, foodKind: null, endedAt: "2026-10-20T11:00:00.000Z", walkerIds: ["marcel"], dogIds: [1, 2] });
   expect(editInput(walk, { ...formOf(walk), note: " matschig ", walkerIds: ["marcel", "bille"] })).toMatchObject({ endedAt: walk.endedAt, note: "matschig", walkers: ["marcel", "bille"], dogIds: [1, 2] });
 });

@@ -23,7 +23,7 @@ describe("the database", () => {
 describe("EntryRepository", () => {
   test("creates an entry with its timestamps", async () => {
     const e = await repo().create(entryAt("2026-10-20T09:30:00.000Z", { endedAt: "2026-10-20T10:00:00.000Z", note: "Park" }));
-    expect(e).toEqual<Entry>({ id: 1, dogIds: [1], type: "walk", at: "2026-10-20T09:30:00.000Z", endedAt: "2026-10-20T10:00:00.000Z", durationMin: 30, amountG: null, foodKind: null, unitG: null, clientKey: null, note: "Park", loggedBy: "marcel", createdAt: NOW.toISOString(), updatedAt: NOW.toISOString() });
+    expect(e).toEqual<Entry>({ id: 1, dogIds: [1], type: "walk", at: "2026-10-20T09:30:00.000Z", endedAt: "2026-10-20T10:00:00.000Z", durationMin: 30, amountG: null, foodKind: null, unitG: null, clientKey: null, note: "Park", details: null, loggedBy: "marcel", createdAt: NOW.toISOString(), updatedAt: NOW.toISOString() });
     expect(await repo().get(e.id)).toEqual(e);
   });
 

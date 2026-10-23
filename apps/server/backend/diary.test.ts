@@ -273,7 +273,7 @@ describe("entries carry their walk and training details", () => {
 });
 
 describe("what happened during a walk", () => {
-  test("a walk carries the pee, poop and the trainings' exercises that fell into its time; other entries carry none", async () => {
+  test("a walk carries the pee, markings, poop and the trainings' exercises that fell into its time; other entries carry none", async () => {
     clock = new Date("2026-10-20T12:00:00Z");
     const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"]]), now: () => clock });
     const sitz = await new Catalog(db()).addExercise("Sitz");
@@ -282,6 +282,7 @@ describe("what happened during a walk", () => {
       { id: "2", at: "2026-10-20T08:05:00.000Z", kind: "log", type: "pee", dogId: 1 },
       { id: "3", at: "2026-10-20T08:06:00.000Z", kind: "log", type: "pee", dogId: 1 },
       { id: "4", at: "2026-10-20T08:07:00.000Z", kind: "log", type: "poop", dogId: 1 },
+      { id: "4m", at: "2026-10-20T08:08:00.000Z", kind: "log", type: "mark", dogId: 1 },
       { id: "5", at: "2026-10-20T08:10:00.000Z", kind: "training.start", trainingKey: "t", walkKey: "w" },
       { id: "6", at: "2026-10-20T08:11:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, ok: true, delta: 1 },
       { id: "7", at: "2026-10-20T08:12:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, ok: false, delta: 1 },
@@ -290,7 +291,7 @@ describe("what happened during a walk", () => {
       { id: "10", at: "2026-10-20T09:00:00.000Z", kind: "log", type: "pee", dogId: 1 },
     ]);
     const { entries } = await diary().history({ type: "walk" });
-    expect(entries[0].during).toEqual({ pees: 2, poops: 1, exercises: [{ name: "Sitz", ok: 1, fail: 1 }] });
+    expect(entries[0].during).toEqual({ pees: 2, marks: 1, poops: 1, exercises: [{ name: "Sitz", ok: 1, fail: 1 }] });
     const pee = (await diary().history({ type: "pee" })).entries[0];
     expect(pee.during).toBeNull();
     expect((await diary().get(entries[0].id))?.during).toEqual(entries[0].during);

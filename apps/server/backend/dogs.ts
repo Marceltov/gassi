@@ -3,8 +3,9 @@ import { z } from "zod";
 import type { DB } from "./db/open";
 import { InputError } from "./errors";
 
-export type Dog = { id: number; name: string; color: string; archived: boolean };
-export type DogInput = { name: string; color: string };
+/** `marks`: the walk offers "Markiert" for this dog (#38). */
+export type Dog = { id: number; name: string; color: string; archived: boolean; marks: boolean };
+export type DogInput = { name: string; color: string; marks?: boolean };
 
 const name = z.string().trim().min(1).max(30);
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -20,7 +21,8 @@ const COLOR = "Die Farbe stimmt nicht.";
 /** The colour a household's first dog gets. */
 export const FIRST_DOG_COLOR = "#b8691a";
 
-const toDog = (r: { id: number; name: string; color: string; archived: number }): Dog => ({ id: r.id, name: r.name, color: r.color, archived: r.archived === 1 });
+const COLUMNS = ["id", "name", "color", "archived", "marks"] as const;
+const toDog = (r: { id: number; name: string; color: string; archived: number; marks: number }): Dog => ({ id: r.id, name: r.name, color: r.color, archived: r.archived === 1, marks: r.marks === 1 });
 
 export class DogRepository {
   constructor(
@@ -30,7 +32,7 @@ export class DogRepository {
 
   /** By name; archived ones only with `withArchived`. */
   async list({ withArchived = false } = {}): Promise<Dog[]> {
-    let q = this.db.selectFrom("dog").select(["id", "name", "color", "archived"]).orderBy("name");
+    let q = this.db.selectFrom("dog").select(COLUMNS).orderBy("name");
     if (!withArchived) q = q.where("archived", "=", 0);
     return (await q.execute()).map(toDog);
   }
@@ -38,13 +40,13 @@ export class DogRepository {
   async add(input: DogInput): Promise<Dog> {
     const row = await this.db
       .insertInto("dog")
-      .values({ name: checked(name, input.name, NAME), color: checked(color, input.color, COLOR), created_at: this.now().toISOString() })
-      .returning(["id", "name", "color", "archived"])
+      .values({ name: checked(name, input.name, NAME), color: checked(color, input.color, COLOR), marks: input.marks ? 1 : 0, created_at: this.now().toISOString() })
+      .returning(COLUMNS)
       .executeTakeFirstOrThrow();
     return toDog(row);
   }
 
-  async update(id: number, change: { name?: string; color?: string; archived?: boolean }): Promise<Dog | undefined> {
+  async update(id: number, change: { name?: string; color?: string; archived?: boolean; marks?: boolean }): Promise<Dog | undefined> {
     // every walk, pee and feeding needs a dog to belong to
     if (change.archived) {
       const active = await this.activeIds();
@@ -56,9 +58,10 @@ export class DogRepository {
         ...(change.name !== undefined ? { name: checked(name, change.name, NAME) } : {}),
         ...(change.color !== undefined ? { color: checked(color, change.color, COLOR) } : {}),
         ...(change.archived !== undefined ? { archived: change.archived ? 1 : 0 } : {}),
+        ...(change.marks !== undefined ? { marks: change.marks ? 1 : 0 } : {}),
       })
       .where("id", "=", id)
-      .returning(["id", "name", "color", "archived"])
+      .returning(COLUMNS)
       .executeTakeFirst();
     return row && toDog(row);
   }

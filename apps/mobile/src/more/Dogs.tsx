@@ -1,5 +1,6 @@
 // Hunde: the household's dogs, archived ones below (their past entries stay; they aren't offered for new ones). A tap
-// opens a dog to rename it, give it another color, archive it or bring it back; Hund hinzufügen at the bottom.
+// opens a dog to rename it, give it another color, say whether it marks (the walk then offers "Markiert", #38), archive it
+// or bring it back; Hund hinzufügen at the bottom.
 import type { Client } from "@gassi/api-client";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -8,6 +9,7 @@ import type { Dog } from "../data/store";
 import { useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { ButtonRow } from "../ui/ButtonRow";
+import { Chip } from "../ui/Chip";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
@@ -17,7 +19,7 @@ import { useWrite } from "./useWrite";
 
 const COLORS = ["#b8691a", "#8a5a1f", "#2e7d4f", "#3b5ba5", "#7a5ab8", "#a33b5b", "#b08a16", "#5f6670"];
 
-type Editing = { dog: Dog | null; name: string; color: string };
+type Editing = { dog: Dog | null; name: string; color: string; marks: boolean };
 
 export function Dogs() {
   const theme = useTheme();
@@ -29,7 +31,7 @@ export function Dogs() {
 
   const open = (dog: Dog | null) => {
     setMessage(null);
-    setEditing({ dog, name: dog?.name ?? "", color: dog?.color ?? COLORS[dogs.length % COLORS.length] });
+    setEditing({ dog, name: dog?.name ?? "", color: dog?.color ?? COLORS[dogs.length % COLORS.length], marks: dog?.marks ?? false });
   };
   const change = async (call: (api: Client) => Promise<unknown>) => {
     if (await run(call)) {
@@ -40,8 +42,8 @@ export function Dogs() {
   };
   const save = (e: Editing) =>
     void change(async (api) => {
-      if (e.dog) await api.updateDog({ id: e.dog.id, name: e.name, color: e.color });
-      else await api.addDog({ name: e.name, color: e.color });
+      if (e.dog) await api.updateDog({ id: e.dog.id, name: e.name, color: e.color, marks: e.marks });
+      else await api.addDog({ name: e.name, color: e.color, marks: e.marks });
     });
   const archive = (dog: Dog, archived: boolean) => void change((api) => api.updateDog({ id: dog.id, archived }));
 
@@ -77,6 +79,9 @@ export function Dogs() {
                       style={[styles.swatch, { backgroundColor: c, borderColor: editing.color === c ? theme.ink : "transparent" }]}
                     />
                   ))}
+                </View>
+                <View style={styles.colors}>
+                  <Chip label="Markiert auf der Runde" on={editing.marks} onPress={() => setEditing({ ...editing, marks: !editing.marks })} />
                 </View>
                 {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
                 {/* a second side action goes above the row (#80) */}

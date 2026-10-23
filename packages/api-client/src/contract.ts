@@ -4,7 +4,9 @@
 // into the query string, of a POST or PATCH into the JSON body.
 import {
   commandSchema,
+  CONSISTENCIES,
   ENTRY_MESSAGES,
+  entryDetails,
   ENTRY_TYPES,
   entryCreateInput,
   entryEditInput,
@@ -47,7 +49,8 @@ export const ISSUE_KINDS = ["wish", "bug"] as const;
 // `at`: when an open issue was opened, when a closed one was closed
 export const issueSchema = z.object({ number: z.number(), title: z.string(), open: z.boolean(), kind: z.enum(ISSUE_KINDS).nullable(), fromApp: z.boolean(), at: z.string(), url: z.string() });
 
-export const dogSchema = z.object({ id: z.number(), name: z.string(), color: z.string(), archived: z.boolean() });
+// marks: the walk offers "Markiert" for this dog (#38)
+export const dogSchema = z.object({ id: z.number(), name: z.string(), color: z.string(), archived: z.boolean(), marks: z.boolean() });
 
 const exerciseTotalSchema = z.object({ name: z.string(), ok: z.number(), fail: z.number() });
 const repSchema = z.object({ exerciseId: z.number(), dogId: z.number(), ok: z.number(), fail: z.number() });
@@ -65,6 +68,7 @@ export const entryViewSchema = z.object({
   unitG: z.number().nullable(),
   clientKey: z.string().nullable(),
   note: z.string().nullable(),
+  details: entryDetails.nullable(),
   loggedBy: z.string(),
   byName: z.string(),
   walkers: z.array(z.string()),
@@ -77,8 +81,8 @@ export const entryViewSchema = z.object({
   treatCounts: z.array(z.object({ treatKindId: z.number(), count: z.number() })),
   distanceM: z.number().nullable(),
   route: routeSchema.nullable(),
-  // a walk's pee, poop and the trainings' exercises during it, decided by time (ADR 0002); null for other entries
-  during: z.object({ pees: z.number(), poops: z.number(), exercises: z.array(exerciseTotalSchema) }).nullable(),
+  // a walk's pee, markings, poop and the trainings' exercises during it, decided by time (ADR 0002); null for others
+  during: z.object({ pees: z.number(), marks: z.number(), poops: z.number(), exercises: z.array(exerciseTotalSchema) }).nullable(),
   // a wet count's can sizes (its rows at the same time, smallest can first, each its entry's id), moved and deleted as
   // one, each size corrected on its own; null for others
   count: z.array(z.object({ id: z.number(), unitG: z.number(), amountG: z.number() })).nullable(),
@@ -120,7 +124,8 @@ const metricsSchema = z.object({
   descentM: z.number(),
   bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).nullable(),
 });
-const markSchema = z.object({ id: z.number(), at: z.string(), dogId: z.number() });
+// `consistency` only on a poop
+const tapSchema = z.object({ id: z.number(), at: z.string(), dogId: z.number(), consistency: z.enum(CONSISTENCIES).nullable() });
 export const walkSummarySchema = z.object({
   id: z.number(),
   note: z.string().nullable(),
@@ -131,9 +136,10 @@ export const walkSummarySchema = z.object({
   pauseCount: z.number(),
   walkers: z.array(personSchema),
   trainings: z.array(z.object({ id: z.number(), startedAt: z.string(), min: z.number(), exercises: z.array(exerciseTotalSchema), treats: z.array(z.object({ name: z.string(), count: z.number() })) })),
-  // the walk's pee and poop entries (their ids, to open one), oldest first
-  pees: z.array(markSchema),
-  poops: z.array(markSchema),
+  // the walk's pee, marking and poop entries (their ids, to open one), oldest first
+  pees: z.array(tapSchema),
+  marks: z.array(tapSchema),
+  poops: z.array(tapSchema),
 });
 const walkOutput = z.object({ summary: walkSummarySchema, track: z.object({ source: z.enum(["phone", "watch"]), points: z.array(trackPointSchema), metrics: metricsSchema }).nullable() });
 
@@ -214,11 +220,11 @@ export const contract = {
   invites: endpoint({ method: "GET", path: "/api/invites", input: none, output: z.object({ invites: z.array(openLink) }) }),
   revokeInvite: endpoint({ method: "DELETE", path: "/api/invites/:id", input: z.object({ id }), output: z.object({ revoked: z.literal(true) }) }),
   dogs: endpoint({ method: "GET", path: "/api/dogs", input: z.object({ archived: z.enum(["0", "1"]).optional() }), output: z.object({ dogs: z.array(dogSchema) }) }),
-  addDog: endpoint({ method: "POST", path: "/api/dogs", input: z.object({ name: z.string(), color: z.string() }), output: dogSchema }),
+  addDog: endpoint({ method: "POST", path: "/api/dogs", input: z.object({ name: z.string(), color: z.string(), marks: z.boolean().optional() }), output: dogSchema }),
   updateDog: endpoint({
     method: "PATCH",
     path: "/api/dogs/:id",
-    input: z.object({ id, name: z.string().optional(), color: z.string().optional(), archived: z.boolean().optional() }),
+    input: z.object({ id, name: z.string().optional(), color: z.string().optional(), archived: z.boolean().optional(), marks: z.boolean().optional() }),
     output: dogSchema,
   }),
   sessions: endpoint({ method: "GET", path: "/api/sessions", input: none, output: sessionsViewSchema }),

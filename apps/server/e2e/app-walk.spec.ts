@@ -33,7 +33,8 @@ test("Pipi with one dog logs at once; without reception Poopoo and Zuhause show 
     const key = (await client.sessions()).walk!.key;
 
     await context.setOffline(true);
-    await page.getByRole("button", { name: "Poopoo" }).click();
+    await page.getByRole("button", { name: "Poopoo", exact: true }).click();
+    await page.keyboard.press("Escape"); // no consistency
     await expect(taps).toContainText("Poopoo");
     await page.getByRole("button", { name: "Zuhause" }).click();
     await expect(page).toHaveURL(new RegExp(`/runde/${key}$`));
@@ -155,4 +156,75 @@ test("the other phone ends the walk: this one goes back to Start, and a pause qu
   await expect(page.getByRole("button", { name: "Gassi gehen" })).toBeVisible();
   expect(dialogs).toEqual([]);
   await expect.poll(() => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith("gassi.commands.")).map((k) => JSON.parse(localStorage.getItem(k)!).length))).toEqual([0]);
+});
+
+test("Markiert shows only for a dog set to mark; it isn't a pee; a poop asks its consistency in a sheet, also from the list and later in Verlauf", async ({ page }) => {
+  const restore = await onlyOneDog();
+  const client = asHirsch();
+  const dog = (await client.dogs()).dogs.find((d) => !d.archived)!;
+  try {
+    await signIn(page);
+    await startWalk(page);
+    await expect(page.getByRole("button", { name: "Markiert", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Zuhause" }).click();
+    await stopEverything();
+
+    // Hunde: the dog marks
+    await page.goto("/mehr/hunde");
+    await page.getByTestId(`dog-${dog.name}`).click();
+    await page.getByRole("button", { name: "Markiert auf der Runde" }).click();
+    await page.getByRole("button", { name: "Speichern" }).click();
+    await expect.poll(async () => (await client.dogs()).dogs.find((d) => d.id === dog.id)?.marks).toBe(true);
+
+    await startWalk(page);
+    const taps = page.getByTestId("walk-taps");
+    await page.getByRole("button", { name: "Markiert", exact: true }).click();
+    await page.getByRole("button", { name: "Markiert", exact: true }).click();
+    // the poop is logged at the tap, then a sheet asks how it was
+    const sheet = page.getByTestId("consistency-choice");
+    await page.getByRole("button", { name: "Poopoo", exact: true }).click();
+    await sheet.getByRole("button", { name: "weich" }).click();
+    await expect(sheet).toHaveCount(0);
+    await expect(taps).toContainText("Poopoo · weich");
+    // closed without an answer, the poop has none; tapped in the list, it asks again
+    await page.getByRole("button", { name: "Poopoo", exact: true }).click();
+    await expect(sheet).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await page.getByRole("button", { name: /^Poopoo, .*Konsistenz wählen$/ }).click();
+    await sheet.getByRole("button", { name: "hart" }).click();
+    await expect(taps).toContainText("Poopoo · hart");
+    await page.getByRole("button", { name: "Markiert", exact: true }).click();
+
+    const key = (await client.sessions()).walk!.key;
+    await expect.poll(async () => (await client.walkByKey({ key })).summary.poops.map((p) => p.consistency)).toEqual(["soft", "hard"]);
+    const summary = (await client.walkByKey({ key })).summary;
+    expect([summary.pees.length, summary.marks.length]).toEqual([0, 3]);
+    await page.getByRole("button", { name: "Zuhause" }).click();
+    await expect(page.getByTestId("summary-counts")).toHaveText("3× markiert · 2× Poopoo");
+
+    // in Verlauf the second poop gets one afterwards
+    await page.goto(`/verlauf/eintrag/${summary.poops[1].id}`);
+    await page.getByRole("button", { name: "breiig" }).click();
+    await page.getByRole("button", { name: "Speichern" }).click();
+    await expect.poll(async () => (await client.entry({ id: summary.poops[1].id })).details).toEqual({ consistency: "mushy" });
+  } finally {
+    await client.updateDog({ id: dog.id, marks: false });
+    await restore();
+  }
+});
+
+test("with two dogs on the walk, Markiert asks which one like Pipi", async ({ page }) => {
+  const client = asHirsch();
+  const [first, second] = (await client.dogs()).dogs.filter((d) => !d.archived);
+  await client.updateDog({ id: first.id, marks: true });
+  try {
+    await signIn(page);
+    await startWalk(page);
+    await page.getByRole("button", { name: "Markiert", exact: true }).click();
+    await page.getByTestId("dog-choice").getByRole("button", { name: second.name }).click();
+    await expect(page.getByTestId("walk-taps")).toContainText(`Markiert · ${second.name}`);
+  } finally {
+    await client.updateDog({ id: first.id, marks: false });
+  }
 });

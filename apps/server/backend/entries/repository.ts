@@ -1,5 +1,5 @@
 // The entry table. Newest first everywhere; ties on `at` break by id, so paging is stable.
-import { type Entry, type EntryFields, isEntryType, isFoodKind, minutesBetween, type NewEntry } from "@gassi/domain";
+import { type Entry, entryDetails, type EntryPatch, isEntryType, isFoodKind, minutesBetween, type NewEntry } from "@gassi/domain";
 import type { DB } from "../db/open";
 import type { EntryRow } from "../db/schema";
 
@@ -28,13 +28,15 @@ function toEntry(row: EntryRow, dogIds: number[]): Entry {
     unitG: row.unit_g,
     clientKey: row.client_key,
     note: row.note,
+    // what was written was checked; a column made unreadable by hand counts as none
+    details: row.details ? (entryDetails.safeParse(JSON.parse(row.details)).data ?? null) : null,
     loggedBy: row.logged_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-const columns = (f: EntryFields) => ({ at: f.at, ended_at: f.endedAt, amount_g: f.amountG, food_kind: f.foodKind, unit_g: f.unitG, note: f.note });
+const columns = (f: EntryPatch) => ({ at: f.at, ended_at: f.endedAt, amount_g: f.amountG, food_kind: f.foodKind, unit_g: f.unitG, note: f.note, details: f.details === undefined ? undefined : f.details && JSON.stringify(f.details) });
 
 export class EntryRepository {
   constructor(
@@ -74,8 +76,8 @@ export class EntryRepository {
     return this.one(row);
   }
 
-  /** Changes the fields, and the dogs when `fields.dogIds` is given. */
-  async update(id: number, fields: EntryFields): Promise<Entry | undefined> {
+  /** Changes the fields, the details when given and the dogs when `fields.dogIds` is given. */
+  async update(id: number, fields: EntryPatch): Promise<Entry | undefined> {
     const change = async (db: DB) => {
       const row = await db.updateTable("entry").set({ ...columns(fields), updated_at: this.now().toISOString() }).where("id", "=", id).returningAll().executeTakeFirst();
       if (row && fields.dogIds) {

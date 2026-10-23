@@ -1,5 +1,5 @@
 // What an entry's detail shows large on top, so the eye finds it first (#81): an opened can's size, a count's or a
-// purchase's cans and grams, a pee's or a poop's time and dog, a training's minutes and what was trained. From the form,
+// purchase's cans and grams, a pee's, marking's or poop's time and dog, a training's minutes and what was trained. From the form,
 // so it follows what is being changed (the − and + next to it, #81). Food, weight, a walk and a note show theirs themselves (the amount, the summary,
 // the text).
 import { clockTime, FOOD_LABEL, formatCans, formatMinutes, formatWeight, minutesBetween, trainingSummaryLine } from "@gassi/domain";
@@ -24,6 +24,7 @@ export function factOf(entry: Entry, form: Form, names: Names): Fact | null {
       if (entry.unitG) return { big: formatCans(Math.round((form.amountG ?? 0) / entry.unitG)), sub: `à ${entry.unitG} g · ${formatWeight(form.amountG ?? 0)}` };
       return { big: formatWeight(form.amountG ?? 0), sub: `${FOOD_LABEL.dry} gekauft` };
     case "pee":
+    case "mark":
     case "poop": {
       const ms = Date.parse(form.at);
       const day = new Intl.DateTimeFormat("de-DE", { timeZone: names.timeZone, weekday: "short", day: "2-digit", month: "2-digit" }).format(ms);

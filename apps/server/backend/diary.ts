@@ -3,7 +3,7 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, perDog, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput, kgToGrams } from "@gassi/domain";
+import { checkDetails, checkDogs, type EntryDetails, computeStock, perDog, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput, kgToGrams } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
@@ -74,6 +74,11 @@ const needsKind = (type: EntryType, kind: FoodKind | null) => {
   if (!kind && (type === "food" || type === "restock" || type === "stockcheck" || type === "opened")) throw new InputError("Welche Futterart?");
 };
 
+const fitsDetails = (type: EntryType, details: EntryDetails | null) => {
+  const problem = checkDetails(type, details);
+  if (problem) throw new InputError(problem);
+};
+
 export type DiaryDeps = { db: DB; names: Names; timeZone: string; now: () => Date };
 
 export class Diary {
@@ -100,6 +105,7 @@ export class Diary {
   async log(user: Person, input: unknown): Promise<EntryView> {
     const fields = parse(newEntryInput, input, ENTRY_MESSAGES);
     needsKind(fields.type, fields.foodKind);
+    fitsDetails(fields.type, fields.details);
     return this.view1(await this.entries.create({ ...fields, dogIds: await this.dogsFor(fields.type, fields.dogIds), loggedBy: user.id }));
   }
 
@@ -107,6 +113,7 @@ export class Diary {
     const { walkers, ...fields } = parse(entryEditFields, input, ENTRY_MESSAGES);
     const before = await this.entries.get(id);
     if (before) needsKind(before.type, fields.foodKind);
+    if (before) fitsDetails(before.type, fields.details);
     if (before && fields.dogIds) fields.dogIds = await this.dogsFor(before.type, fields.dogIds, before.dogIds);
     if (before && walkers) {
       if (before.type !== "walk") throw new InputError("Mitgeher gibt es nur bei Runden.");
@@ -327,7 +334,7 @@ export class Diary {
     };
   }
 
-  // What happened during each walk, decided by time as the walk summary does (ADR 0002): the pee and poop and the
+  // What happened during each walk, decided by time as the walk summary does (ADR 0002): the pee, markings and poop and the
   // trainings begun from its start until its end (now, while it runs), read at once for the time all of them span.
   private async during(walks: readonly Entry[]): Promise<Map<number, WalkDuring>> {
     if (walks.length === 0) return new Map();
@@ -335,7 +342,7 @@ export class Diary {
     const endOf = (w: Entry) => w.endedAt ?? now;
     const since = walks.reduce((min, w) => (w.at < min ? w.at : min), walks[0].at);
     const until = walks.reduce((max, w) => (endOf(w) > max ? endOf(w) : max), endOf(walks[0]));
-    const inside = (await this.entries.list({ since, until })).filter((e) => e.type === "pee" || e.type === "poop" || e.type === "training");
+    const inside = (await this.entries.list({ since, until })).filter((e) => e.type === "pee" || e.type === "mark" || e.type === "poop" || e.type === "training");
     const trainingIds = inside.filter((e) => e.type === "training").map((e) => e.id);
     const reps = trainingIds.length
       ? await this.deps.db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute()
@@ -347,7 +354,7 @@ export class Diary {
         const trainings = mine.filter((e) => e.type === "training").reverse();
         const rows = trainings.flatMap((t) => reps.filter((r) => r.entry_id === t.id).map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count })));
         const count = (type: EntryType) => mine.filter((e) => e.type === type).length;
-        return [w.id, { pees: count("pee"), poops: count("poop"), exercises: exerciseTotals(rows) }];
+        return [w.id, { pees: count("pee"), marks: count("mark"), poops: count("poop"), exercises: exerciseTotals(rows) }];
       }),
     );
   }

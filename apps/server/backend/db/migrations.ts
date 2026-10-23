@@ -153,9 +153,24 @@ const migrations: Record<string, Migration> = {
         .execute();
     },
   },
+  // The first change to a database with real data (2026-10-23): entries get `details` (JSON of what only some kinds
+  // have, a poop's consistency first, #86) and dogs `marks` (the walk offers "Markiert" for them, #38). Both are new
+  // columns with empty defaults, so every row stays as it was.
+  "0.4_details_marks": {
+    async up(db: Kysely<any>) {
+      await db.schema.alterTable("entry").addColumn("details", "text").execute();
+      await db.schema.alterTable("dog").addColumn("marks", "integer", (c) => c.notNull().defaultTo(0)).execute();
+    },
+  },
 };
 
 const provider: MigrationProvider = { getMigrations: async () => migrations };
+
+/** For tests: the schema as it was after migration `name`, to check that the next ones keep the data. */
+export async function migrateTo(db: Kysely<any>, name: string): Promise<void> {
+  const { error } = await new Migrator({ db, provider }).migrateTo(name);
+  if (error) throw error;
+}
 
 /** Thrown for a database whose recorded migrations this version doesn't know (made by an older Gassi before 0.3). */
 export class OldDatabaseError extends Error {}

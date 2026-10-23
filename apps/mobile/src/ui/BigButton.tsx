@@ -1,7 +1,8 @@
 // A big button for the thumb: an icon and the label, optionally a small line under it. A colored one has the depth of
 // Start's tiles (its kind's diagonal gradient, a soft shadow, a light top edge); a neutral one stays calm (its surface
 // with a faint shadow and edge); a side one is only outlined, a dangerSide one outlined in red; ink and danger are solid
-// (#80). Disabled, it is flat and faded.
+// (#80). Disabled, it is flat and faded. `stacked` puts the icon above the label, for three side by side (the walk's
+// Pipi, Markiert, Poopoo).
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { type ButtonKind, FIELD_HEIGHT, type Palette, radius, useTheme } from "../theme";
 import { Icon, type IconName } from "./Icon";
@@ -22,9 +23,10 @@ type Props = {
   a11y?: string;
   /** Greyed out and not tappable. */
   disabled?: boolean;
+  stacked?: boolean;
 };
 
-export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, disabled, size = "xl" }: Props) {
+export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, disabled, stacked, size = "xl" }: Props) {
   const theme = useTheme();
   const { height, font, icon: iconSize } = sizes[size];
   const look = lookOf(kind, theme, !!disabled);
@@ -36,9 +38,9 @@ export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, 
       disabled={disabled}
       onPress={onPress}
       onLongPress={onLongPress}
-      style={({ pressed }) => [styles.button, { height, opacity: disabled ? 0.35 : pressed ? 0.8 : 1 }, look.box]}
+      style={({ pressed }) => [styles.button, { height, opacity: disabled ? 0.35 : pressed ? 0.8 : 1 }, look.box, stacked && styles.narrow]}
     >
-      <View style={styles.line}>
+      <View style={[styles.line, stacked && styles.stacked]}>
         {icon ? <Icon name={icon} size={iconSize} color={look.ink} /> : null}
         {label ? <Text style={[styles.label, { fontSize: font, color: look.ink }]}>{label}</Text> : null}
       </View>
@@ -72,6 +74,8 @@ function lookOf(kind: ButtonKind, theme: Palette, disabled: boolean): { box: obj
 const styles = StyleSheet.create({
   button: { borderRadius: radius.button, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
   line: { flexDirection: "row", alignItems: "center", gap: 8 },
+  stacked: { flexDirection: "column", gap: 2 },
+  narrow: { paddingHorizontal: 4 },
   label: { fontWeight: "700" },
   sub: { fontSize: 12, marginTop: 2, opacity: 0.8 },
 });

@@ -1,10 +1,11 @@
 // One entry from Verlauf, to be put right afterwards: its time (and end), the dogs, for a walk who went, for food the
-// amount and kind, for weight the weight, for a training its repetitions per exercise and dog and its treats, a note;
+// amount and kind, for weight the weight, for a poop its consistency, for a training its repetitions per exercise and
+// dog and its treats, a note;
 // Speichern sends it all, Löschen asks first. What it is, who entered it and what it is about (large, fact.ts: #81)
 // stay on top, the buttons at the bottom (#71). A wet count (one row per can size) is one thing here: its sizes as rows,
 // its time moved and its rows deleted together. Both need the server (the writes' client): they say so without
 // reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
-import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, type Stock, TYPE_LABEL } from "@gassi/domain";
+import { clampPortion, CONSISTENCIES, CONSISTENCY_LABEL, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, type Stock, TYPE_LABEL, withDetail } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -29,7 +30,7 @@ import { TIME_ZONE } from "../time";
 import { TimeField } from "./TimeField";
 
 // Speichern in the color of the thing (#80): food bought, counted and opened is food; weight and a note have none
-const BUTTON: Record<Entry["type"], ButtonKind> = { walk: "walk", food: "food", restock: "food", stockcheck: "food", opened: "food", training: "training", pee: "pee", poop: "poop", weight: "ink", note: "ink" };
+const BUTTON: Record<Entry["type"], ButtonKind> = { walk: "walk", food: "food", restock: "food", stockcheck: "food", opened: "food", training: "training", pee: "pee", mark: "pee", poop: "poop", weight: "ink", note: "ink" };
 
 export function EntryDetail({ id }: { id: number }) {
   const router = useRouter();
@@ -163,6 +164,13 @@ export function EntryDetail({ id }: { id: number }) {
               <Segments options={FOOD_KIND_OPTIONS} value={form.foodKind ?? "wet"} onChange={(foodKind) => change({ foodKind })} kind="food" />
               <AmountStepper testID="edit-amount" value={`${form.amountG ?? 0} g`} step="10 g" onStep={(d) => change({ amountG: clampPortion((form.amountG ?? 0) + d * 10) })} atMin={(form.amountG ?? 0) <= 1} atMax={(form.amountG ?? 0) >= FOOD_MAX_G} />
             </>
+          ) : null}
+          {entry.type === "poop" ? (
+            <Group label="Konsistenz">
+              {CONSISTENCIES.map((c) => (
+                <Chip key={c} label={CONSISTENCY_LABEL[c]} accent={theme.poop} on={form.details?.consistency === c} onPress={() => change({ details: withDetail(form.details, "consistency", form.details?.consistency === c ? null : c) })} />
+              ))}
+            </Group>
           ) : null}
           {entry.type === "weight" ? <AmountStepper testID="edit-amount" value={formatKg(form.amountG ?? 0)} step="100 g" onStep={(d) => change({ amountG: Math.max(100, (form.amountG ?? 0) + d * 100) })} atMin={(form.amountG ?? 0) <= 100} atMax={false} /> : null}
 

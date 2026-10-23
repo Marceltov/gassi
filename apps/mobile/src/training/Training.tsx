@@ -13,7 +13,7 @@ import { useNow } from "../start/useNow";
 import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { ChoiceList } from "../ui/ChoiceList";
-import { DogChoiceSheet } from "../ui/DogChoiceSheet";
+import { ChoiceSheet } from "../ui/ChoiceSheet";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
@@ -172,11 +172,16 @@ export function Training() {
           ) : null}
           <BigButton kind="training" size="l" icon="check" label="Fertig" onPress={done} />
 
-          <DogChoiceSheet
+          <ChoiceSheet
+            testID="dog-choice"
             open={choosing !== null}
             title={choosing ? `${choosingExercise} ${choosing.ok ? "klappt" : "klappt nicht"}${choosing.undoDogs ? " rückgängig" : ""} – welcher Hund?` : ""}
-            dogs={(choosing?.undoDogs ?? dogIds).map((id) => ({ id, name: dogName(id), color: dogs.find((d) => d.id === id)?.color }))}
-            onPick={(id) => choosing && (choosing.undoDogs ? rep(choosing.exerciseId, id, choosing.ok, -1) : pick(choosing.exerciseId, choosing.ok, id))}
+            choices={(choosing?.undoDogs ?? dogIds).map((id) => ({
+              key: id,
+              label: dogName(id),
+              color: dogs.find((d) => d.id === id)?.color,
+              onPress: () => choosing && (choosing.undoDogs ? rep(choosing.exerciseId, id, choosing.ok, -1) : pick(choosing.exerciseId, choosing.ok, id)),
+            }))}
             onClose={() => setChoosing(null)}
           />
           <Sheet open={picking} onClose={() => setPicking(false)} label={naming === null ? "Welche Übung?" : "Neue Übung"}>

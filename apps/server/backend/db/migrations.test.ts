@@ -2,7 +2,9 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
+import { Kysely, SqliteDialect } from "kysely";
 import { expect, test } from "vitest";
+import { migrate, migrateTo } from "./migrations";
 import { DB_FILE, openDatabase } from "./open";
 
 test("a database from Gassi 0.2 is refused with what to do, not run on the old tables", async () => {
@@ -20,5 +22,18 @@ test("a fresh database gets the current schema and opens again", async () => {
   await (await openDatabase(dir)).destroy();
   const db = await openDatabase(dir);
   expect(await db.selectFrom("device").selectAll().execute()).toEqual([]);
+  await db.destroy();
+});
+
+test("0.4 keeps a 0.3 database's entries and dogs: no details, no dog marks", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = new Kysely<any>({ dialect: new SqliteDialect({ database: new Database(":memory:") }) });
+  await migrateTo(db, "0.3_schema");
+  await db.insertInto("person").values({ id: "marcel", name: "Hirsch", created_at: "2026-10-20T08:00:00Z" }).execute();
+  await db.insertInto("dog").values({ name: "Toffee", color: "#b8691a", created_at: "2026-10-20T08:00:00Z" }).execute();
+  await db.insertInto("entry").values({ type: "poop", at: "2026-10-20T09:00:00Z", note: "im Park", logged_by: "marcel", created_at: "2026-10-20T09:00:00Z", updated_at: "2026-10-20T09:00:00Z" }).execute();
+  await migrate(db);
+  expect(await db.selectFrom("entry").select(["type", "note", "details"]).execute()).toEqual([{ type: "poop", note: "im Park", details: null }]);
+  expect(await db.selectFrom("dog").select(["name", "marks"]).execute()).toEqual([{ name: "Toffee", marks: 0 }]);
   await db.destroy();
 });
