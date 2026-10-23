@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { clockTime, dayBounds, dayOf, formatAgo, formatElapsed, formatMinutes, localToUtc, utcToLocal } from "./time";
+import { clockTime, dayBounds, dayOf, formatAgo, formatAgoShort, formatElapsed, formatMinutes, localToUtc, utcToLocal } from "./time";
 
 const TZ = "Europe/Berlin";
 const at = (iso: string) => Date.parse(iso);
@@ -79,4 +79,15 @@ test("formatMinutes: Min. below an hour, then Std. and Min.", () => {
   expect(formatMinutes(52)).toBe("52 Min.");
   expect(formatMinutes(60)).toBe("1 Std.");
   expect(formatMinutes(200)).toBe("3 Std. 20 Min.");
+});
+
+test("formatAgoShort: past an hour only the hours, as a list of times reads; else as formatAgo", () => {
+  const now = Date.parse("2026-10-20T12:00:00Z");
+  const ago = (min: number) => formatAgoShort(now - min * 60_000, now);
+  expect(ago(0)).toBe("gerade eben");
+  expect(ago(25)).toBe("vor 25 Min.");
+  expect(ago(61)).toBe("vor 1 Std.");
+  expect(ago(23 * 60 + 48)).toBe("vor 23 Std.");
+  expect(ago(26 * 60)).toBe("vor 1 Tag");
+  expect(ago(50 * 60)).toBe("vor 2 Tagen");
 });

@@ -12,7 +12,7 @@ import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
 import { InviteCard, OpenInvites, useInvites } from "./Invite";
 import { SignOutSheet } from "./SignOut";
-import { Group, Row, Small } from "./List";
+import { Group, Row, Small } from "../ui/List";
 import { useServer } from "./useServer";
 import { useWrite } from "./useWrite";
 

@@ -242,6 +242,8 @@ test("a training reads Sitz 2/3 in the list; its repetitions are changed in its 
   await page.goto("/verlauf");
   const row = page.getByTestId(`entry-${training.id}`);
   await expect(row).toContainText("Sitz 2/3");
+  // a line per exercise under the minutes, not one line cut short
+  await expect(page.getByTestId(`entry-${training.id}-line`)).toHaveText(["Sitz 2/3"]);
   await row.click();
   await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${training.id}`);
   await page.getByRole("button", { name: "Sitz klappt: eins mehr" }).click();

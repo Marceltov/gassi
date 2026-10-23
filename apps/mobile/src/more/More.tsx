@@ -10,7 +10,7 @@ import { useGassi } from "../data/GassiProvider";
 import { useNow } from "../start/useNow";
 import { useTheme } from "../theme";
 import { Screen } from "../ui/Screen";
-import { Group, Row } from "./List";
+import { Group, Row } from "../ui/List";
 import { SignOutSheet } from "./SignOut";
 import { useServer } from "./useServer";
 

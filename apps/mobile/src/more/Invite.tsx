@@ -7,7 +7,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { radius, useTheme } from "../theme";
 import { dayTime } from "../time";
 import { canCopy, copyText } from "../ui/copy";
-import { Group, Row, Small } from "./List";
+import { Group, Row, Small } from "../ui/List";
 import { useServer } from "./useServer";
 import { useWrite } from "./useWrite";
 

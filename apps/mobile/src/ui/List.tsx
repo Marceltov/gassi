@@ -1,9 +1,10 @@
-// Mehr's lists: rows in rounded groups, each a name with a short value on the right; tappable ones open something.
+// Lists of rows in rounded groups (Mehr's, Start's day at a glance): each a name with a short value on the right;
+// tappable ones open something.
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { onColor } from "../colors";
 import { type ListTone, radius, useTheme } from "../theme";
-import { Icon, type IconName } from "../ui/Icon";
+import { Icon, type IconName } from "./Icon";
 
 export function Group({ title, children }: { title?: string; children: ReactNode }) {
   const theme = useTheme();
@@ -15,9 +16,10 @@ export function Group({ title, children }: { title?: string; children: ReactNode
   );
 }
 
-type RowProps = { label: string; value?: string; icon?: IconName; tone?: ListTone; square?: string; dot?: string; onPress?: () => void; testID?: string; muted?: boolean; right?: ReactNode };
+/** `a11y`: what a screen reader says for a tappable row, when label and value are not enough. */
+type RowProps = { label: string; value?: string; icon?: IconName; tone?: ListTone; square?: string; dot?: string; onPress?: () => void; testID?: string; muted?: boolean; right?: ReactNode; a11y?: string };
 
-export function Row({ label, value, icon, tone, square, dot, onPress, testID, muted, right }: RowProps) {
+export function Row({ label, value, icon, tone, square, dot, onPress, testID, muted, right, a11y }: RowProps) {
   const theme = useTheme();
   const content = (
     <>
@@ -41,7 +43,7 @@ export function Row({ label, value, icon, tone, square, dot, onPress, testID, mu
   );
   const style = [styles.row, { borderBottomColor: theme.line }];
   return onPress ? (
-    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={value ? `${label}, ${value}` : label} onPress={onPress} style={({ pressed }) => [style, { opacity: pressed ? 0.7 : 1 }]}>
+    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={a11y ?? (value ? `${label}, ${value}` : label)} onPress={onPress} style={({ pressed }) => [style, { opacity: pressed ? 0.7 : 1 }]}>
       {content}
     </Pressable>
   ) : (

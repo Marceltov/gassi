@@ -11,7 +11,7 @@ import { ButtonRow } from "../ui/ButtonRow";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
-import { Group, Row } from "./List";
+import { Group, Row } from "../ui/List";
 import { useServer } from "./useServer";
 import { useWrite } from "./useWrite";
 

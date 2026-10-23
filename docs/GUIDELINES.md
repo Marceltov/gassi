@@ -53,7 +53,7 @@ here in the same PR that follows it.
   list (Verlauf's) stay at the bottom. Only what grows scrolls, between them (`top`), and only when it doesn't fit.
   Rows you read (a list) start under the title; rows you work in (Vorrat's counts) sit right above the controls. Rows
   in a list have one height: a heading and one subline, cut short rather than wrapping; a row with more to show may be
-  taller, never shorter (a wet count a line per size, a walk with a track its map). Nothing is cut off to make a page
+  taller, never shorter (a wet count a line per size, a training a line per exercise, a walk with a track its map). Nothing is cut off to make a page
   fit; Gewicht scales to the height instead (`fill`, #69). `e2e/fit.ts` checks each page at 360×640 and 430×932.
 - **A write that worked says nothing**: the screen shows what changed. A message above the buttons would move them;
   only what went wrong is said there.

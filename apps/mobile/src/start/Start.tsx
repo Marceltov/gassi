@@ -1,16 +1,17 @@
-// Start: the day at a glance on top, three big tiles at the bottom: Gassi gehen across, Futter and Training side by side
+// Start: the day at a glance on top as one list (#83): Draußen, Gefressen, Trainiert, Pipi, Poopoo, each since when and
+// who, the times in one column; three big tiles at the bottom: Gassi gehen across, Futter and Training side by side
 // below it, each with when it was last. A running walk or training shows its clock on its tile and is led back into. A
-// tile on top opens Verlauf filtered to its type.
-import { type EntryType, formatAgo, newId, TYPE_LABEL } from "@gassi/domain";
+// row on top opens Verlauf filtered to its type.
+import { type EntryType, formatAgoShort, newId, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { FoodSheet } from "../food/FoodSheet";
 import { useGassi } from "../data/GassiProvider";
-import type { TileKind } from "../theme";
+import { type TileKind, useTheme } from "../theme";
 import type { IconName } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
-import { Tile } from "../ui/Tile";
+import { Group, Row } from "../ui/List";
 import { useLeaving } from "../ui/useLeaving";
 import { trainingClock, walkClock } from "./elapsed";
 import { lastFeeding, lastTraining, lastWalk } from "./lines";
@@ -25,17 +26,37 @@ export function Start() {
   const router = useRouter();
   const { view, send } = useGassi();
   const today = useToday();
+  const theme = useTheme();
   const now = useNow(view.walk || view.training ? 1000 : 30_000);
   const [foodOpen, setFoodOpen] = useState(false);
 
   // A second tap before the screen has caught up must not start a second walk or training.
   const { leave } = useLeaving();
   const open = (path: "/runde" | "/training") => leave(() => router.push(path));
-  // a fact tile opens Verlauf with its type chosen
-  const tile = (label: string, entry: Entry, type: Shown, icon: IconName) => {
-    const when = entry ? formatAgo(Date.parse(entry.endedAt ?? entry.at), now) : "noch nicht";
+  // a row of the day at a glance: since when and who; it opens Verlauf with its type chosen
+  const fact = (label: string, entry: Entry, type: Shown, icon: IconName) => {
+    const when = entry ? formatAgoShort(Date.parse(entry.endedAt ?? entry.at), now) : "noch nicht";
     const show = () => leave(() => router.navigate({ pathname: "/verlauf", params: { type } }));
-    return <Tile label={label} value={when} by={entry?.byName} kind={type} icon={icon} a11y={`${TYPE_LABEL[type]} im Verlauf zeigen`} onPress={show} />;
+    return (
+      <Row
+        testID={`tile-${label}`}
+        label={label}
+        icon={icon}
+        tone={type}
+        a11y={`${TYPE_LABEL[type]} im Verlauf zeigen, ${when}${entry ? `, ${entry.byName}` : ""}`}
+        onPress={show}
+        right={
+          <View style={styles.since}>
+            <Text testID={`tile-${label}-since`} style={[styles.when, { color: theme.ink }]} numberOfLines={1}>
+              {when}
+            </Text>
+            <Text style={[styles.by, { color: theme.muted }]} numberOfLines={1}>
+              {entry?.byName ?? ""}
+            </Text>
+          </View>
+        }
+      />
+    );
   };
   const startWalk = () =>
     leave(() => {
@@ -52,14 +73,13 @@ export function Start() {
     <Screen
       top={
         <>
-          <View style={styles.row}>
-            {tile("Draußen", today.walk, "walk", "walk")}
-            {tile("Gefressen", today.food, "food", "food")}
-          </View>
-          <View style={styles.row}>
-            {tile("Pipi", today.pee, "pee", "pee")}
-            {tile("Poopoo", today.poop, "poop", "poop")}
-          </View>
+          <Group>
+            {fact("Draußen", today.walk, "walk", "walk")}
+            {fact("Gefressen", today.food, "food", "food")}
+            {fact("Trainiert", today.training, "training", "training")}
+            {fact("Pipi", today.pee, "pee", "pee")}
+            {fact("Poopoo", today.poop, "poop", "poop")}
+          </Group>
         </>
       }
       bottom={
@@ -91,4 +111,8 @@ export function Start() {
 const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 8 },
   cell: { flex: 1 },
+  // the times right-aligned in one column, who beside them
+  since: { flex: 1, flexDirection: "row", justifyContent: "flex-end", alignItems: "baseline", gap: 10 },
+  when: { flexShrink: 0, fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  by: { width: 56, fontSize: 12, textAlign: "right" },
 });

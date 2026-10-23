@@ -11,11 +11,11 @@ import { signIn } from "./signed-in";
 test.beforeEach(stopEverything);
 test.afterEach(stopEverything);
 
-test("Start shows the four tiles and three big ones; one tap on Gassi gehen starts the walk with a running clock", async ({ page }) => {
+test("Start shows the five rows and three big tiles; one tap on Gassi gehen starts the walk with a running clock", async ({ page }) => {
   const token = await signIn(page);
   await page.goto("/");
 
-  for (const label of ["Draußen", "Gefressen", "Pipi", "Poopoo"]) await expect(page.getByTestId(`tile-${label}`)).toBeVisible();
+  for (const label of ["Draußen", "Gefressen", "Trainiert", "Pipi", "Poopoo"]) await expect(page.getByTestId(`tile-${label}`)).toBeVisible();
   await expect(page.getByRole("button", { name: "Futter geben" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Training starten" })).toBeVisible();
   await page.getByRole("button", { name: "Gassi gehen" }).dblclick(); // a double tap starts one walk
@@ -101,4 +101,20 @@ test("on the go fits a small and a big phone with its big buttons: Start, a walk
   await expect(page.getByRole("button", { name: "Fertig" })).toBeVisible();
   await expectFits(page, new URL(page.url()).pathname, "Fertig");
   expect(await height("Fertig")).toBe(72);
+});
+
+test("the day at a glance is one list: a row each for Draußen, Gefressen, Trainiert, Pipi, Poopoo, one height, the times in one column; a row opens Verlauf with its kind", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/");
+  const labels = ["Draußen", "Gefressen", "Trainiert", "Pipi", "Poopoo"];
+  const rows = await Promise.all(labels.map((l) => page.getByTestId(`tile-${l}`).boundingBox()));
+  for (let i = 1; i < rows.length; i++) {
+    expect(rows[i]!.y).toBeGreaterThan(rows[i - 1]!.y); // one under the other, in this order
+    expect(rows[i]!.height).toBe(rows[0]!.height);
+  }
+  const times = await Promise.all(labels.map((l) => page.getByTestId(`tile-${l}-since`).boundingBox()));
+  for (const t of times) expect(Math.round(t!.x + t!.width)).toBe(Math.round(times[0]!.x + times[0]!.width)); // right-aligned
+  await page.getByTestId("tile-Trainiert").click();
+  await expect(page).toHaveURL(`${BASE_URL}/verlauf?type=training`);
+  await expectFits(page, "/", "Gassi gehen");
 });
