@@ -4,19 +4,11 @@ import { FOOD_KINDS, FOOD_SHORT, type FoodKind } from "./entryTypes";
 import { type CanStock, cansOf, type Stock } from "./stock";
 import { utcToLocal } from "./time";
 
-const QUARTERS = ["", "¼", "½", "¾"];
-/** "11½", "2¾", "¼", "0": whole cans and quarters (the stock rounds down to quarters). */
-const halves = (cans: number): string => {
-  const whole = Math.floor(cans);
-  const part = QUARTERS[Math.round((cans - whole) * 4)] ?? "";
-  return `${whole === 0 && part ? "" : whole}${part}`;
-};
+/** "11 Dosen", "1 Dose", "0 Dosen": closed cans are whole. */
+export const formatCans = (cans: number): string => `${cans} ${cans === 1 ? "Dose" : "Dosen"}`;
 
-/** "11½ Dosen", "2¾ Dosen", "1 Dose", "½ Dose". */
-export const formatCans = (cans: number): string => `${halves(cans)} ${cans > 0 && cans <= 1 ? "Dose" : "Dosen"}`;
-
-/** One can size's count: "3 × 400 g", "2¾ × 800 g". */
-export const formatCanCount = (s: Pick<CanStock, "unitG" | "cans">): string => `${halves(s.cans)} × ${s.unitG} g`;
+/** One can size's count: "3 × 400 g". */
+export const formatCanCount = (s: Pick<CanStock, "unitG" | "cans">): string => `${s.cans} × ${s.unitG} g`;
 
 /** "4,4 kg" from 1 kg on, else "800 g". */
 export const formatWeight = (grams: number): string =>
@@ -27,12 +19,12 @@ export const parseDecimal = (v: string): number => (v.trim() ? Number(v.trim().r
 
 export type Portion = { foodKind: FoodKind; amountG: number };
 /** Each kind's last portion, and the can size the last wet feeding came out of (when it said). */
-type LastFood = { wet: number | null; dry: number | null; wetUnitG?: number | null };
+type LastFood = { wet: number | null; dry: number | null };
 
 /** What the food sheet offers when nothing else is known (no feeding yet). */
 export const DEFAULT_PORTION_G: Record<FoodKind, number> = { wet: 100, dry: 50 };
 
-/** The grams to start a feeding of `kind` with: that kind's last portion, else the newest of it in `recent`
+/** The grams per dog to start a feeding of `kind` with: that kind's last portion, else the newest of it in `recent`
  * (newest first), else a default. */
 export function portionFor(kind: FoodKind, recent: readonly Portion[], last: LastFood | null): number {
   return clampPortion(last?.[kind] ?? recent.find((p) => p.foodKind === kind)?.amountG ?? DEFAULT_PORTION_G[kind]);
@@ -47,22 +39,20 @@ export function prefillFood(recent: readonly Portion[], last: LastFood | null): 
   return { foodKind, amountG: portionFor(foodKind, recent, last) };
 }
 
-/** Shortcuts for the amount: the household's recent portions of this kind (newest first, no repeats), and for wet
- * food half a can and a whole can once the can size is known; at most four. */
-export function quickPortions(recent: readonly Portion[], kind: FoodKind, canSizeG: number | null): { label: string; amountG: number }[] {
-  const cans = kind === "wet" && canSizeG ? [{ label: "½ Dose", amountG: Math.round(canSizeG / 2) }, { label: "1 Dose", amountG: canSizeG }] : [];
-  const grams = [...new Set(recent.filter((p) => p.foodKind === kind).map((p) => p.amountG))].filter((g) => !cans.some((c) => c.amountG === g));
-  return [...grams.slice(0, 4 - cans.length).map((amountG) => ({ label: `${amountG} g`, amountG })), ...cans];
+/** Shortcuts for the amount: the household's recent portions of this kind (newest first, no repeats), at most four. */
+export function quickPortions(recent: readonly Portion[], kind: FoodKind): { label: string; amountG: number }[] {
+  return [...new Set(recent.filter((p) => p.foodKind === kind).map((p) => p.amountG))].slice(0, 4).map((amountG) => ({ label: `${amountG} g`, amountG }));
 }
 
-/** The can sizes a wet feeding can come out of (the known ones, smallest first; without the server's stock yet the
- * last used one), and the one to start with: the last used one while it is known, else the one bought last. */
-export function canChoices(stock: Stock | null, last: LastFood | null): { sizes: number[]; preset: number | null } {
-  const used = last?.wetUnitG ?? null;
-  if (!stock) return { sizes: used ? [used] : [], preset: used };
-  const sizes = stock.wet.sizes.map((s) => s.unitG);
-  const preset = [used, stock.wet.newestUnitG, stock.wet.sizes.findLast((s) => s.cans > 0)?.unitG, sizes.at(-1)].find((u) => u != null && sizes.includes(u)) ?? null;
-  return { sizes, preset };
+/** A feeding's grams for each of its dogs (a feeding is stored as what all of them got together). */
+export const perDog = (amountG: number, dogs: number): number => Math.round(amountG / Math.max(1, dogs));
+
+/** The sizes a can is opened from, with their closed cans: those with cans left (smallest first); with none left,
+ * every known size, so a can beyond the count can still be opened (the count then goes below zero). */
+export function openableSizes(stock: Stock): { unitG: number; cans: number }[] {
+  const all = stock.wet.sizes.map((s) => ({ unitG: s.unitG, cans: s.cans }));
+  const left = all.filter((s) => s.cans > 0);
+  return left.length ? left : all;
 }
 
 /** The stock of a kind in parts: what is left ("3 × 400 g · 2 × 800 g", "1,2 kg"; null when it isn't known), for wet
@@ -80,15 +70,6 @@ export function stockParts(stock: Stock, kind: FoodKind): { left: string | null;
   const days = s.daysLeft === null ? null : Math.round(s.daysLeft);
   const lasts = s.daysLeft === null || empty ? null : s.daysLeft < 0.5 ? "reicht weniger als einen Tag" : `reicht etwa ${days} ${days === 1 ? "Tag" : "Tage"}`;
   return { left, sizes, amount, lasts, empty };
-}
-
-/** The stock of a kind in one line: "Vorrat: noch 3 × 400 g · 2 × 800 g · reicht etwa 9 Tage", "Vorrat
- * aufgebraucht"; null when it isn't known. */
-export function stockLine(stock: Stock, kind: FoodKind): string | null {
-  const { left, lasts, empty } = stockParts(stock, kind);
-  if (empty) return "Vorrat aufgebraucht";
-  if (left === null) return null;
-  return `Vorrat: noch ${left}${lasts ? ` · ${lasts}` : ""}`;
 }
 
 /** Both kinds' stock in one line, the same form for each: "Nass: 3 × 400 g, 2 × 800 g · Trocken: 1,2 kg", "Nass:
@@ -110,7 +91,7 @@ export function countTitle(at: string, timeZone: string): string {
   return `Zählung vom ${local.slice(8, 10)}.${local.slice(5, 7)}., ${local.slice(11)}`;
 }
 
-/** What a wet count comes to ("2,8 kg"): its cans per size as typed ("2,75"); null while one isn't a number. */
+/** What a wet count comes to ("2,8 kg"): its cans per size as typed ("3"); null while one isn't a number. */
 export function countWeight(sizes: readonly { unitG: number; cans: string }[]): string | null {
   const cans = sizes.map((s) => parseDecimal(s.cans));
   return cans.some((n) => !Number.isFinite(n) || n < 0) ? null : formatWeight(sizes.reduce((g, s, i) => g + s.unitG * cans[i]!, 0));

@@ -56,17 +56,18 @@ export const RESTOCK_MESSAGES: FieldMessages = {
   unit: "Gramm oder Kilogramm?",
 };
 
-/** What is there now, counted by hand: wet in cans per can size, any number typed ("2,75" or 2.75 for opened cans;
- * every size at once, a size left out is 0; a size in two rows adds up), dry in g or kg. */
+/** What is there now, counted by hand: wet in whole closed cans per can size, typed ("3"; every size at once, a size
+ * left out is 0; a size in two rows adds up), dry in g or kg. */
 export const stockCountInput = z.discriminatedUnion("foodKind", [
   z
-    .object({ foodKind: z.literal("wet"), sizes: z.array(z.object({ unitG: canSize, cans: z.preprocess(decimal, z.number().min(0).max(1000)) })).min(1).max(20) })
+    // whole closed cans: an open can isn't counted
+    .object({ foodKind: z.literal("wet"), sizes: z.array(z.object({ unitG: canSize, cans: z.preprocess(decimal, z.number().int().min(0).max(1000)) })).min(1).max(20) })
     .transform((r) => ({ ...r, sizes: mergeSizes(r.sizes) })),
   dryAmount(0),
 ]);
 export const STOCK_COUNT_MESSAGES: FieldMessages = {
   foodKind: "Diese Futterart gibt es nicht.",
-  sizes: "Wie viele Dosen sind noch da? Eine Zahl, z. B. 2,75.",
+  sizes: "Wie viele geschlossene Dosen sind noch da? Eine ganze Zahl, z. B. 3.",
   unitG: "Welche Dosengröße? Ganze Gramm, bis 10000.",
   amount: "Wie viel ist noch da?",
   grams: "Wie viel ist noch da?",

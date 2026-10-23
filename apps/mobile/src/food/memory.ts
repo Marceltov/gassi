@@ -9,21 +9,19 @@ export type FoodFacts = { recent: Portion[]; last: Output<"lastFood"> | null; st
 /** How many of the newest feedings the portions are taken from. */
 export const RECENT = 20;
 
-const key = (personId: string) => `food.${personId}`;
+// "foodPerDog": the facts kept under "food." before #78 hold totals, not grams per dog, and are not read
+const key = (personId: string) => `foodPerDog.${personId}`;
 
 export function loadFacts(personId: string): FoodFacts {
   const s = loadKept(key(personId)) as FoodFacts | null;
-  if (!s || !Array.isArray(s.recent)) return { recent: [], last: null, stock: null };
-  // a stock kept by an older version (without can sizes) is left for the server's next answer
-  return Array.isArray(s.stock?.wet.sizes) ? s : { ...s, stock: null };
+  return s && Array.isArray(s.recent) ? s : { recent: [], last: null, stock: null };
 }
 
 export const saveFacts = (personId: string, facts: FoodFacts): void => saveKept(key(personId), facts);
 
-/** The facts after a feeding entered here (maybe still unsent): it is the newest portion and its kind's last, and
- * the can size it came out of (`unitG`, wet food) the last used one. */
-export function withFeeding(facts: FoodFacts, p: Portion, unitG: number | null = null): FoodFacts {
+/** The facts after a feeding entered here (maybe still unsent): it is the newest portion and its kind's last. */
+export function withFeeding(facts: FoodFacts, p: Portion): FoodFacts {
   const prev = facts.last;
-  const last = { wet: prev?.wet ?? null, dry: prev?.dry ?? null, wetUnitG: (p.foodKind === "wet" ? unitG : null) ?? prev?.wetUnitG ?? null, [p.foodKind]: p.amountG };
+  const last = { wet: prev?.wet ?? null, dry: prev?.dry ?? null, [p.foodKind]: p.amountG };
   return { ...facts, recent: [p, ...facts.recent].slice(0, RECENT), last };
 }

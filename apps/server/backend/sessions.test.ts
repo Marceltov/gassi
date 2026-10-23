@@ -351,11 +351,14 @@ describe("food", () => {
     expect([...all[0].dogIds].sort()).toEqual(active);
   });
 
-  test("a wet feeding keeps the can size it came out of; dry food has none", async () => {
+  test("a can opened is one wet entry of one can, for no dog, also when sent twice", async () => {
     const s = sessions();
-    await s.apply(HIRSCH, [cmd(5, { kind: "food", amountG: 400, foodKind: "wet", unitG: 800 }), cmd(6, { kind: "food", amountG: 40, foodKind: "dry", unitG: 800 })]);
-    const all = await new EntryRepository(db()).list({ type: "food" });
-    expect(all.map((e) => [e.foodKind, e.unitG])).toEqual([["dry", null], ["wet", 800]]);
+    const open = cmd(6, { kind: "can.open", unitG: 400 });
+    await s.apply(HIRSCH, [open]);
+    expect(await s.apply(HIRSCH, [open])).toEqual({ applied: [open.id], dropped: [] });
+    const all = await new EntryRepository(db()).list({ type: "opened" });
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ type: "opened", at: at(6), foodKind: "wet", unitG: 400, amountG: 400, dogIds: [], loggedBy: "marcel" });
   });
 });
 

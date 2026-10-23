@@ -13,6 +13,7 @@ export const TYPE_ICON: Record<EntryType, IconName> = {
   note: "note",
   restock: "restock",
   stockcheck: "stock",
+  opened: "stock",
 };
 
 /** The color of each entry type: the dot and strip of its row in Verlauf. */
@@ -26,4 +27,5 @@ export const TYPE_TONE: Record<EntryType, ListTone> = {
   note: "device",
   restock: "food",
   stockcheck: "food",
+  opened: "food",
 };

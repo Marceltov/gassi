@@ -213,7 +213,11 @@ class Step {
       }
       case "food":
         // the same kind of entry the diary logs, so stock and the usual portion see it
-        await this.create("food", c.at, null, await this.dogsFor(c.dogIds), { amountG: c.amountG, foodKind: c.foodKind, unitG: c.foodKind === "wet" ? (c.unitG ?? null) : null });
+        await this.create("food", c.at, null, await this.dogsFor(c.dogIds), { amountG: c.amountG, foodKind: c.foodKind, unitG: null });
+        return "applied";
+      case "can.open":
+        // one closed can less in Vorrat; the household's, so no dog
+        await this.create("opened", c.at, null, [], { amountG: c.unitG, foodKind: "wet", unitG: c.unitG });
         return "applied";
     }
   }

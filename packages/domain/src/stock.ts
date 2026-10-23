@@ -1,18 +1,18 @@
-// How much food is left. Per kind (wet in cans, dry by weight) the count starts at the latest "stockcheck" (the stock
-// corrected by hand), else at the first restock ever entered (from 0), else it is unknown. Later restocks add, later
-// feedings subtract, and for dry food so do treats that come out of it. A count below zero shows as 0 and asks for a
-// correction. "Reicht noch" divides what is left by the average daily use of the last 14 days (of fewer while the
-// count is younger than that).
+// How much food is left. Per kind (wet in closed cans, dry by weight) the count starts at the latest "stockcheck" (the
+// stock counted by hand), else at the first restock ever entered (from 0), else it is unknown. Later restocks add. For
+// dry food later feedings subtract, and so do treats that come out of it; for wet food each can opened ("opened")
+// subtracts one can, and feedings don't: a feeding names no can, and an open can isn't counted. A count below zero
+// shows as 0 and asks for a correction. "Reicht noch" divides what is left by the average daily grams fed of the last
+// 14 days (of fewer while the count is younger than that).
 //
-// Wet food is counted per can size (400 g and 800 g cans are not merged), with a total over the sizes. A wet count
-// sets every size at once: it is one stockcheck per size at the same time, and a size it leaves out is 0; a size
-// it has no cans of is retired until it is bought, counted or fed again. A feeding
-// names the can it came out of; one that doesn't (older data) comes out of the size bought most recently before it.
+// Wet food is counted per can size (400 g and 800 g cans are not merged), in whole cans, with a total over the sizes.
+// A wet count sets every size at once: it is one stockcheck per size at the same time, and a size it leaves out is 0;
+// a size it has no cans of is retired until it is bought, counted or opened again.
 import type { Entry } from "./entry";
 import type { FoodKind } from "./entryTypes";
 
 export type KindStock = { grams: number | null; daysLeft: number | null; belowZero: boolean };
-/** One can size: grams left (never below 0), cans (rounded down to ¼), whether it counts below 0, and when it was
+/** One can size: grams left in closed cans (never below 0), whole cans, whether it counts below 0, and when it was
  * last bought or counted with cans (null when neither). */
 export type CanStock = { unitG: number; grams: number; cans: number; belowZero: boolean; lastAt: string | null };
 /** `sizes`: every can size bought or counted, smallest first; `newestUnitG`: the size bought last. */
@@ -20,15 +20,8 @@ export type WetStock = KindStock & { sizes: CanStock[]; newestUnitG: number | nu
 export type Stock = { wet: WetStock; dry: KindStock };
 export type Treat = { at: string; grams: number };
 
-/** Grams lost to rounding ½ Dose (395 g → 198 g) that must not take a half can away. */
-const HALF_SLACK_G = 5;
-
-/** What a feeding takes out of cans of `unitG` grams: ½ Dose (stored as whole grams, 395 g → 198 g) is exactly half a
- * can, so that many halves don't drift; anything else is its grams. */
-export const canGrams = (grams: number, unitG: number): number => (grams === Math.round(unitG / 2) ? unitG / 2 : grams);
-
-/** Cans in `grams` of cans of `unitG` grams, rounded down to quarters (Ruling W), give or take a few grams. */
-export const cansOf = (grams: number, unitG: number): number => Math.max(0, Math.floor(((grams + HALF_SLACK_G) / unitG) * 4) / 4);
+/** Whole cans in `grams` of cans of `unitG` grams (an older count of 2,5 cans is 2 closed ones). */
+export const cansOf = (grams: number, unitG: number): number => Math.max(0, Math.floor(grams / unitG));
 
 const WINDOW_MS = 14 * 86_400_000;
 const DAY_MS = 86_400_000;
@@ -62,38 +55,36 @@ function dryStock(entries: readonly Entry[], treats: readonly Treat[], now: numb
 function wetStock(entries: readonly Entry[], now: number): WetStock {
   const sorted = [...entries].sort(byTime);
   const restocks = sorted.filter((e) => e.type === "restock" && e.unitG);
+  const opened = sorted.filter((e) => e.type === "opened" && e.unitG);
   const checkAt = sorted.filter((e) => e.type === "stockcheck").at(-1)?.at;
   const check = sorted.filter((e) => e.type === "stockcheck" && e.at === checkAt);
-  // the size an entry came out of: its own, else the one bought most recently before it (else any bought, else counted)
-  const fallback = restocks.at(-1)?.unitG ?? check.find((c) => c.unitG)?.unitG ?? null;
-  const sizeOf = (e: Entry) => e.unitG ?? restocks.filter((r) => r.at <= e.at).at(-1)?.unitG ?? fallback;
-  // the known sizes (Ruling V): those the latest count has cans of, and those bought, counted or fed after it; without a
-  // count every size bought (or fed). So a count that sets a size to 0 retires it, one eaten down to 0 stays.
-  const after = sorted.filter((e) => (checkAt ? e.at > checkAt : true) && (e.type === "restock" || (e.type === "food" && e.unitG)));
-  const sizesOf = (es: readonly Entry[]) => es.flatMap((e) => (sizeOf(e) ? [sizeOf(e)!] : []));
-  const units = [...new Set([...sizesOf(check.filter((c) => (c.amountG ?? 0) > 0)), ...sizesOf(after)])].sort((a, b) => a - b);
+  // the known sizes (Ruling V): those the latest count has cans of, and those bought or opened after it; without a
+  // count every size bought or opened. So a count that sets a size to 0 retires it, one opened down to 0 stays.
+  const after = [...restocks, ...opened].filter((e) => (checkAt ? e.at > checkAt : true));
+  const units = [...new Set([...check.filter((c) => (c.amountG ?? 0) > 0), ...after].flatMap((e) => (e.unitG ? [e.unitG] : [])))].sort((a, b) => a - b);
   const newestUnitG = restocks.at(-1)?.unitG ?? null;
   if (!units.length && !checkAt) return { grams: null, daysLeft: null, belowZero: false, sizes: [], newestUnitG };
 
-  const feedings = sorted.filter((e) => e.type === "food");
   const sizes = units.map((unitG): CanStock => {
-    const mine = (e: Entry) => sizeOf(e) === unitG;
+    const mine = (e: Entry) => e.unitG === unitG;
     // after a count: what it said for this size (0 when it left the size out); else from this size's first restock
     const from = checkAt ?? restocks.find(mine)?.at ?? "";
     const counts = (e: Entry) => mine(e) && (checkAt ? e.at > checkAt : e.at >= from);
-    const grams = sum(check.filter(mine)) + sum(restocks.filter(counts)) - feedings.filter(counts).reduce((g, e) => g + canGrams(e.amountG ?? 0, unitG), 0);
+    // whole closed cans: an older count of 2,5 cans counts 2
+    const counted = check.filter(mine).reduce((g, c) => g + cansOf(c.amountG ?? 0, unitG) * unitG, 0);
+    const grams = counted + sum(restocks.filter(counts)) - sum(opened.filter(counts));
     const left = Math.max(0, grams);
     const lastAt = [...restocks, ...check.filter((c) => (c.amountG ?? 0) > 0)].filter(mine).reduce<string | null>((t, e) => (t === null || e.at > t ? e.at : t), null);
     return { unitG, grams: left, cans: cansOf(left, unitG), belowZero: grams < 0, lastAt };
   });
   const left = sum(sizes);
   const countStart = checkAt ?? restocks[0]?.at ?? sorted[0]?.at ?? new Date(now).toISOString();
-  const use = feedings.map((e) => ({ at: e.at, grams: e.amountG ?? 0 }));
+  const use = sorted.filter((e) => e.type === "food").map((e) => ({ at: e.at, grams: e.amountG ?? 0 }));
   return { grams: left, daysLeft: daysLeft(left, use, countStart, now), belowZero: sizes.some((s) => s.belowZero), sizes, newestUnitG };
 }
 
 /** `entries`: all entries (other types are ignored); `treats`: the treats that come out of the dry food. */
 export function computeStock(input: { entries: readonly Entry[]; treats: readonly Treat[]; now: number }): Stock {
-  const of = (kind: FoodKind) => input.entries.filter((e) => e.foodKind === kind && (e.type === "food" || e.type === "restock" || e.type === "stockcheck"));
+  const of = (kind: FoodKind) => input.entries.filter((e) => e.foodKind === kind && (e.type === "food" || e.type === "restock" || e.type === "stockcheck" || e.type === "opened"));
   return { wet: wetStock(of("wet"), input.now), dry: dryStock(of("dry"), input.treats, input.now) };
 }

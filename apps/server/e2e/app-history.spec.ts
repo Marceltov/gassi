@@ -324,3 +324,26 @@ test("a walk's small map in Verlauf shows the walk, not the city around it, and 
   const left = async (id: number) => (await page.getByTestId(`entry-${id}-title`).boundingBox())!.x;
   expect(await left(walk.id)).toBe(await left(food.id));
 });
+
+test("an opened can shows in Verlauf and, deleted, goes back into Vorrat", async ({ page }) => {
+  const client = asHirsch();
+  const counted = await client.correctStock({ foodKind: "wet", sizes: [{ unitG: 400, cans: "3" }] });
+  made.push(...counted.entries.map((e) => e.id));
+  const key = `opened-${Date.now()}`;
+  await client.commands({ commands: [{ id: key, at: new Date(Date.parse(counted.entries[0].at) + 1000).toISOString(), kind: "can.open", unitG: 400 }] }); // after the count
+  const opened = (await client.entries({ type: "opened" })).entries[0];
+  made.push(opened.id);
+  expect((await client.stock()).wet.sizes.find((s) => s.unitG === 400)?.cans).toBe(2);
+
+  await signIn(page);
+  await page.goto("/verlauf");
+  await expect(page.getByTestId(`entry-${opened.id}-title`)).toHaveText("Dose aufgemacht");
+  await expect(page.getByTestId(`entry-${opened.id}-extra`)).toHaveText("400-g-Dose");
+  await page.getByTestId(`entry-${opened.id}`).click();
+  await expect(page.getByTestId("count-line")).toHaveText("400-g-Dose"); // which can, before deleting it
+  await page.getByRole("button", { name: "Löschen", exact: true }).click();
+  await page.getByRole("button", { name: "Ja, löschen" }).click();
+  await expect(page.getByTestId(`entry-${opened.id}`)).toHaveCount(0);
+  expect((await client.stock()).wet.sizes.find((s) => s.unitG === 400)?.cans).toBe(3);
+  await expectFits(page, "/mehr/vorrat", "Nassfutter");
+});

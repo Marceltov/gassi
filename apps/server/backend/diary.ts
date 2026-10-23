@@ -3,7 +3,7 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDogs, computeStock, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput, kgToGrams } from "@gassi/domain";
+import { checkDogs, computeStock, perDog, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput, kgToGrams } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
@@ -69,9 +69,9 @@ function parse<S extends z.ZodType>(schema: S, input: unknown, messages: FieldMe
   throw new InputError(messageFor(messages, result.error));
 }
 
-// Food, restocks and stock counts belong to one kind: without it they would count for neither stock.
+// Food, restocks, stock counts and opened cans belong to one kind: without it they would count for neither stock.
 const needsKind = (type: EntryType, kind: FoodKind | null) => {
-  if (!kind && (type === "food" || type === "restock" || type === "stockcheck")) throw new InputError("Welche Futterart?");
+  if (!kind && (type === "food" || type === "restock" || type === "stockcheck" || type === "opened")) throw new InputError("Welche Futterart?");
 };
 
 export type DiaryDeps = { db: DB; names: Names; timeZone: string; now: () => Date };
@@ -191,12 +191,15 @@ export class Diary {
     return true;
   }
 
-  /** The amount of the newest feeding of each kind, offered as the usual portion, and the can size of the newest wet
-   * feeding that named one, offered as the can to feed from. */
-  async lastFoodAmounts(): Promise<Record<FoodKind, number | null> & { wetUnitG: number | null }> {
+  /** The amount per dog of the newest feeding of each kind, offered as the usual portion. */
+  async lastFoodAmounts(): Promise<Record<FoodKind, number | null>> {
     const food = await this.entries.list({ type: "food" });
-    const last = (kind: FoodKind) => food.find((e) => e.foodKind === kind)?.amountG ?? null;
-    return { wet: last("wet"), dry: last("dry"), wetUnitG: food.find((e) => e.foodKind === "wet" && e.unitG)?.unitG ?? null };
+    // per dog, as the food sheet asks for it
+    const last = (kind: FoodKind) => {
+      const e = food.find((f) => f.foodKind === kind && f.amountG !== null);
+      return e ? perDog(e.amountG!, e.dogIds.length) : null;
+    };
+    return { wet: last("wet"), dry: last("dry") };
   }
 
   /** Bought food: wet as cans × grams per can, one restock per can size (together), dry in grams. */

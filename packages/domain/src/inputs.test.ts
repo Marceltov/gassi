@@ -6,14 +6,14 @@ const message = (schema: typeof restockInput | typeof stockCountInput, messages:
   return r.success ? null : messageFor(messages, r.error);
 };
 
-test("a wet count gives the cans per size, typed freely with a decimal comma", () => {
-  expect(stockCountInput.parse({ foodKind: "wet", sizes: [{ unitG: 400, cans: "2,75" }, { unitG: "800", cans: 0 }, { unitG: 200, cans: " 11 " }] })).toEqual({ foodKind: "wet", sizes: [{ unitG: 400, cans: 2.75 }, { unitG: 800, cans: 0 }, { unitG: 200, cans: 11 }] });
+test("a wet count gives the whole closed cans per size, typed freely", () => {
+  expect(stockCountInput.parse({ foodKind: "wet", sizes: [{ unitG: 400, cans: "3" }, { unitG: "800", cans: 0 }, { unitG: 200, cans: " 11 " }] })).toEqual({ foodKind: "wet", sizes: [{ unitG: 400, cans: 3 }, { unitG: 800, cans: 0 }, { unitG: 200, cans: 11 }] });
   expect(weightInput.parse({ kg: "12,4" }).kg).toBe(12.4);
-  const COUNT = "Wie viele Dosen sind noch da? Eine Zahl, z. B. 2,75.";
-  for (const cans of ["zwei", "", "-1", "1001"]) expect(message(stockCountInput, STOCK_COUNT_MESSAGES, { foodKind: "wet", sizes: [{ unitG: 400, cans }] }), cans).toBe(COUNT);
+  const COUNT = "Wie viele geschlossene Dosen sind noch da? Eine ganze Zahl, z. B. 3.";
+  for (const cans of ["zwei", "", "-1", "1001", "2,5"]) expect(message(stockCountInput, STOCK_COUNT_MESSAGES, { foodKind: "wet", sizes: [{ unitG: 400, cans }] }), cans).toBe(COUNT);
   expect(message(stockCountInput, STOCK_COUNT_MESSAGES, { foodKind: "wet", sizes: [] })).toBe(COUNT);
   // a size in two rows (a new row typed with a known size) adds up
-  expect(stockCountInput.parse({ foodKind: "wet", sizes: [{ unitG: 400, cans: "1,5" }, { unitG: 800, cans: 1 }, { unitG: 400, cans: 2 }] })).toEqual({ foodKind: "wet", sizes: [{ unitG: 400, cans: 3.5 }, { unitG: 800, cans: 1 }] });
+  expect(stockCountInput.parse({ foodKind: "wet", sizes: [{ unitG: 400, cans: "1" }, { unitG: 800, cans: 1 }, { unitG: 400, cans: 2 }] })).toEqual({ foodKind: "wet", sizes: [{ unitG: 400, cans: 3 }, { unitG: 800, cans: 1 }] });
 });
 
 test("dry food is entered in g or kg (with a decimal comma) and comes out in whole grams", () => {
@@ -33,7 +33,7 @@ test("what a check gives back passes the check again (the client sends it so)", 
     const once = restockInput.parse(input);
     expect(restockInput.parse(once)).toEqual(once);
   }
-  for (const input of [{ foodKind: "dry", amount: "250", unit: "g" }, { foodKind: "wet", sizes: [{ unitG: 400, cans: "2,75" }] }]) {
+  for (const input of [{ foodKind: "dry", amount: "250", unit: "g" }, { foodKind: "wet", sizes: [{ unitG: 400, cans: "3" }] }]) {
     const once = stockCountInput.parse(input);
     expect(stockCountInput.parse(once)).toEqual(once);
   }
