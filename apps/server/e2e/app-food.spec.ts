@@ -178,3 +178,24 @@ test("+ Dose aufgemacht: two cans in one feeding, each its own entry; × takes o
     for (const id of made) await client.deleteEntry({ id }).catch(() => undefined);
   }
 });
+
+test("the list of cans has a way back that keeps what was set", async ({ page }) => {
+  const client = asHirsch();
+  const made = (await client.correctStock({ foodKind: "wet", sizes: [{ unitG: 400, cans: "3" }] })).entries.map((e) => e.id);
+  try {
+    await signIn(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Futter geben" }).click();
+    const sheet = page.getByTestId("food-sheet");
+    await sheet.getByRole("tab", { name: "Nass" }).click();
+    await sheet.getByRole("button", { name: "10 g mehr" }).click();
+    const amount = await sheet.getByTestId("food-amount").textContent();
+    await sheet.getByRole("button", { name: "+ Dose aufgemacht" }).click();
+    await sheet.getByRole("button", { name: "Zurück" }).click();
+    await expect(sheet.getByText("Welche Dose aufgemacht?")).toHaveCount(0);
+    await expect(sheet.getByTestId("food-amount")).toHaveText(amount!);
+    await expect(sheet.getByText(/-g-Dose aufgemacht/)).toHaveCount(0);
+  } finally {
+    for (const id of made) await client.deleteEntry({ id }).catch(() => undefined);
+  }
+});

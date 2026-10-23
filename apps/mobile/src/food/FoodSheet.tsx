@@ -109,7 +109,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
     onClose();
   };
 
-  // the sizes take the sheet's place until one is chosen
+  // the sizes take the sheet's place until one is chosen or Zurück leads back
   if (choosingCan)
     return (
       <View testID="food-sheet" style={styles.form}>
@@ -126,6 +126,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
             },
           }))}
         />
+        <BigButton kind="neutral" size="s" label="Zurück" onPress={() => setChoosingCan(false)} />
       </View>
     );
   return (
