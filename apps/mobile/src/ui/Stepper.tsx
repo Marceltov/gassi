@@ -21,15 +21,19 @@ export function StepButton({ label, sign, disabled, small, onPress }: StepProps)
   );
 }
 
-/** An amount between − and +: `step` names one step for the screen reader ("10 g" weniger / mehr). */
-export function AmountStepper({ value, step, testID, onStep, atMin, atMax }: { value: string; step: string; testID?: string; onStep: (d: 1 | -1) => void; atMin: boolean; atMax: boolean }) {
+/** An amount between − and +: `step` names one step for the screen reader ("10 g" weniger / mehr), `sub` what the
+ * amount is of, under it ("je Hund"). */
+export function AmountStepper({ value, sub, step, testID, onStep, atMin, atMax }: { value: string; sub?: string; step: string; testID?: string; onStep: (d: 1 | -1) => void; atMin: boolean; atMax: boolean }) {
   const theme = useTheme();
   return (
     <View style={styles.row}>
       <StepButton label={`${step} weniger`} sign="−" disabled={atMin} onPress={() => onStep(-1)} />
-      <Text testID={testID} style={[styles.amount, { color: theme.ink }]}>
-        {value}
-      </Text>
+      <View style={styles.middle}>
+        <Text testID={testID} style={[styles.amount, { color: theme.ink }]}>
+          {value}
+        </Text>
+        {sub ? <Text style={[styles.sub, { color: theme.muted }]}>{sub}</Text> : null}
+      </View>
       <StepButton label={`${step} mehr`} sign="+" disabled={atMax} onPress={() => onStep(1)} />
     </View>
   );
@@ -37,7 +41,9 @@ export function AmountStepper({ value, step, testID, onStep, atMin, atMax }: { v
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  middle: { alignItems: "center" },
   amount: { fontSize: 30, fontWeight: "700" },
+  sub: { fontSize: 13 },
   big: { width: FIELD_HEIGHT, height: FIELD_HEIGHT, borderRadius: radius.tile, alignItems: "center", justifyContent: "center" },
   bigText: { fontSize: 22, fontWeight: "700" },
   small: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },

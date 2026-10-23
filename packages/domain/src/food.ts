@@ -32,7 +32,7 @@ type LastFood = { wet: number | null; dry: number | null; wetUnitG?: number | nu
 /** What the food sheet offers when nothing else is known (no feeding yet). */
 export const DEFAULT_PORTION_G: Record<FoodKind, number> = { wet: 100, dry: 50 };
 
-/** The grams to start a feeding of `kind` with: that kind's last portion, else the newest of it in `recent`
+/** The grams per dog to start a feeding of `kind` with: that kind's last portion, else the newest of it in `recent`
  * (newest first), else a default. */
 export function portionFor(kind: FoodKind, recent: readonly Portion[], last: LastFood | null): number {
   return clampPortion(last?.[kind] ?? recent.find((p) => p.foodKind === kind)?.amountG ?? DEFAULT_PORTION_G[kind]);
@@ -47,21 +47,23 @@ export function prefillFood(recent: readonly Portion[], last: LastFood | null): 
   return { foodKind, amountG: portionFor(foodKind, recent, last) };
 }
 
-/** Shortcuts for the amount: the household's recent portions of this kind (newest first, no repeats), and for wet
- * food half a can and a whole can once the can size is known; at most four. */
-export function quickPortions(recent: readonly Portion[], kind: FoodKind, canSizeG: number | null): { label: string; amountG: number }[] {
-  const cans = kind === "wet" && canSizeG ? [{ label: "½ Dose", amountG: Math.round(canSizeG / 2) }, { label: "1 Dose", amountG: canSizeG }] : [];
-  const grams = [...new Set(recent.filter((p) => p.foodKind === kind).map((p) => p.amountG))].filter((g) => !cans.some((c) => c.amountG === g));
-  return [...grams.slice(0, 4 - cans.length).map((amountG) => ({ label: `${amountG} g`, amountG })), ...cans];
+/** Shortcuts for the amount: the household's recent portions of this kind (newest first, no repeats), at most four. */
+export function quickPortions(recent: readonly Portion[], kind: FoodKind): { label: string; amountG: number }[] {
+  return [...new Set(recent.filter((p) => p.foodKind === kind).map((p) => p.amountG))].slice(0, 4).map((amountG) => ({ label: `${amountG} g`, amountG }));
 }
 
-/** The can sizes a wet feeding can come out of (the known ones, smallest first; without the server's stock yet the
- * last used one), and the one to start with: the last used one while it is known, else the one bought last. */
+/** A feeding's grams for each of its dogs (a feeding is stored as what all of them got together). */
+export const perDog = (amountG: number, dogs: number): number => Math.round(amountG / Math.max(1, dogs));
+
+/** The can sizes a wet feeding can come out of (the ones with cans left, smallest first; without any the known ones;
+ * without the server's stock yet the last used one), and the one to start with: the last used one while it is one of
+ * them, else the one bought last, else the largest. Only with two or more to choose from does the sheet ask. */
 export function canChoices(stock: Stock | null, last: LastFood | null): { sizes: number[]; preset: number | null } {
   const used = last?.wetUnitG ?? null;
   if (!stock) return { sizes: used ? [used] : [], preset: used };
-  const sizes = stock.wet.sizes.map((s) => s.unitG);
-  const preset = [used, stock.wet.newestUnitG, stock.wet.sizes.findLast((s) => s.cans > 0)?.unitG, sizes.at(-1)].find((u) => u != null && sizes.includes(u)) ?? null;
+  const left = stock.wet.sizes.filter((s) => s.cans > 0).map((s) => s.unitG);
+  const sizes = left.length ? left : stock.wet.sizes.map((s) => s.unitG);
+  const preset = [used, stock.wet.newestUnitG, sizes.at(-1)].find((u) => u != null && sizes.includes(u)) ?? null;
   return { sizes, preset };
 }
 

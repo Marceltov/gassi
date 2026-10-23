@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { buyingSizes, canChoices, countWeight, clampPortion, countLine, formSizes, mergeSizes, stillHidden, countTitle, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
+import { buyingSizes, canChoices, countWeight, clampPortion, countLine, formSizes, mergeSizes, stillHidden, countTitle, formatCanCount, perDog, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
 import type { CanStock, Stock, WetStock } from "./stock";
 
 const can = (unitG: number, cans: number): CanStock => ({ unitG, grams: cans * unitG, cans, belowZero: false, lastAt: null });
@@ -20,12 +20,17 @@ test("with less to go on: the recent portion of the kind, the kind that has a la
   expect(prefillFood([], null)).toEqual({ foodKind: "wet", amountG: 100 });
 });
 
-test("quick amounts: recent portions of the kind without repeats, and half and whole can for wet food", () => {
-  const recent = [wet(80), dry(50), wet(80), wet(40), wet(95)];
-  expect(quickPortions(recent, "wet", 400)).toEqual([{ label: "80 g", amountG: 80 }, { label: "40 g", amountG: 40 }, { label: "½ Dose", amountG: 200 }, { label: "1 Dose", amountG: 400 }]);
-  expect(quickPortions(recent, "wet", null).map((q) => q.amountG)).toEqual([80, 40, 95]);
-  expect(quickPortions(recent, "dry", 400)).toEqual([{ label: "50 g", amountG: 50 }]);
-  expect(quickPortions([wet(200)], "wet", 400).map((q) => q.label)).toEqual(["½ Dose", "1 Dose"]); // the same amount only once
+test("quick amounts: recent portions of the kind without repeats, at most four", () => {
+  const recent = [wet(80), dry(50), wet(80), wet(40), wet(95), wet(60), wet(70)];
+  expect(quickPortions(recent, "wet")).toEqual([{ label: "80 g", amountG: 80 }, { label: "40 g", amountG: 40 }, { label: "95 g", amountG: 95 }, { label: "60 g", amountG: 60 }]);
+  expect(quickPortions(recent, "dry")).toEqual([{ label: "50 g", amountG: 50 }]);
+});
+
+test("per dog: a feeding's grams shared by its dogs", () => {
+  expect(perDog(400, 2)).toBe(200);
+  expect(perDog(395, 2)).toBe(198);
+  expect(perDog(120, 1)).toBe(120);
+  expect(perDog(120, 0)).toBe(120); // a feeding always has a dog; nothing to share by otherwise
 });
 
 test("a can size's count: whole and half cans × grams", () => {
@@ -66,7 +71,7 @@ test("a wet count comes to its cans times their sizes, as typed; not while a cou
   expect(countWeight([{ unitG: 400, cans: "zwei" }])).toBeNull();
 });
 
-test("the can sizes to feed from: the known ones, pre-set to the last used one, else the one bought last", () => {
+test("the can sizes to feed from: the ones with cans left, pre-set to the last used one, else the one bought last", () => {
   const stock: Stock = { wet: wetStock([can(400, 3), can(800, 2)], { newestUnitG: 400 }), dry: { grams: null, daysLeft: null, belowZero: false } };
   expect(canChoices(stock, { wet: 100, dry: null, wetUnitG: 800 })).toEqual({ sizes: [400, 800], preset: 800 });
   expect(canChoices(stock, { wet: 100, dry: null, wetUnitG: null })).toEqual({ sizes: [400, 800], preset: 400 });
@@ -74,6 +79,9 @@ test("the can sizes to feed from: the known ones, pre-set to the last used one, 
   expect(canChoices({ ...stock, wet: wetStock([can(400, 1)], { newestUnitG: null }) }, null)).toEqual({ sizes: [400], preset: 400 });
   expect(canChoices(null, { wet: 100, dry: null, wetUnitG: 800 })).toEqual({ sizes: [800], preset: 800 }); // nothing kept from the server yet
   expect(canChoices({ ...stock, wet: UNKNOWN_WET }, null)).toEqual({ sizes: [], preset: null });
+  // a size without cans left is not offered, while another has some; with none left, all known ones
+  expect(canChoices({ ...stock, wet: wetStock([can(400, 0), can(800, 2)], { newestUnitG: 400 }) }, { wet: 100, dry: null, wetUnitG: 400 })).toEqual({ sizes: [800], preset: 800 });
+  expect(canChoices({ ...stock, wet: wetStock([can(400, 0), can(800, 0)], { newestUnitG: 400 }) }, null)).toEqual({ sizes: [400, 800], preset: 400 });
 });
 
 test("a portion is a whole number from 1 to 5000 grams", () => {

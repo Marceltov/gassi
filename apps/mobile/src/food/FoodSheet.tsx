@@ -1,8 +1,9 @@
-// Futter geben: a sheet pre-filled with the newest feeding (kind and grams), a switch for wet or dry, for wet food the
-// can size it comes out of (pre-set to the last used one), − and + in 10 g steps, quick amounts (½ and 1 can of that
-// size), the stock, and one tap on Eintragen. All dogs unless some are switched off. It opens at once
-// from what was kept, and Eintragen goes through the queue, so it works without reception.
-import { canChoices, clampPortion, FOOD_MAX_G, type FoodKind, newId, portionFor, prefillFood, quickPortions, stockLine } from "@gassi/domain";
+// Futter geben: a sheet pre-filled with the newest feeding (kind and grams per dog), a switch for wet or dry, − and + in
+// 10 g steps per dog, quick amounts (recent portions per dog), the dogs, what they get together, the stock, and one tap
+// on "400 g eintragen" (all of it, for the dogs that are on). A wet feeding comes out of the can size last used; only
+// when two sizes have cans left does the sheet ask which. All dogs unless some are switched off. It opens at once from
+// what was kept, and Eintragen goes through the queue, so it works without reception.
+import { canChoices, clampPortion, FOOD_MAX_G, type FoodKind, newId, perDog, portionFor, prefillFood, quickPortions, stockLine } from "@gassi/domain";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
@@ -33,7 +34,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
   const [facts, setFacts] = useState<FoodFacts>(() => loadFacts(personId));
   const start = prefillFood(facts.recent, facts.last);
   const [kind, setKind] = useState<FoodKind>(start.foodKind);
-  const [amountG, setAmountG] = useState(start.amountG);
+  const [amountG, setAmountG] = useState(start.amountG); // per dog
   const [unitG, setUnitG] = useState(() => canChoices(facts.stock, facts.last).preset); // the can it comes out of
   const unitPicked = useRef(false); // the person chose the can: the server's answer must not change it
   const chosenKind = useRef(start.foodKind); // the kind now, for the server's answer
@@ -52,7 +53,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
       const fresh: FoodFacts = {
         last: last ?? kept.current.last,
         stock: stock ?? kept.current.stock,
-        recent: entries ? entries.entries.flatMap((e) => (e.foodKind && e.amountG ? [{ foodKind: e.foodKind, amountG: e.amountG }] : [])).slice(0, RECENT) : kept.current.recent,
+        recent: entries ? entries.entries.flatMap((e) => (e.foodKind && e.amountG ? [{ foodKind: e.foodKind, amountG: perDog(e.amountG, e.dogIds.length) }] : [])).slice(0, RECENT) : kept.current.recent,
       };
       saveFacts(personId, fresh);
       setFacts(fresh);
@@ -85,10 +86,14 @@ function FoodForm({ onClose }: { onClose: () => void }) {
     setKind(next);
     setAmountG(portionFor(next, facts.recent, facts.last));
   };
+  // what they get together stays within what one feeding may have
+  const most = Math.floor(FOOD_MAX_G / chosen.length);
   const set = (grams: number) => {
     edited.current = true;
-    setAmountG(clampPortion(grams));
+    setAmountG(Math.min(most, clampPortion(grams)));
   };
+  const portion = Math.min(most, amountG); // a dog switched on can lower what each may get
+  const total = portion * chosen.length;
 
   const cans = canChoices(facts.stock, facts.last).sizes;
   const can = kind === "wet" && unitG !== null && cans.includes(unitG) ? unitG : null;
@@ -96,12 +101,12 @@ function FoodForm({ onClose }: { onClose: () => void }) {
     unitPicked.current = true;
     setUnitG(next);
   };
-  const quick = quickPortions(facts.recent, kind, can);
+  const quick = quickPortions(facts.recent, kind);
   const stock = facts.stock ? stockLine(facts.stock, kind) : null;
   const submit = () => {
-    send({ id: submitId, at: new Date().toISOString(), kind: "food", foodKind: kind, amountG, ...(can ? { unitG: can } : {}), ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
+    send({ id: submitId, at: new Date().toISOString(), kind: "food", foodKind: kind, amountG: total, ...(can ? { unitG: can } : {}), ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
     // the next opening (maybe without reception) starts from this feeding, as it would from the server's answer
-    saveFacts(personId, withFeeding(facts, { foodKind: kind, amountG }, can));
+    saveFacts(personId, withFeeding(facts, { foodKind: kind, amountG: portion }, can));
     onClose();
   };
 
@@ -109,14 +114,10 @@ function FoodForm({ onClose }: { onClose: () => void }) {
     <View testID="food-sheet" style={styles.form}>
       <Text style={[styles.title, { color: theme.ink }]}>{active.length === 1 ? `Futter für ${active[0].name}` : "Futter geben"}</Text>
       <Segments options={FOOD_KIND_OPTIONS} value={kind} onChange={pick} kind="food" />
-      {kind === "wet" && cans.length ? (
-        <View testID="food-cans" style={styles.chips}>
-          {cans.map((u) => (
-            <Chip key={u} label={`${u}-g-Dose`} on={u === can} accent={theme.food} onPress={() => pickCan(u)} />
-          ))}
-        </View>
+      {kind === "wet" && cans.length > 1 && can !== null ? (
+        <Segments options={cans.map((u) => ({ value: String(u), label: `${u}-g-Dose` }))} value={String(can)} onChange={(u) => pickCan(Number(u))} kind="food" />
       ) : null}
-      <AmountStepper testID="food-amount" value={`${amountG} g`} step={`${STEP_G} g`} onStep={(d) => set(amountG + d * STEP_G)} atMin={amountG <= 1} atMax={amountG >= FOOD_MAX_G} />
+      <AmountStepper testID="food-amount" value={`${portion} g`} sub={active.length > 1 ? "je Hund" : undefined} step={`${STEP_G} g`} onStep={(d) => set(portion + d * STEP_G)} atMin={portion <= 1} atMax={portion + STEP_G > most} />
       {quick.length ? (
         <View style={styles.chips}>
           {quick.map((q) => (
@@ -127,14 +128,17 @@ function FoodForm({ onClose }: { onClose: () => void }) {
         </View>
       ) : null}
       {active.length > 1 ? (
-        <View style={styles.chips}>
-          {active.map((d) => (
-            <Chip key={d.id} label={d.name} color={d.color} on={!off.includes(d.id)} accent={theme.food} onPress={() => toggleDog(d.id)} />
-          ))}
-        </View>
+        <>
+          <View style={styles.chips}>
+            {active.map((d) => (
+              <Chip key={d.id} label={d.name} color={d.color} on={!off.includes(d.id)} accent={theme.food} onPress={() => toggleDog(d.id)} />
+            ))}
+          </View>
+          <Text testID="food-total" style={[styles.total, { color: theme.ink }]}>{`zusammen ${total} g`}</Text>
+        </>
       ) : null}
       {stock ? <Text testID="food-stock" style={[styles.stock, { color: theme.muted }]}>{stock}</Text> : null}
-      <BigButton kind="food" size="m" icon="check" label="Eintragen" onPress={submit} />
+      <BigButton kind="food" size="m" icon="check" label={`${total} g eintragen`} onPress={submit} />
     </View>
   );
 }
@@ -145,5 +149,6 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   quick: { flexGrow: 1, alignItems: "center", borderRadius: 10, borderWidth: 1, paddingVertical: 9, paddingHorizontal: 10 },
   quickText: { fontSize: 14, fontWeight: "600" },
+  total: { fontSize: 15, fontWeight: "600", textAlign: "center" },
   stock: { fontSize: 12, textAlign: "center" },
 });
