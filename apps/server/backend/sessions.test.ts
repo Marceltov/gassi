@@ -250,6 +250,27 @@ describe("notes and encounters", () => {
   });
 });
 
+describe("commands and treats without a training (#36)", () => {
+  test("a command is an entry with its repetition and treat; a treat alone too; an unknown exercise is dropped whole", async () => {
+    const s = sessions();
+    const catalog = new Catalog(db());
+    const warten = await catalog.addExercise("Warten");
+    const kaese = await catalog.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false });
+    await s.apply(HIRSCH, [
+      cmd(1, { kind: "quick.command", dogId: 1, exerciseId: warten.id, ok: true, treatKindId: kaese.id }),
+      cmd(2, { kind: "quick.command", dogId: 1, exerciseId: warten.id, ok: false }),
+      cmd(3, { kind: "quick.treat", dogId: 1, treatKindId: kaese.id }),
+    ]);
+    const all = await entries();
+    expect(all.map((e) => e.type)).toEqual(["treat", "command", "command"]);
+    const reps = await db().selectFrom("training_exercise").select(["entry_id", "ok_count", "fail_count"]).orderBy("entry_id").execute();
+    expect(reps.map((r) => [r.ok_count, r.fail_count])).toEqual([[1, 0], [0, 1]]);
+    expect((await db().selectFrom("training_treat").select("count").execute()).map((r) => r.count)).toEqual([1, 1]);
+    expect(await s.apply(HIRSCH, [cmd(4, { id: "gone", kind: "quick.command", dogId: 1, exerciseId: 999, ok: true })])).toEqual({ applied: [], dropped: ["gone"] });
+    expect(await entries()).toHaveLength(3);
+  });
+});
+
 describe("dogs", () => {
   const addDog = async (name: string, archived = false) =>
     (await db().insertInto("dog").values({ name, color: "#3a6fc0", archived: archived ? 1 : 0, created_at: "2026-01-01T00:00:00.000Z" }).returning("id").executeTakeFirstOrThrow()).id;

@@ -98,3 +98,41 @@ test("with two dogs, Begegnung asks the dog first, like Pipi, and the form is ab
   await sheet.getByRole("button", { name: "Eintragen" }).click();
   expect((await newest(token, "dogEncounter")).dogIds).toEqual([dogs[1].id]);
 });
+
+test("Kommando and Leckerli, on a walk and at home: one or two taps, counted like a training's", async ({ page }) => {
+  const restore = await onlyOneDog();
+  const api = asHirsch();
+  const warten = await api.addExercise({ name: `Warten ${Date.now()}` });
+  const kaese = await api.addTreatKind({ name: `Käse ${Date.now()}`, gramsPerPiece: 2, fromDry: false });
+  try {
+    const token = await signIn(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Gassi gehen" }).click();
+    await page.getByRole("button", { name: "Kommando", exact: true }).click();
+    const command = page.getByTestId("command-sheet");
+    await command.getByRole("button", { name: warten.name }).click();
+    await command.getByRole("button", { name: `+ 1 ${kaese.name}` }).click();
+    await expect(command.getByRole("button", { name: `+ 1 ${kaese.name}` })).toHaveAttribute("aria-pressed", "true");
+    await command.getByRole("button", { name: "klappt", exact: true }).click();
+    await expect(page.getByTestId("walk-taps")).toContainText(`Kommando · ${warten.name} ✓ · 1 Leckerli`);
+    const entry = await newest(token, "command");
+    expect(entry).toMatchObject({ exercises: [{ name: warten.name, ok: 1, fail: 0 }], treats: 1 });
+
+    // the next one has the exercise and treat preset: one tap
+    await page.getByRole("button", { name: "Kommando", exact: true }).click();
+    await command.getByRole("button", { name: "klappt nicht" }).click();
+    await expect(page.getByTestId("walk-taps")).toContainText(`Kommando · ${warten.name} ✗`);
+    made.push((await newest(token, "command")).id);
+    await page.getByRole("button", { name: "Zuhause" }).click();
+
+    // at home: Leckerli asks the kind, the last one marked
+    await page.goto("/");
+    await page.getByRole("button", { name: "Leckerli", exact: true }).click();
+    await page.getByTestId("treat-sheet").getByRole("button", { name: kaese.name }).click();
+    expect((await newest(token, "treat")).treatCounts).toEqual([{ treatKindId: kaese.id, count: 1 }]);
+  } finally {
+    await api.updateExercise({ id: warten.id, archived: true });
+    await api.updateTreatKind({ id: kaese.id, archived: true });
+    await restore();
+  }
+});

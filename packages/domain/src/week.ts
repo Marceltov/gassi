@@ -4,6 +4,7 @@
 // per-person sums can add up to more than the total; feedings and trainings count for whoever logged them (trainings
 // have no walkers). A walk or training still running counts up to now.
 import type { Entry } from "./entry";
+import { isPractice } from "./entryTypes";
 import type { ExerciseTotal } from "./exerciseTotals";
 import { dayBounds, dayOf } from "./time";
 
@@ -96,7 +97,7 @@ export function weekView({ entries, walkers, trainings, tracks, names, monday, t
       if (startsInWeek) person(e.loggedBy).feedings++;
       continue;
     }
-    if (e.type !== "walk" && e.type !== "training") continue;
+    if (e.type !== "walk" && !isPractice(e.type)) continue;
     const until = e.endedAt ? Date.parse(e.endedAt) : e.clientKey ? now : at;
     const min = minutes(Math.max(0, Math.min(until, week.end) - Math.max(at, week.start)));
     if (e.type === "walk") {
@@ -112,8 +113,11 @@ export function weekView({ entries, walkers, trainings, tracks, names, monday, t
     } else {
       if (!startsInWeek) continue;
       const p = person(e.loggedBy);
-      p.trainings++;
-      p.trainingMin += min;
+      // a command or treat without a training (#36) counts in the exercises and treats, not as a training
+      if (e.type === "training") {
+        p.trainings++;
+        p.trainingMin += min;
+      }
       const t = trainings[e.id];
       for (const x of t?.exercises ?? []) {
         const total = exercises.get(x.name) ?? { name: x.name, ok: 0, fail: 0 };

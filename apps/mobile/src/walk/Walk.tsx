@@ -1,6 +1,6 @@
 // The running walk ("Runde"): one hand holds the leash, the thumb taps. On top the clock, who walks with which dogs
 // (a chip taps them off, "+" adds), and what happened so far; at the bottom Pipi, Markiert (for dogs that mark, #38) and
-// Poopoo, Begegnung (a person or a dog, #90, #37), Pause/Weiter and Training, Zuhause; with several dogs on the walk
+// Poopoo, Kommando, Leckerli and Begegnung (#36, #90, #37), Pause/Weiter and Training, Zuhause; with several dogs on the walk
 // each asks which one. A poop is logged at the tap and then asks how it was (#86), in a sheet like the dog's; closed,
 // it has none. A poop in the list asks again. Every tap goes through the queue and shows at once. When the walk is over
 // (ended here or on another phone), the screen leaves: to the summary after Zuhause, else to Start.
@@ -222,7 +222,17 @@ export function Walk() {
               <BigButton kind="poop" icon="poop" label={TYPE_LABEL.poop} stacked={marking} disabled={walkDogs.length === 0} onPress={() => tap("poop")} />
             </View>
           </View>
-          <BigButton kind="encounter" size="m" icon="people" label="Begegnung" disabled={walkDogs.length === 0} onPress={() => setLogging("encounter")} />
+          <View style={styles.row}>
+            <View style={styles.cell}>
+              <BigButton kind="training" size="m" icon="training" label="Kommando" stacked disabled={walkDogs.length === 0} onPress={() => setLogging("command")} />
+            </View>
+            <View style={styles.cell}>
+              <BigButton kind="training" size="m" icon="treat" label="Leckerli" stacked disabled={walkDogs.length === 0} onPress={() => setLogging("treat")} />
+            </View>
+            <View style={styles.cell}>
+              <BigButton kind="encounter" size="m" icon="people" label="Begegnung" stacked disabled={walkDogs.length === 0} onPress={() => setLogging("encounter")} />
+            </View>
+          </View>
           <View style={styles.row}>
             <View style={styles.cell}>
               <BigButton kind="neutral" size="m" icon={walk.paused ? "resume" : "pause"} label={walk.paused ? "Weiter" : "Pause"} onPress={pause} />

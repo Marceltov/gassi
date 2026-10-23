@@ -1,6 +1,6 @@
 // Start: the day at a glance on top as one list (#83): Draußen, Gefressen, Trainiert, Pipi, Poopoo, each since when and
 // who, the times in one column; three big tiles at the bottom: Gassi gehen across, Futter and Training side by side
-// below it, each with when it was last; under them Begegnung and Notiz, small (#90, #37, #91). A running walk or training shows its clock on its tile and is led back into. A
+// below it, each with when it was last; under them Kommando, Leckerli, Begegnung and Notiz, small (#36, #90, #37, #91). A running walk or training shows its clock on its tile and is led back into. A
 // row on top opens Verlauf filtered to its type.
 import { type EntryType, formatAgoShort, newId, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
@@ -22,6 +22,14 @@ import { useNow } from "./useNow";
 import { type Today, useToday } from "./useToday";
 
 type Entry = Today["walk"];
+
+// the small buttons under the tiles: what they start (log/LogSheet.tsx)
+const SMALL: [LogStart, string, IconName][] = [
+  ["command", "Kommando", "training"],
+  ["treat", "Leckerli", "treat"],
+  ["encounter", "Begegnung", "people"],
+  ["note", "Notiz", "note"],
+];
 type Shown = TileKind & EntryType;
 
 export function Start() {
@@ -105,12 +113,11 @@ export function Start() {
             </View>
           </View>
           <View style={styles.row}>
-            <View style={styles.cell}>
-              <BigButton kind="side" size="s" icon="people" label="Begegnung" onPress={() => setLogging("encounter")} />
-            </View>
-            <View style={styles.cell}>
-              <BigButton kind="side" size="s" icon="note" label="Notiz" onPress={() => setLogging("note")} />
-            </View>
+            {SMALL.map(([start, label, icon]) => (
+              <View key={start} style={styles.cell}>
+                <BigButton kind="side" size="s" icon={icon} label={label} stacked onPress={() => setLogging(start)} />
+              </View>
+            ))}
           </View>
           <FoodSheet open={foodOpen} onClose={() => setFoodOpen(false)} />
           <Logging start={logging} dogIds={dogs.filter((d) => !d.archived).map((d) => d.id)} place="home" onDone={() => setLogging(null)} />

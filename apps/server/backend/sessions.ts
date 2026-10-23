@@ -10,7 +10,7 @@
 //   alias of the running walk, so its later taps land there. A start arriving after the stop joins the walk that was
 //   running at its time. Trainings do the same; a training started on a walk that has since ended ends with it.
 import { sql, type Kysely } from "kysely";
-import { checkDetails, checkDogs, type Command, type Consistency, type Entry, type EntryDetails, withDetail, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, keepsOne, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView, withinWalk } from "@gassi/domain";
+import { checkDetails, checkDogs, type Command, isPractice, type Consistency, type Entry, type EntryDetails, withDetail, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, keepsOne, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView, withinWalk } from "@gassi/domain";
 import type { DB } from "./db/open";
 import type { Schema } from "./db/schema";
 import { DogRepository } from "./dogs";
@@ -36,8 +36,11 @@ export type WalkSummary = {
   poops: Tap[];
   logged: Logged[]; // oldest first
 };
-/** A note or an encounter during a walk (#91, #37, #90). */
-export type Logged = { id: number; at: string; type: "note" | "dogEncounter" | "personEncounter"; dogId: number | null; note: string | null; details: EntryDetails | null };
+/** A note, an encounter, a command or a treat during a walk (#91, #37, #90, #36); a command's repetition and the
+ * treats are named. */
+export type Logged = { id: number; at: string; type: LoggedType; dogId: number | null; note: string | null; details: EntryDetails | null; exercises: ExerciseTotal[]; treats: { name: string; count: number }[] };
+type LoggedType = "note" | "dogEncounter" | "personEncounter" | "command" | "treat";
+const LOGGED: readonly string[] = ["note", "dogEncounter", "personEncounter", "command", "treat"] satisfies LoggedType[];
 /** A pee, marking or poop during a walk: its entry, when, which dog, and a poop's consistency. */
 export type Tap = { id: number; at: string; dogId: number; consistency: Consistency | null };
 
@@ -105,10 +108,15 @@ export class Sessions {
       pees: taps(during, "pee"),
       marks: taps(during, "mark"),
       poops: taps(during, "poop"),
-      logged: during
-        .filter((e): e is Entry & { type: Logged["type"] } => e.type === "note" || e.type === "dogEncounter" || e.type === "personEncounter")
-        .reverse()
-        .map((e) => ({ id: e.id, at: e.at, type: e.type, dogId: e.dogIds[0] ?? null, note: e.note, details: e.details })),
+      logged: await Promise.all(
+        during
+          .filter((e): e is Entry & { type: LoggedType } => LOGGED.includes(e.type))
+          .reverse()
+          .map(async (e) => {
+            const done = isPractice(e.type) ? await this.trainingSummary(e, end) : { exercises: [], treats: [] };
+            return { id: e.id, at: e.at, type: e.type, dogId: e.dogIds[0] ?? null, note: e.note, details: e.details, exercises: done.exercises, treats: done.treats };
+          }),
+      ),
     };
   }
 
@@ -237,6 +245,18 @@ class Step {
         const details = c.details && Object.keys(c.details).length ? c.details : null;
         if (checkDogs(c.type, dogIds) || checkDetails(c.type, details)) return "dropped";
         await this.entries.create({ type: c.type, at: c.at, endedAt: null, amountG: null, foodKind: null, unitG: null, note: c.note || null, details, dogIds, loggedBy: this.user.id });
+        return "applied";
+      }
+      case "quick.command":
+      case "quick.treat": {
+        // a repetition and a treat without a training (#36): an entry of their own, with the same rows a training has
+        if (!(await this.activeDogs()).includes(c.dogId)) return "dropped";
+        const e = await this.create(c.kind === "quick.command" ? "command" : "treat", c.at, null, [c.dogId]);
+        const done = c.kind === "quick.command" ? await this.rep(e, c.exerciseId, c.dogId, c.ok, 1) : "applied";
+        if (done === "dropped" || (c.treatKindId !== undefined && (await this.treat(e, c.treatKindId, 1)) === "dropped")) {
+          await this.entries.remove(e.id); // an exercise or treat kind that is gone: nothing half
+          return "dropped";
+        }
         return "applied";
       }
       case "food":

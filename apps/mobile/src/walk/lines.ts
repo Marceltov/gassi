@@ -1,7 +1,7 @@
 // How a training on a walk reads in the walk's list and its summary: "Training · 4 Min. · Sitz 4/5 · 3 Leckerli",
 // with the training screen's parts (@gassi/domain); the walk's taps and trainings in one list by time, and how many of
 // each: "2× Pipi · 5× markiert · 1× Poopoo · 1 Training".
-import { detailLine, formatMinutes, trainingParts, TYPE_LABEL } from "@gassi/domain";
+import { commandLine, detailLine, formatMinutes, trainingParts, TYPE_LABEL } from "@gassi/domain";
 import type { Tap, WalkSummary } from "./taps";
 
 type Training = WalkSummary["trainings"][number];
@@ -11,12 +11,15 @@ export function trainingLine(t: Training): string {
   return ["Training", formatMinutes(t.min), ...trainingParts(t.exercises, treats)].join(" · ");
 }
 
-/** A tap in the walk's list: "Poopoo · weich", "Hundebegegnung · 2 fiept · nah", "Notiz · Matsch am Bach", with the
+/** A tap in the walk's list: "Poopoo · weich", "Hundebegegnung · 2 fiept · nah", "Kommando · Warten ✓ · 1 Leckerli",
+ * "Leckerli · Käse", "Notiz · Matsch am Bach", with the
  * dog's name when several dogs walk ("Pipi · Toffee"). */
 export function tapLine(tap: Tap, dogName: string | null): string {
   // a poop's consistency comes as its own field (the walk summary's), the others' details whole
   const details = detailLine(tap.type, tap.type === "poop" ? (tap.consistency ? { consistency: tap.consistency } : null) : (tap.details ?? null));
-  return [TYPE_LABEL[tap.type], details, tap.type === "note" ? (tap.note ?? "") : "", dogName ?? ""].filter(Boolean).join(" · ");
+  const treats = tap.treats ?? [];
+  const practice = tap.type === "command" ? commandLine(tap.exercises ?? [], treats.reduce((n, t) => n + t.count, 0)) : tap.type === "treat" ? treats.map((t) => t.name).join(", ") : "";
+  return [TYPE_LABEL[tap.type], details, practice, tap.type === "note" ? (tap.note ?? "") : "", dogName ?? ""].filter(Boolean).join(" · ");
 }
 
 /** How many pees, markings, poops and trainings a walk had, the ones it had: "2× Pipi · 5× markiert · 1× Poopoo ·

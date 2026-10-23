@@ -27,7 +27,9 @@ export function factOf(entry: Entry, form: Form, names: Names): Fact | null {
     case "mark":
     case "poop":
     case "dogEncounter":
-    case "personEncounter": {
+    case "personEncounter":
+    case "command":
+    case "treat": {
       const ms = Date.parse(form.at);
       const day = new Intl.DateTimeFormat("de-DE", { timeZone: names.timeZone, weekday: "short", day: "2-digit", month: "2-digit" }).format(ms);
       return { big: clockTime(ms, names.timeZone), sub: `${form.dogIds.map(names.dogName).join(", ")} · ${day}` };

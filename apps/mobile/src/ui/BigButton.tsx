@@ -28,7 +28,9 @@ type Props = {
 
 export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, disabled, stacked, size = "xl" }: Props) {
   const theme = useTheme();
-  const { height, font, icon: iconSize } = sizes[size];
+  const { height, font: full, icon: iconSize } = sizes[size];
+  // four small ones side by side (Start's) need a smaller word under their icon
+  const font = stacked && size === "s" ? 12 : full;
   const look = lookOf(kind, theme, !!disabled);
   return (
     <Pressable

@@ -3,7 +3,7 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDetails, checkDogs, type EntryDetails, computeStock, perDog, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput, kgToGrams } from "@gassi/domain";
+import { checkDetails, checkDogs, isPractice, type EntryDetails, computeStock, perDog, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput, kgToGrams } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
@@ -147,7 +147,7 @@ export class Diary {
     const { reps, treats } = parse(trainingEditInput.omit({ id: true }), input, ENTRY_MESSAGES);
     const training = await this.entries.get(id);
     if (!training) return null;
-    if (training.type !== "training") throw new InputError("Das ist kein Training.");
+    if (!isPractice(training.type)) throw new InputError("Das ist kein Training.");
     const { db } = this.deps;
     const [exerciseIds, kinds] = await Promise.all([
       db.selectFrom("exercise").select("id").execute(),
@@ -265,7 +265,7 @@ export class Diary {
     const entries = await this.entries.list({ since: iso(start), until: iso(end), overlapping: true });
     const d = await this.details(entries);
     const walkers = Object.fromEntries(d.walkers);
-    const trainings: WeekInput["trainings"] = Object.fromEntries(entries.filter((e) => e.type === "training").map((e) => [e.id, { exercises: d.exercises.get(e.id) ?? [], treats: d.treats.get(e.id) ?? 0 }]));
+    const trainings: WeekInput["trainings"] = Object.fromEntries(entries.filter((e) => isPractice(e.type)).map((e) => [e.id, { exercises: d.exercises.get(e.id) ?? [], treats: d.treats.get(e.id) ?? 0 }]));
     const tracks: WeekInput["tracks"] = Object.fromEntries([...d.tracks].map(([id, t]) => [id, { distanceM: t.metrics.distanceM, route: simplify(t.points, ROUTE_POINTS) }]));
     return weekView({ entries, walkers, trainings, tracks, names, monday, timeZone, now });
   }
@@ -308,7 +308,8 @@ export class Diary {
   private async details(entries: readonly Entry[]): Promise<Details> {
     const { db } = this.deps;
     const ids = (type: EntryType) => entries.filter((e) => e.type === type).map((e) => e.id);
-    const [walkIds, trainingIds] = [ids("walk"), ids("training")];
+    const walkIds = ids("walk");
+    const trainingIds = entries.filter((e) => isPractice(e.type)).map((e) => e.id);
     const [walkers, pauses, exercises, treats, tracks, during] = await Promise.all([
       walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "person_id"]).where("entry_id", "in", walkIds).orderBy(sql`rowid`).execute() : [],
       walkIds.length ? db.selectFrom("walk_pause").select(["entry_id", "started_at", "ended_at"]).where("entry_id", "in", walkIds).execute() : [],
@@ -342,16 +343,16 @@ export class Diary {
     const endOf = (w: Entry) => w.endedAt ?? now;
     const since = walks.reduce((min, w) => (w.at < min ? w.at : min), walks[0].at);
     const until = walks.reduce((max, w) => (endOf(w) > max ? endOf(w) : max), endOf(walks[0]));
-    const inside = (await this.entries.list({ since, until })).filter((e) => e.type === "pee" || e.type === "mark" || e.type === "poop" || e.type === "training");
-    const trainingIds = inside.filter((e) => e.type === "training").map((e) => e.id);
+    const inside = (await this.entries.list({ since, until })).filter((e) => e.type === "pee" || e.type === "mark" || e.type === "poop" || e.type === "training" || e.type === "command");
+    const trainingIds = inside.filter((e) => e.type === "training" || e.type === "command").map((e) => e.id);
     const reps = trainingIds.length
       ? await this.deps.db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute()
       : [];
     return new Map(
       walks.map((w) => {
         const mine = inside.filter((e) => withinWalk(e.at, w.at, endOf(w)));
-        // oldest training first, as the summary lists them
-        const trainings = mine.filter((e) => e.type === "training").reverse();
+        // oldest training (or command, #36) first, as the summary lists them
+        const trainings = mine.filter((e) => e.type === "training" || e.type === "command").reverse();
         const rows = trainings.flatMap((t) => reps.filter((r) => r.entry_id === t.id).map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count })));
         const count = (type: EntryType) => mine.filter((e) => e.type === type).length;
         return [w.id, { pees: count("pee"), marks: count("mark"), poops: count("poop"), exercises: exerciseTotals(rows) }];
@@ -384,7 +385,7 @@ export class Diary {
         walkerIds: d.walkers.get(e.id) ?? [],
         pauseMin: isWalk && pauses.length ? Math.round(pausedWithin(pauses, e.at, e.endedAt ?? now) / 60_000) : isWalk && e.clientKey ? 0 : null,
         exercises: d.exercises.get(e.id) ?? [],
-        treats: e.type === "training" ? (d.treats.get(e.id) ?? 0) : null,
+        treats: isPractice(e.type) ? (d.treats.get(e.id) ?? 0) : null,
         reps: d.reps.get(e.id) ?? [],
         treatCounts: d.treatCounts.get(e.id) ?? [],
         distanceM: track?.metrics.distanceM ?? null,
