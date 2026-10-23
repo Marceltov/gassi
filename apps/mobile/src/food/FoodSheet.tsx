@@ -1,6 +1,6 @@
 // Futter geben: a sheet pre-filled with the newest feeding (kind and grams per dog), a switch for wet or dry, − and + in
-// 10 g steps per dog, quick amounts (recent portions per dog), the dogs, what they get together, the stock, and one tap
-// on "400 g eintragen" (all of it, for the dogs that are on). A wet feeding comes out of the can size last used; only
+// 10 g steps per dog, quick amounts (recent portions per dog), the dogs, the stock, and one tap on "400 g eintragen",
+// which says what they get together (for the dogs that are on). A wet feeding comes out of the can size last used; only
 // when two sizes have cans left does the sheet ask which. All dogs unless some are switched off. It opens at once from
 // what was kept, and Eintragen goes through the queue, so it works without reception.
 import { canChoices, clampPortion, FOOD_MAX_G, type FoodKind, newId, perDog, portionFor, prefillFood, quickPortions, stockLine } from "@gassi/domain";
@@ -128,14 +128,11 @@ function FoodForm({ onClose }: { onClose: () => void }) {
         </View>
       ) : null}
       {active.length > 1 ? (
-        <>
-          <View style={styles.chips}>
-            {active.map((d) => (
-              <Chip key={d.id} label={d.name} color={d.color} on={!off.includes(d.id)} accent={theme.food} onPress={() => toggleDog(d.id)} />
-            ))}
-          </View>
-          <Text testID="food-total" style={[styles.total, { color: theme.ink }]}>{`zusammen ${total} g`}</Text>
-        </>
+        <View style={styles.chips}>
+          {active.map((d) => (
+            <Chip key={d.id} label={d.name} color={d.color} on={!off.includes(d.id)} accent={theme.food} onPress={() => toggleDog(d.id)} />
+          ))}
+        </View>
       ) : null}
       {stock ? <Text testID="food-stock" style={[styles.stock, { color: theme.muted }]}>{stock}</Text> : null}
       <BigButton kind="food" size="m" icon="check" label={`${total} g eintragen`} onPress={submit} />
@@ -149,6 +146,5 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   quick: { flexGrow: 1, alignItems: "center", borderRadius: 10, borderWidth: 1, paddingVertical: 9, paddingHorizontal: 10 },
   quickText: { fontSize: 14, fontWeight: "600" },
-  total: { fontSize: 15, fontWeight: "600", textAlign: "center" },
   stock: { fontSize: 12, textAlign: "center" },
 });

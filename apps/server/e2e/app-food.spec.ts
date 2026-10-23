@@ -121,7 +121,7 @@ test("a wet feeding comes out of the last used can; the sheet asks which only wh
   }
 });
 
-test("with two dogs the grams are per dog: the sheet says what they get together, a dog switched off gets nothing", async ({ page }) => {
+test("with two dogs the grams are per dog: the button says what they get together, a dog switched off gets nothing", async ({ page }) => {
   const dogs = (await asHirsch().dogs()).dogs.filter((d) => !d.archived);
   test.skip(dogs.length !== 2, "needs exactly two dogs");
   await feed(300, "dry"); // both dogs: 150 g each
@@ -131,11 +131,10 @@ test("with two dogs the grams are per dog: the sheet says what they get together
   const sheet = page.getByTestId("food-sheet");
   await expect(sheet.getByTestId("food-amount")).toHaveText("150 g");
   await expect(sheet.getByText("je Hund")).toBeVisible();
-  await expect(sheet.getByTestId("food-total")).toHaveText("zusammen 300 g");
+  await expect(sheet.getByRole("button", { name: "300 g eintragen" })).toBeVisible();
   await sheet.getByRole("button", { name: "10 g mehr" }).click();
-  await expect(sheet.getByTestId("food-total")).toHaveText("zusammen 320 g");
+  await expect(sheet.getByRole("button", { name: "320 g eintragen" })).toBeVisible();
   await sheet.getByRole("button", { name: dogs[1].name }).click(); // off
-  await expect(sheet.getByTestId("food-total")).toHaveText("zusammen 160 g");
   await sheet.getByRole("button", { name: "160 g eintragen" }).click();
   await expect(sheet).toBeHidden();
   const client = createClient({ baseUrl: BASE_URL, token });
