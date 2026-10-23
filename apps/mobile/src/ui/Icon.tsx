@@ -29,6 +29,8 @@ const SYMBOLS = {
   cross: sym("xmark", "close"),
   next: sym("chevron.right", "chevron_right"),
   back: sym("chevron.left", "chevron_left"),
+  expand: sym("arrow.up.left.and.arrow.down.right", "open_in_full"),
+  shrink: sym("arrow.down.right.and.arrow.up.left", "close_fullscreen"),
   add: sym("plus", "add"),
   invite: sym("person.badge.plus", "person_add"),
   treat: sym("gift.fill", "pet_supplies"),

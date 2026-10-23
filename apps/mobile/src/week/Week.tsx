@@ -1,14 +1,18 @@
 // Woche: the week's totals per person, a 0–24 h strip per day (walks, feedings, trainings) and all its routes on one
-// map, on top; arrows to the week before and after at the bottom for the thumb. A walk counts fully for each walker.
+// map. The week and the arrows to the week before and after stay on top as its title (#71); the map takes the height
+// that is left. A swipe sideways or ← → on a keyboard goes to the week before and after too. A walk counts fully for
+// each walker.
 import { addDays, formatMinutes, mondayOf, type PersonWeek, successRate, weekLabel } from "@gassi/domain";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useNow } from "../start/useNow";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { TrackMap } from "../map/TrackMap";
-import { space, useTheme } from "../theme";
+import { FIELD_HEIGHT, space, useTheme } from "../theme";
 import { TIME_ZONE } from "../time";
-import { BigButton } from "../ui/BigButton";
+import { Icon } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
+import { useArrowKeys } from "../ui/useArrowKeys";
+import { useSwipe } from "../ui/useSwipe";
 import { Strip, StripHours } from "./Strip";
 import { useWeek } from "./useWeek";
 
@@ -20,6 +24,12 @@ export function Week() {
   const [monday, setMonday] = useState(() => mondayOf(Date.now(), TIME_ZONE));
   const { week, stale, error } = useWeek(monday);
   const thisWeek = monday >= mondayOf(now, TIME_ZONE);
+  const before = useCallback(() => setMonday((m) => addDays(m, -7)), []);
+  const after = useCallback(() => {
+    if (!thisWeek) setMonday((m) => addDays(m, 7));
+  }, [thisWeek]);
+  const swipe = useSwipe(after, before);
+  useArrowKeys(before, after);
 
   const cell = (testID: string, text: string, flex: number, bold = false) => (
     <Text testID={testID} style={[styles.cell, { flex, color: bold ? theme.ink : theme.muted, fontWeight: bold ? "700" : "400" }]}>
@@ -64,30 +74,41 @@ export function Week() {
               ))}
             </View>
           </View>
-          {week.routes.length ? <TrackMap routes={week.routes.map((r) => r.route)} height={240} /> : null}
+          {week.routes.length ? <TrackMap routes={week.routes.map((r) => r.route)} height={{ min: 200 }} /> : null}
         </>
       ) : null}
     </>
   );
 
-  const bottom = (
+  const head = (
     <View style={styles.nav}>
-      <View style={styles.arrow}>
-        <BigButton kind="neutral" size="l" icon="back" label="" a11y="Vorherige Woche" onPress={() => setMonday(addDays(monday, -7))} />
-      </View>
+      <Arrow icon="back" label="Vorherige Woche" onPress={before} />
       <Text testID="week-heading" style={[styles.heading, { color: theme.ink }]}>
         {weekLabel(monday)}
       </Text>
-      <View style={styles.arrow}>
-        <BigButton kind="neutral" size="l" icon="next" label="" a11y="Nächste Woche" disabled={thisWeek} onPress={() => !thisWeek && setMonday(addDays(monday, 7))} />
-      </View>
+      <Arrow icon="next" label="Nächste Woche" disabled={thisWeek} onPress={after} />
     </View>
   );
 
-  return <Screen top={top} bottom={bottom} />;
+  return (
+    <View style={styles.screen} {...swipe}>
+      <Screen head={head} top={top} />
+    </View>
+  );
+}
+
+/** Just the arrow, no button around it. */
+function Arrow({ icon, label, disabled = false, onPress }: { icon: "back" | "next"; label: string; disabled?: boolean; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} hitSlop={8} style={({ pressed }) => [styles.arrow, { opacity: disabled ? 0.3 : pressed ? 0.6 : 1 }]}>
+      <Icon name={icon} size={30} color={theme.ink} />
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   line: { flexDirection: "row", gap: 4, alignItems: "center" },
   cell: { fontSize: 13 },
   head: { fontSize: 11 },
@@ -98,6 +119,6 @@ const styles = StyleSheet.create({
   swatch: { width: 10, height: 10, borderRadius: 3 },
   small: { fontSize: 12 },
   nav: { flexDirection: "row", alignItems: "center", gap: space.gap },
-  arrow: { flex: 1 },
-  heading: { flex: 2, textAlign: "center", fontSize: 17, fontWeight: "700" },
+  arrow: { width: FIELD_HEIGHT, height: FIELD_HEIGHT, alignItems: "center", justifyContent: "center" },
+  heading: { flex: 1, textAlign: "center", fontSize: 22, fontWeight: "700" },
 });

@@ -2,7 +2,8 @@
 // (`top`) scrolls when it doesn't fit (#71). All keep the gutter plus the safe area from the sides (the rounded
 // corners, a notch in landscape). The bottom keeps clear of the home indicator, except on a tab (every screen of the
 // signed-in app): the tab bar below does that. With `fill` the top doesn't scroll but takes the height that is there,
-// for a screen that scales to it (Gewicht).
+// for a screen that scales to it (Gewicht). In the scrolling top a part with `flex: 1` takes the height that is left
+// (Woche's map), and the top scrolls once it is at its least.
 import { BottomTabBarHeightContext } from "expo-router/tabs";
 import { type ReactNode, useContext } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -43,10 +44,10 @@ export function Screen({ head, top, bottom, topMin, fill, low }: { head?: ReactN
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   top: { flex: 1 },
-  topContent: { padding: space.gutter, gap: space.gap },
+  topContent: { flexGrow: 1, padding: space.gutter, gap: space.gap },
   fill: { overflow: "hidden" },
   head: { paddingTop: space.gutter, paddingBottom: space.gap, gap: space.gap },
   underHead: { paddingTop: 0 },
-  low: { flexGrow: 1, justifyContent: "flex-end" },
+  low: { justifyContent: "flex-end" },
   bottom: { flexShrink: 1, minHeight: 0, paddingTop: space.gap, gap: space.gap },
 });
