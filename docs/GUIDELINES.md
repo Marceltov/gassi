@@ -38,13 +38,16 @@ here in the same PR that follows it.
 ## Screens
 
 - **Big buttons only on the go** (#68): Start, the walk and the training keep their sizes; everywhere else a page's
-  main action is `m` (52) and side actions are `s` (44). The Futter sheet is not on the go.
+  main action is `m` (52) and side actions are `s` (44). Buttons side by side in one row share one height (the
+  larger one's). The Futter sheet is not on the go.
 - **Three zones** (#71): a page's title and what it shows stay at the top (`Screen`'s `head`); its controls stay at
   the bottom, bottom-aligned (`bottom`: switches and filters, side actions, the main action last); only what grows
   scrolls, between them (`top`), and only when it doesn't fit. Rows you read (a list) start under the title; rows you
   work in (Vorrat's counts) sit right above the controls. Rows in one list have the same height. Nothing is cut off to
   make a page fit; Gewicht scales to the height instead (`fill`, #69). `e2e/fit.ts` checks each page at 360×640 and
   430×932.
+- **A write that worked says nothing**: the screen shows what changed. A message above the buttons would move them;
+  only what went wrong is said there.
 - **Text fields are at least 16 px**: an iPhone zooms into a smaller one when it gets the focus. `e2e/fit.ts` checks it
   on every page it opens.
 

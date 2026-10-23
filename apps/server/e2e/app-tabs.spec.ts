@@ -53,7 +53,7 @@ test("Mehr's screens keep the tab bar with Mehr highlighted, also opened directl
   await signIn(page);
   await page.goto("/mehr/vorrat");
   await homeIndicator(page);
-  await expect(page.getByRole("tab", { name: "Nass" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Eingekauft" })).toBeVisible();
   await expectTabBar(page, "Mehr");
   await expect(page.getByRole("button", { name: "Zurück" })).toHaveCount(0);
   await tab(page, "Mehr").click(); // opened directly: the tab still leads to Mehr

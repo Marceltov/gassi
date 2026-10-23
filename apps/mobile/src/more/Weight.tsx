@@ -54,7 +54,7 @@ export function Weight() {
       await api.logWeight({ kg, ...dogIds });
       setKg("");
       reload();
-    }, "Eingetragen.");
+    });
   const openDay = (date: string) => {
     const weight = byDay.get(date);
     setMessage(null);

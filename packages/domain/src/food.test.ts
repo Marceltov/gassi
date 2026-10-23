@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { buyingSizes, canChoices, clampPortion, countLine, formSizes, mergeSizes, stillHidden, countTitle, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
+import { buyingSizes, canChoices, countWeight, clampPortion, countLine, formSizes, mergeSizes, stillHidden, countTitle, formatCanCount, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
 import type { CanStock, Stock, WetStock } from "./stock";
 
 const can = (unitG: number, cans: number): CanStock => ({ unitG, grams: cans * unitG, cans, belowZero: false, lastAt: null });
@@ -49,15 +49,21 @@ test("the stock line says what is left per can size and for how long", () => {
 
 test("the stock in parts, for the stock screen: per can size, the total, for how long, and whether it ran out", () => {
   const stock: Stock = { wet: wetStock([can(400, 3), can(800, 2)], { daysLeft: 9.2 }), dry: { grams: 300, daysLeft: 0.4, belowZero: false } };
-  expect(stockParts(stock, "wet")).toEqual({ left: "3 × 400 g · 2 × 800 g", sizes: ["3 × 400 g", "2 × 800 g"], total: "zusammen 2,8 kg", lasts: "reicht etwa 9 Tage", empty: false });
-  expect(stockParts({ ...stock, wet: wetStock([can(400, 0), can(800, 2.5)]) }, "wet")).toMatchObject({ sizes: ["2½ × 800 g"], total: "zusammen 2 kg" });
-  expect(stockParts(stock, "dry")).toEqual({ left: "300 g", sizes: [], total: null, lasts: "reicht weniger als einen Tag", empty: false });
-  expect(stockParts({ ...stock, dry: { grams: null, daysLeft: null, belowZero: false } }, "dry")).toEqual({ left: null, sizes: [], total: null, lasts: null, empty: false });
+  expect(stockParts(stock, "wet")).toEqual({ left: "3 × 400 g · 2 × 800 g", sizes: ["3 × 400 g", "2 × 800 g"], amount: "2,8 kg", lasts: "reicht etwa 9 Tage", empty: false });
+  expect(stockParts({ ...stock, wet: wetStock([can(400, 0), can(800, 2.5)]) }, "wet")).toMatchObject({ sizes: ["2½ × 800 g"], amount: "2 kg" });
+  expect(stockParts(stock, "dry")).toEqual({ left: "300 g", sizes: [], amount: "300 g", lasts: "reicht weniger als einen Tag", empty: false });
+  expect(stockParts({ ...stock, dry: { grams: null, daysLeft: null, belowZero: false } }, "dry")).toEqual({ left: null, sizes: [], amount: null, lasts: null, empty: false });
   expect(stockParts({ ...stock, dry: { grams: 0, daysLeft: 0, belowZero: true } }, "dry")).toMatchObject({ left: "0 g", lasts: null, empty: true });
-  expect(stockParts({ ...stock, wet: UNKNOWN_WET }, "wet")).toEqual({ left: null, sizes: [], total: null, lasts: null, empty: false });
+  expect(stockParts({ ...stock, wet: UNKNOWN_WET }, "wet")).toEqual({ left: null, sizes: [], amount: null, lasts: null, empty: false });
   // one size below zero doesn't make the other run out
   expect(stockParts({ ...stock, wet: wetStock([{ ...can(400, 0), belowZero: true }, can(800, 1)], { belowZero: true }) }, "wet")).toMatchObject({ sizes: ["1 × 800 g"], empty: false });
-  expect(stockParts({ ...stock, wet: wetStock([can(400, 0)]) }, "wet")).toMatchObject({ left: "0 Dosen", empty: true, total: null });
+  expect(stockParts({ ...stock, wet: wetStock([can(400, 0)]) }, "wet")).toMatchObject({ left: "0 Dosen", empty: true, amount: "0 g" });
+});
+
+test("a wet count comes to its cans times their sizes, as typed; not while a count isn't a number", () => {
+  expect(countWeight([{ unitG: 400, cans: "2,75" }, { unitG: 800, cans: "1" }])).toBe("1,9 kg");
+  expect(countWeight([{ unitG: 400, cans: "0" }])).toBe("0 g");
+  expect(countWeight([{ unitG: 400, cans: "zwei" }])).toBeNull();
 });
 
 test("the can sizes to feed from: the known ones, pre-set to the last used one, else the one bought last", () => {

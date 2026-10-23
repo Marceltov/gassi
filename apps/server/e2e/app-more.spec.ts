@@ -2,7 +2,7 @@
 // Geräte (sign out), the Garmin placeholder. And the installable web app: its manifest, the Apple tags, and the app
 // shell that opens without reception after the first visit. The server is shared: each test removes what it made.
 import { createClient } from "@gassi/api-client";
-import { formatCanCount, localToUtc, utcToLocal } from "@gassi/domain";
+import { localToUtc, utcToLocal } from "@gassi/domain";
 import { type BrowserContext, expect, type Locator, type Page, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
 import { expectFits } from "./fit";
@@ -96,155 +96,136 @@ test("Gewicht: a day last month is added, changed and deleted from the calendar;
   await expect(month).toHaveText(thisMonth!);
 });
 
+const savedCount = (page: Page) => page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
+const savedPurchase = (page: Page) => page.waitForResponse((r) => r.url().endsWith("/api/stock/restock") && r.request().method() === "POST");
+type Made = { entries: { id: number; unitG: number; amountG: number }[] };
+
+test("Vorrat: a card per kind with its amount and how long it lasts; the stock as rows right above + Eingekauft, which fit any phone", async ({ page }) => {
+  await signIn(page);
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [100, 200, 300, 400, 800].map((unitG) => ({ unitG, cans: 2 })) })).entries.map((e) => e.id));
+  await expectFits(page, "/mehr/vorrat", "Nassfutter");
+  await page.setViewportSize({ width: 360, height: 640 });
+  await expect(page.getByTestId("stock-wet")).toContainText(/\d kg/);
+  for (const t of ["Nachgezählt", "Eingekauft"]) await expect(page.getByRole("tab", { name: t })).toHaveCount(0); // no modes to pick
+  const dry = (await page.getByTestId("count-dry").boundingBox())!;
+  const buy = (await page.getByRole("button", { name: "Eingekauft" }).boundingBox())!;
+  expect(buy.y - (dry.y + dry.height)).toBeLessThan(40); // the rows you count in sit right above the controls
+});
+
 test("Vorrat: the fields typed into are 16 px, so an iPhone doesn't zoom into them", async ({ page }) => {
   await signIn(page);
   await page.goto("/mehr/vorrat");
-  await page.getByRole("tab", { name: "Nass" }).click();
-  await page.getByRole("tab", { name: "Eingekauft" }).click();
+  await page.getByRole("button", { name: "Eingekauft" }).click();
   await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
-  await expect(page.getByTestId("count-new").getByLabel("Dosengröße in Gramm")).toHaveCSS("font-size", "16px");
+  await expect(page.getByTestId("buy-new").getByLabel("Dosengröße in Gramm")).toHaveCSS("font-size", "16px");
 });
 
-test("Vorrat: cans bought are entered per size in rows, a new size in a row of its own; one Eintragen records each", async ({ page }) => {
+test("Vorrat: + Eingekauft takes cans per size from 0, a new size in a row of its own; the button says what it records", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });
   made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 800, cans: 1 }] })).entries.map((e) => e.id)); // 800 g is a known size
   await page.goto("/mehr/vorrat");
-  await page.getByRole("tab", { name: "Nass" }).click();
-  await page.getByRole("tab", { name: "Eingekauft" }).click();
-  await expect(page.getByTestId("count-800-value")).toHaveText("0 Dosen"); // bought: from 0
-  await page.getByRole("button", { name: "1 Dose à 800 g mehr" }).click();
-  await page.getByRole("button", { name: "1 Dose à 800 g mehr" }).click();
-  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
-  await page.getByTestId("count-new").getByLabel("Dosengröße in Gramm").fill("1234");
-  await page.getByRole("button", { name: "1 Dose à 1234 g mehr" }).click();
-  // a row without grams holds up Eintragen until it is taken away with ×
-  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
-  await page.getByRole("button", { name: "1 Dose neuer Größe mehr" }).click();
-  await expect(page.getByTestId("stock-unsized")).toHaveText("Eine Zeile hat keine Dosengröße: Gramm eintragen oder mit × entfernen.");
-  await expect(page.getByRole("button", { name: "Eintragen" })).toBeDisabled();
-  await page.getByTestId("count-new").getByRole("button", { name: "Dosengröße entfernen" }).click();
-  await expect(page.getByTestId("stock-unsized")).toHaveCount(0);
-  await expect(page.getByTestId("count-1234-value")).toHaveText("1 Dose");
-  const bought = page.waitForResponse((r) => r.url().endsWith("/api/stock/restock") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Eintragen" }).click();
-  const { entries } = (await (await bought).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
+  await page.getByRole("button", { name: "Eingekauft" }).click();
+  const sheet = page.getByRole("dialog", { name: "Eingekauft" });
+  await expect(sheet.getByTestId("buy-800-value")).toHaveText("0"); // bought: from 0
+  await sheet.getByRole("button", { name: "1 Dose à 800 g mehr" }).click();
+  await sheet.getByRole("button", { name: "1 Dose à 800 g mehr" }).click();
+  await sheet.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
+  await sheet.getByTestId("buy-new").getByLabel("Dosengröße in Gramm").fill("1234");
+  await sheet.getByRole("button", { name: "1 Dose à 1234 g mehr" }).click();
+  // the grams of a known size and of an added one line up
+  const right = async (id: string) => {
+    const b = (await sheet.getByTestId(`buy-${id}-size`).boundingBox())!;
+    return Math.round(b.x + b.width);
+  };
+  expect(await right("1234")).toBe(await right("800"));
+  // a row without grams holds up the button until it is taken away with ×
+  await sheet.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
+  await sheet.getByRole("button", { name: "1 Dose neuer Größe mehr" }).click();
+  await expect(sheet.getByTestId("buy-unsized")).toHaveText("Eine Zeile hat keine Dosengröße: Gramm eintragen oder mit × entfernen.");
+  await expect(sheet.getByRole("button", { name: /eintragen$/i })).toBeDisabled();
+  await sheet.getByTestId("buy-new").getByRole("button", { name: "Dosengröße entfernen" }).click();
+  await expect(sheet.getByTestId("buy-unsized")).toHaveCount(0);
+  const bought = savedPurchase(page);
+  await sheet.getByRole("button", { name: "3 Dosen eintragen" }).click();
+  const { entries } = (await (await bought).json()) as Made;
   made.push(...entries.map((e) => e.id));
   expect(entries.map((e) => [e.unitG, e.amountG]).sort()).toEqual([[1234, 1234], [800, 1600]].sort()); // sizes left at 0 stay out
-  const after = (await client.stock()).wet;
-  await expect(page.getByTestId("stock-wet")).toContainText(formatCanCount(after.sizes.find((s) => s.unitG === 800)!));
-  await expect(page.getByTestId("stock-wet")).toContainText("zusammen ");
-  await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
-  // the message is about that purchase: it goes when the form turns to something else
-  await page.getByRole("tab", { name: "Nachgezählt" }).click();
-  await expect(page.getByTestId("stock-message")).toBeHidden();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.getByTestId("stock-message")).toHaveCount(0); // what worked shows on the page, not in a message
+  const after = (await client.stock()).wet.sizes.find((s) => s.unitG === 800)!;
+  await expect(page.getByTestId("count-800-value")).toHaveText(decimal(after.cans));
 });
 
-test("Vorrat: a wet count sets every can size at once, typed freely or by whole cans, a new size without any purchase of it", async ({ page }) => {
+test("Vorrat: counting in the list changes nothing until it is saved; the count shows in orange with the old one, Verwerfen takes it back", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });
   made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 400, cans: 3 }] })).entries.map((e) => e.id));
   const before = (await client.stock()).wet.sizes;
+  const was = decimal(before.find((s) => s.unitG === 400)!.cans);
   await page.goto("/mehr/vorrat");
-  await page.getByRole("tab", { name: "Nass" }).click();
-  await page.getByRole("tab", { name: "Nachgezählt" }).click();
   for (const s of before) await expect(page.getByTestId(`count-${s.unitG}-value`)).toHaveText(decimal(s.cans)); // one row per known size, from the stock
+  const card = await page.getByTestId("stock-wet").textContent();
+  // every count sits in the middle of its row, one under the other
+  const middle = async (id: string) => {
+    const [row, value] = await Promise.all([page.getByTestId(`count-${id}`).boundingBox(), page.getByTestId(`count-${id}-value`).boundingBox()]);
+    return { dy: Math.abs(row!.y + row!.height / 2 - (value!.y + value!.height / 2)), x: Math.round(value!.x + value!.width / 2) };
+  };
+  const [wetMiddle, dryMiddle] = [await middle("400"), await middle("dry")];
+  expect(wetMiddle.dy).toBeLessThanOrEqual(1);
+  expect(dryMiddle.dy).toBeLessThanOrEqual(1);
+  expect(wetMiddle.x).toBe(dryMiddle.x);
+  await page.getByRole("button", { name: "½ Dose à 400 g weniger" }).click();
+  const height = (await page.getByTestId("count-dry").boundingBox())!.height;
+  await expect(page.getByTestId("count-400").getByText(`vorher ${was}`)).toBeVisible();
+  expect((await page.getByTestId("count-400").boundingBox())!.height).toBe(height); // rows keep one height
+  expect((await middle("400")).dy).toBeGreaterThan(2); // the new count moves up for the old one under it
+  await expect(page.getByTestId("stock-wet")).not.toHaveText(card!); // the card shows what the count comes to
+  await expect(page.getByRole("button", { name: "Eingekauft" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Verwerfen" }).click();
+  await expect(page.getByTestId("count-400-value")).toHaveText(was);
+  await expect(page.getByTestId("count-400").getByText(`vorher ${was}`)).toHaveCount(0);
+  await expect(page.getByTestId("stock-wet")).toHaveText(card!);
+
   await typeIn(page.getByLabel("Anzahl Dosen à 400 g"), "zwei");
-  await page.getByRole("button", { name: "Eintragen" }).click();
+  await page.getByRole("button", { name: "Zählung speichern" }).click();
   await expect(page.getByTestId("stock-message")).toHaveText("Wie viele Dosen sind noch da? Eine Zahl, z. B. 2,75.");
   await typeIn(page.getByLabel("Anzahl Dosen à 400 g"), "2,75");
-  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
-  await page.getByTestId("count-new").getByLabel("Dosengröße in Gramm").fill("1235");
-  for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "½ Dose à 1235 g mehr" }).click();
-  await expect(page.getByTestId("count-1235-value")).toHaveText("1,5");
-  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Eintragen" }).click();
-  const { entries } = (await (await counted).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
+  // the stock read after saving is held back: until it arrives the saved count stays, the old one doesn't flash up
+  let release = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  await page.route("**/api/stock", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const counted = savedCount(page);
+  await page.getByRole("button", { name: "Zählung speichern" }).click();
+  const { entries } = (await (await counted).json()) as Made;
+  await page.waitForTimeout(200);
+  expect(await page.getByTestId("count-400-value").textContent()).toBe("2,75");
+  release();
   made.push(...entries.map((e) => e.id));
   expect(entries.find((e) => e.unitG === 400)?.amountG).toBe(1100);
-  expect(entries.find((e) => e.unitG === 1235)?.amountG).toBe(1853);
-  expect(entries.map((e) => e.unitG).sort()).toEqual([...before.map((s) => s.unitG), 1235].sort());
-  await expect(page.getByTestId("stock-wet")).toContainText("2¾ × 400 g");
-  await expect(page.getByTestId("stock-wet")).toContainText("1½ × 1235 g");
-  await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
-  await page.getByRole("tab", { name: "Trocken" }).click();
-  await expect(page.getByTestId("stock-message")).toBeHidden();
+  expect(entries.map((e) => e.unitG).sort()).toEqual(before.map((s) => s.unitG).sort()); // every size at once
+  await expect(page.getByTestId("stock-message")).toHaveCount(0);
+  await expect(page.getByTestId("count-400-value")).toHaveText("2,75");
+  await expect(page.getByRole("button", { name: "Eingekauft" })).toBeVisible();
 });
 
-test("Vorrat: a new row typed with a known size adds only what is typed to it, also when counting", async ({ page }) => {
-  const token = await signIn(page);
-  const client = createClient({ baseUrl: BASE_URL, token });
-  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 400, cans: 2 }] })).entries.map((e) => e.id));
-  const before = (await client.stock()).wet.sizes;
-  await page.goto("/mehr/vorrat");
-  await page.getByRole("tab", { name: "Nass" }).click();
-  await page.getByRole("tab", { name: "Nachgezählt" }).click();
-  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
-  await page.getByTestId("count-new").getByLabel("Dosengröße in Gramm").fill("400");
-  await expect(page.getByTestId("count-400-value")).toHaveCount(2);
-  await expect(page.getByTestId("count-400-value").last()).toHaveText("0"); // only the known row starts at the stock
-  await page.getByRole("button", { name: "½ Dose à 400 g mehr" }).last().click();
-  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Eintragen" }).click();
-  const { entries } = (await (await counted).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
-  made.push(...entries.map((e) => e.id));
-  const was = before.find((s) => s.unitG === 400)!.cans;
-  expect(entries.find((e) => e.unitG === 400)?.amountG).toBe(Math.round((was + 0.5) * 400));
-});
-
-test("Vorrat: × while buying only hides the size from the purchase rows; the stock keeps it, and buying it again brings it back", async ({ page }) => {
-  await signIn(page);
-  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9999, cans: 1 }] })).entries.map((e) => e.id));
-  await page.goto("/mehr/vorrat");
-  await page.getByRole("tab", { name: "Nass" }).click();
-  await page.getByRole("tab", { name: "Eingekauft" }).click();
-  await page.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
-  await page.getByTestId("count-new").getByRole("button", { name: "Dosengröße entfernen" }).click(); // an added row: just gone
-  await expect(page.getByTestId("count-new")).toHaveCount(0);
-  await page.getByTestId("count-9999").getByRole("button", { name: "Dosengröße entfernen" }).click();
-  await expect(page.getByTestId("count-9999")).toHaveCount(0);
-  await expect(page.getByTestId("stock-wet")).toContainText("1 × 9999 g"); // the stock didn't change
-
-  await page.reload(); // remembered on this phone
-  await page.getByRole("tab", { name: "Nass" }).click();
-  await expect(page.getByTestId("stock-wet")).toContainText("1 × 9999 g");
-  await page.getByRole("tab", { name: "Eingekauft" }).click();
-  await expect(page.getByTestId("count-9999")).toHaveCount(0);
-  await page.getByRole("tab", { name: "Nachgezählt" }).click();
-  await expect(page.getByTestId("count-9999")).toBeVisible(); // counting still lists it
-
-  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9999, cans: 1 }] })).entries.map((e) => e.id)); // bought again
-  await page.reload();
-  await page.getByRole("tab", { name: "Nass" }).click();
-  await page.getByRole("tab", { name: "Eingekauft" }).click();
-  await expect(page.getByTestId("count-9999")).toBeVisible();
-});
-
-test("Vorrat: × while counting sets the size to 0; Eintragen retires it", async ({ page }) => {
+test("Vorrat: a size counted to 0 is retired when the count is saved", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });
   made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9998, cans: 1 }] })).entries.map((e) => e.id));
   await page.goto("/mehr/vorrat");
-  await page.getByRole("tab", { name: "Nass" }).click();
-  await page.getByRole("tab", { name: "Nachgezählt" }).click();
-  await page.getByTestId("count-9998").getByRole("button", { name: "Dosengröße entfernen" }).click();
+  await typeIn(page.getByLabel("Anzahl Dosen à 9998 g"), "0,5");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "½ Dose à 9998 g weniger" }).click();
+  await expect(page.getByTestId("count-9998-value")).toHaveText("0");
+  const counted = savedCount(page);
+  await page.getByRole("button", { name: "Zählung speichern" }).click();
+  made.push(...((await (await counted).json()) as Made).entries.map((e) => e.id));
   await expect(page.getByTestId("count-9998")).toHaveCount(0);
-  await expect(page.getByTestId("stock-wet")).toContainText("1 × 9998 g"); // not before Eintragen
-  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Eintragen" }).click();
-  const { entries } = (await (await counted).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
-  made.push(...entries.map((e) => e.id));
-  expect(entries.find((e) => e.unitG === 9998)?.amountG).toBe(0);
   expect((await client.stock()).wet.sizes.some((x) => x.unitG === 9998)).toBe(false);
-
-  await page.reload();
-  await page.getByRole("tab", { name: "Nass" }).click();
-  await expect(page.getByTestId("stock-wet")).not.toContainText("…"); // the stock is in
-  await expect(page.getByTestId("stock-wet")).not.toContainText("9998");
-  for (const mode of ["Eingekauft", "Nachgezählt"]) {
-    await page.getByRole("tab", { name: mode }).click();
-    await expect(page.getByTestId("count-9998")).toHaveCount(0);
-  }
 });
 
 test("Vorrat: every size can be corrected; counting, 10000 g corrected to 1000 g retires 10000 g", async ({ page }) => {
@@ -252,49 +233,75 @@ test("Vorrat: every size can be corrected; counting, 10000 g corrected to 1000 g
   const client = createClient({ baseUrl: BASE_URL, token });
   made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 10_000, cans: 2 }] })).entries.map((e) => e.id)); // meant 1000 g
   await page.goto("/mehr/vorrat");
-  await page.getByRole("tab", { name: "Nass" }).click();
-  await page.getByRole("tab", { name: "Nachgezählt" }).click();
   const row = page.getByTestId("count-10000");
   await expect(row.getByLabel("Dosengröße in Gramm")).toHaveText("10000"); // plain text until tapped
   await typeIn(row.getByLabel("Dosengröße in Gramm"), "1000");
   await page.keyboard.press("Enter");
-  await expect(row.getByLabel("Dosengröße in Gramm")).toHaveText("1000");
   await expect(row.getByLabel("Anzahl Dosen à 1000 g")).toHaveText("2");
-  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Eintragen" }).click();
-  const { entries } = (await (await counted).json()) as { entries: { id: number; unitG: number; amountG: number }[] };
+  const counted = savedCount(page);
+  await page.getByRole("button", { name: "Zählung speichern" }).click();
+  const { entries } = (await (await counted).json()) as Made;
   made.push(...entries.map((e) => e.id));
   expect(entries.find((e) => e.unitG === 1000)?.amountG).toBe(2000);
   expect(entries.find((e) => e.unitG === 10_000)?.amountG).toBe(0);
-  await expect(page.getByTestId("stock-wet")).toContainText("2 × 1000 g");
-  await expect(page.getByTestId("stock-wet")).not.toContainText("10000");
   expect((await client.stock()).wet.sizes.some((x) => x.unitG === 10_000)).toBe(false);
+  await expect(page.getByTestId("count-10000")).toHaveCount(0);
 });
 
-test("Vorrat: dry food bought in kg with a decimal comma, counted in g", async ({ page }) => {
+test("Vorrat: × in Eingekauft only hides the size from the purchase rows; the stock keeps it, and buying it again brings it back", async ({ page }) => {
+  await signIn(page);
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9999, cans: 1 }] })).entries.map((e) => e.id));
+  await page.goto("/mehr/vorrat");
+  const open = async () => {
+    await page.getByRole("button", { name: "Eingekauft" }).click();
+    return page.getByRole("dialog", { name: "Eingekauft" });
+  };
+  let sheet = await open();
+  await sheet.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
+  await sheet.getByTestId("buy-new").getByRole("button", { name: "Dosengröße entfernen" }).click(); // an added row: just gone
+  await expect(sheet.getByTestId("buy-new")).toHaveCount(0);
+  await sheet.getByTestId("buy-9999").getByRole("button", { name: "Dosengröße entfernen" }).click();
+  await expect(sheet.getByTestId("buy-9999")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("count-9999-value")).toHaveText("1"); // the stock didn't change, counting still lists it
+
+  await page.reload(); // remembered on this phone
+  sheet = await open();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByTestId("buy-9999")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 9999, cans: 1 }] })).entries.map((e) => e.id)); // bought again
+  await page.reload();
+  sheet = await open();
+  await expect(sheet.getByTestId("buy-9999")).toBeVisible();
+});
+
+test("Vorrat: dry food bought in kg with a decimal comma, counted in kg", async ({ page }) => {
   const token = await signIn(page);
   const client = createClient({ baseUrl: BASE_URL, token });
   await page.goto("/mehr/vorrat");
-  await page.getByRole("tab", { name: "Trocken" }).click();
-  await page.getByRole("tab", { name: "Eingekauft" }).click();
-  await page.getByRole("tab", { name: "kg", exact: true }).click();
-  await page.getByLabel("Menge").fill("1,5");
-  const bought = page.waitForResponse((r) => r.url().endsWith("/api/stock/restock") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Eintragen" }).click();
-  const { entries: [{ id }] } = (await (await bought).json()) as { entries: { id: number }[] };
+  await page.getByRole("button", { name: "Eingekauft" }).click();
+  const sheet = page.getByRole("dialog", { name: "Eingekauft" });
+  await sheet.getByRole("tab", { name: "Trocken" }).click();
+  await sheet.getByRole("tab", { name: "kg", exact: true }).click();
+  await sheet.getByLabel("Menge").fill("1,5");
+  const bought = savedPurchase(page);
+  await sheet.getByRole("button", { name: "1,5 kg eintragen" }).click();
+  const { entries: [{ id }] } = (await (await bought).json()) as Made;
   made.push(id);
   expect(await client.entry({ id })).toMatchObject({ foodKind: "dry", amountG: 1500 });
-  await expect(page.getByTestId("stock-message")).toHaveText("Eingetragen.");
+  await expect(page.getByLabel("Anzahl kg Trockenfutter")).toHaveText(decimal((await client.stock()).dry.grams! / 1000));
 
-  await page.getByRole("tab", { name: "Nachgezählt" }).click();
-  await page.getByRole("tab", { name: "g", exact: true }).click();
-  await page.getByLabel("Menge").fill("750");
-  const counted = page.waitForResponse((r) => r.url().endsWith("/api/stock/correct") && r.request().method() === "POST");
-  await page.getByRole("button", { name: "Eintragen" }).click();
-  const { entries } = (await (await counted).json()) as { entries: { id: number; amountG: number }[] };
+  await typeIn(page.getByLabel("Anzahl kg Trockenfutter"), "0,75");
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("stock-dry")).toContainText("750 g"); // what the count comes to, before saving
+  const counted = savedCount(page);
+  await page.getByRole("button", { name: "Zählung speichern" }).click();
+  const { entries } = (await (await counted).json()) as Made;
   made.push(...entries.map((e) => e.id));
   expect(entries.map((e) => e.amountG)).toEqual([750]);
-  await expect(page.getByTestId("stock-dry")).toContainText("750 g");
+  await expect(page.getByTestId("count-dry-value")).toHaveText("0,75");
 });
 
 test("Haushalt: an invite shows its link, its code and when it ends; Zurückziehen takes it back", async ({ page }) => {
@@ -432,24 +439,32 @@ test("a sheet that opens with its field focused closes with Escape from that fie
   await expect(add).toBeFocused();
 });
 
-test("Vorrat: quick + taps each count; a count reads out with its value; clearing a size's grams holds up Eintragen", async ({ page }) => {
+test("Vorrat: quick taps each count; a count reads out with its value; clearing a size's grams holds up saving", async ({ page }) => {
   await signIn(page);
   made.push(...(await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 777, cans: 1 }] })).entries.map((e) => e.id));
   await page.goto("/mehr/vorrat");
-  await page.getByRole("tab", { name: "Nass" }).click();
-  await page.getByRole("tab", { name: "Nachgezählt" }).click();
   const row = page.getByTestId("count-777");
-  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveAccessibleName("Anzahl Dosen à 777 g, 1");
+  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveAccessibleName(/^Anzahl Dosen à 777 g, \d/);
+  const from = Number((await row.getByLabel("Anzahl Dosen à 777 g").textContent())!.replace(",", "."));
   // four taps faster than the screen renders
   await row.getByRole("button", { name: "½ Dose à 777 g mehr" }).evaluate((b: HTMLElement) => {
     for (let i = 0; i < 4; i++) b.click();
   });
-  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText("3");
+  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText(decimal(from + 2));
+  // a typed count goes to the nearest half first, then on in halves
+  for (const [button, to] of [["mehr", "3"], ["weniger", "2,5"]]) {
+    await typeIn(row.getByLabel("Anzahl Dosen à 777 g"), "2,85");
+    await page.keyboard.press("Enter");
+    await row.getByRole("button", { name: `½ Dose à 777 g ${button}` }).click();
+    await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText(to);
+  }
+  await row.getByRole("button", { name: "½ Dose à 777 g weniger" }).click();
+  await expect(row.getByLabel("Anzahl Dosen à 777 g")).toHaveText("2");
 
   await typeIn(row.getByLabel("Dosengröße in Gramm"), "");
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("stock-unsized")).toHaveText("Eine Zeile hat keine Dosengröße: Gramm eintragen oder mit × entfernen.");
-  await expect(page.getByRole("button", { name: "Eintragen" })).toBeDisabled();
+  await expect(page.getByTestId("stock-unsized")).toHaveText("Eine Zeile hat keine Dosengröße: Gramm eintragen.");
+  await expect(page.getByRole("button", { name: "Zählung speichern" })).toBeDisabled();
 });
 
 test("Mehr and its screens fit a small and a big phone: the title and the buttons below stay, only the content between scrolls", async ({ page }) => {
