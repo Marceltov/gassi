@@ -294,6 +294,9 @@ test("Verlauf, an entry and a walk's summary fit a small and a big phone; every 
   expect(await height(walk.id)).toBe(await height(food.id)); // a walk too
   for (const d of dogs) await expect(page.getByTestId(`entry-${food.id}-more`)).toContainText(d.name); // all of them, too
   await expect(page.getByTestId(`entry-${pee.id}-more`)).toContainText(dogs[0].name);
+  // what the entry says is bold, what kind it is isn't
+  await expect(page.getByTestId(`entry-${food.id}-extra`)).toHaveCSS("font-weight", "700");
+  await expect(page.getByTestId(`entry-${food.id}-title`)).not.toHaveCSS("font-weight", "700");
 
   await expectFits(page, `/verlauf/eintrag/${food.id}`, "Speichern");
   await expectFits(page, `/verlauf/runde/${walk.id}`, "Fertig");

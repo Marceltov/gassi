@@ -1,5 +1,5 @@
 // One entry in Verlauf: the time, a small map for a tracked walk, the type's icon in a dot of its color (and a strip of it
-// on the left edge), two lines and who. The first line is the type in bold with its figures ("Gassi 42 Min. · 3,1 km"),
+// on the left edge), two lines and who. The first line is the type with its figures in bold ("Gassi **42 Min. · 3,1 km**"),
 // the second the dogs, what happened on a walk and the note. An entry without dogs (a purchase, a count) has its
 // figures on the second line, so the first isn't cut short while the second stays empty. Every row has the same height (#71): each line is cut
 // short rather than wrapping, and the second is there even when empty. Tapping opens it.
@@ -26,7 +26,7 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
   const routes = useMemo(() => (routeKey !== "null" ? [JSON.parse(routeKey) as [number, number][]] : []), [routeKey]);
   const below = !dogs; // the figures go on the second line
   const extra = below ? "" : d.extra;
-  const more = [below ? d.extra : "", dogs, d.during, entry.note ?? ""].filter(Boolean).join(" · ");
+  const rest = [dogs, d.during, entry.note ?? ""].filter(Boolean).join(" · ");
   const tone = theme[TYPE_TONE[entry.type]];
   return (
     <Pressable
@@ -45,12 +45,14 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
         <Icon name={TYPE_ICON[entry.type]} size={14} color="#fff" />
       </View>
       <View style={styles.main}>
-        <Text style={[styles.title, { color: theme.ink }]} numberOfLines={1}>
+        <Text testID={`entry-${entry.id}-title`} style={[styles.title, { color: theme.ink }]} numberOfLines={1}>
           {d.title}
-          {extra ? <Text testID={`entry-${entry.id}-extra`} style={[styles.extra, { color: theme.ink }]}>{` ${extra}`}</Text> : null}
+          {extra ? <Text testID={`entry-${entry.id}-extra`} style={styles.figures}>{` ${extra}`}</Text> : null}
         </Text>
         <Text testID={`entry-${entry.id}-more`} style={[styles.small, { color: theme.muted }]} numberOfLines={1}>
-          {more || " "}
+          {below && d.extra ? <Text style={[styles.figures, { color: theme.ink }]}>{d.extra}</Text> : null}
+          {below && d.extra && rest ? " · " : ""}
+          {rest || (below && d.extra ? "" : " ")}
         </Text>
       </View>
       <Text style={[styles.by, { color: theme.muted }]} numberOfLines={2}>
@@ -66,8 +68,8 @@ const styles = StyleSheet.create({
   thumb: { width: 56, height: 40, borderRadius: 8, overflow: "hidden", pointerEvents: "none" },
   main: { flex: 1, gap: 2 },
   dot: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-  title: { fontSize: 15, fontWeight: "700" },
-  extra: { fontWeight: "400" },
+  title: { fontSize: 15 },
+  figures: { fontWeight: "700" }, // what the entry says, not what kind it is
   small: { fontSize: 13 },
   by: { maxWidth: 110, fontSize: 12, textAlign: "right" },
 });
