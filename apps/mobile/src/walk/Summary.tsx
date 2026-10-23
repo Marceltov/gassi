@@ -15,6 +15,7 @@ import { TrackMap } from "../map/TrackMap";
 import { useTheme } from "../theme";
 import { hhmm } from "../time";
 import { BigButton } from "../ui/BigButton";
+import { ButtonRow } from "../ui/ButtonRow";
 import { Chip } from "../ui/Chip";
 import { Icon } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
@@ -58,7 +59,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
 
   if (!shown) {
     const waitText = <Text style={[styles.line, { color: theme.muted }]}>{error ?? "Lädt …"}</Text>;
-    return <Screen top={waitText} bottom={<BigButton kind="neutral" size="m" label="Fertig" onPress={done} />} />;
+    return <Screen top={waitText} bottom={<BigButton kind="walk" size="m" icon="check" label="Fertig" onPress={done} />} />;
   }
 
   const several = new Set(shown.taps.map((t) => t.dogId)).size > 1 || dogs.filter((d) => !d.archived).length > 1;
@@ -111,14 +112,17 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
             multiline
             style={[styles.note, { color: theme.ink, backgroundColor: theme.surface }]}
           />
-          {note !== null && note !== (shown.note ?? "") ? <BigButton kind="neutral" size="m" label="Notiz speichern" onPress={() => void saveNote(shown, note)} /> : null}
+          {note !== null && note !== (shown.note ?? "") ? <BigButton kind="side" size="m" label="Notiz speichern" onPress={() => void saveNote(shown, note)} /> : null}
         </>
       }
       bottom={
         <>
           {message ? <Text style={[styles.small, { color: theme.muted }]}>{message}</Text> : null}
-          {shown.id !== null && !local ? <BigButton kind="neutral" size="s" label="Zeit, Hunde, Löschen …" onPress={() => router.push(tabPath(`/eintrag/${shown.id}`))} /> : null}
-          <BigButton kind="walk" size="m" icon="check" label="Fertig" onPress={done} />
+          {/* the detail (time, dogs, Löschen) is a side action next to Fertig (#80) */}
+          <ButtonRow
+            side={[shown.id !== null && !local ? <BigButton key="detail" kind="side" size="m" label="Ändern …" a11y="Zeit, Hunde, Löschen …" onPress={() => router.push(tabPath(`/eintrag/${shown.id}`))} /> : null]}
+            main={<BigButton kind="walk" size="m" icon="check" label="Fertig" onPress={done} />}
+          />
         </>
       }
     />

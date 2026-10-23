@@ -9,6 +9,7 @@ import { useGassi } from "../data/GassiProvider";
 import type { Exercise, TreatKind } from "../data/store";
 import { useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
+import { ButtonRow, TrashButton } from "../ui/ButtonRow";
 import { Chip } from "../ui/Chip";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
@@ -100,9 +101,10 @@ export function Catalog({ what }: { what: Editing["what"] }) {
                   </>
                 ) : null}
                 {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-                <BigButton kind="training" size="m" icon={editing.item ? "check" : "add"} label={editing.item ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />
-                {editing.item ? <BigButton kind="neutral" size="s" label="Entfernen" onPress={() => remove(editing)} /> : null}
-                <BigButton kind="neutral" size="s" label="Abbrechen" onPress={() => setEditing(null)} />
+                <ButtonRow
+                  side={[editing.item ? <TrashButton key="trash" label="Entfernen" onPress={() => remove(editing)} /> : null, <BigButton key="no" kind="side" size="m" label="Abbrechen" onPress={() => setEditing(null)} />]}
+                  main={<BigButton kind="training" size="m" icon={editing.item ? "check" : "add"} label={editing.item ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />}
+                />
               </View>
             ) : null}
           </Sheet>

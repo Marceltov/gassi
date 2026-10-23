@@ -7,6 +7,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { useNow } from "../start/useNow";
 import { useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
+import { ButtonRow } from "../ui/ButtonRow";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
 import { InviteCard, OpenInvites, useInvites } from "./Invite";
@@ -71,8 +72,7 @@ export function Devices() {
             <View testID="remove-device-sheet" style={styles.sheet}>
               <Text style={[styles.sheetTitle, { color: theme.ink }]}>{`${asking?.name ?? ""} abmelden?`}</Text>
               <Text style={[styles.small, { color: theme.muted }]}>Das Gerät braucht danach einen neuen Link oder Code.</Text>
-              <BigButton kind="neutral" size="m" label="Ja, abmelden" onPress={() => asking && remove(asking)} />
-              <BigButton kind="neutral" size="s" label="Abbrechen" onPress={() => setAsking(null)} />
+              <ButtonRow side={[<BigButton key="no" kind="side" size="m" label="Abbrechen" onPress={() => setAsking(null)} />]} main={<BigButton kind="danger" size="m" label="Ja, abmelden" onPress={() => asking && remove(asking)} />} />
             </View>
           </Sheet>
         </>
@@ -80,8 +80,7 @@ export function Devices() {
       bottom={
         <>
           {message ?? invites.message ? <Text style={[styles.message, { color: theme.ink }]}>{message ?? invites.message}</Text> : null}
-          <BigButton kind="walk" size="m" icon="add" label="Gerät hinzufügen" onPress={invites.create} />
-          <BigButton kind="neutral" size="s" label="Hier abmelden" a11y="Auf diesem Gerät abmelden" onPress={() => setAskingHere(true)} />
+          <ButtonRow side={[<BigButton key="here" kind="side" size="m" label="Hier abmelden" a11y="Auf diesem Gerät abmelden" onPress={() => setAskingHere(true)} />]} main={<BigButton kind="ink" size="m" icon="add" label="Gerät hinzufügen" onPress={invites.create} />} />
         </>
       }
     />

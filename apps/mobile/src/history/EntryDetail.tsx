@@ -12,6 +12,7 @@ import { errorMessage } from "../data/api";
 import { type Gassi, useGassi } from "../data/GassiProvider";
 import { type ButtonKind, radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
+import { ButtonRow, TrashButton } from "../ui/ButtonRow";
 import { Chip } from "../ui/Chip";
 import { ChoiceList } from "../ui/ChoiceList";
 import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
@@ -27,7 +28,8 @@ import { bumpRep, bumpTreat, countEdits, editInput, type Entry, type Form, formO
 import { TIME_ZONE } from "../time";
 import { TimeField } from "./TimeField";
 
-const BUTTON: Partial<Record<Entry["type"], ButtonKind>> = { walk: "walk", food: "food", training: "training", pee: "pee", poop: "poop" };
+// Speichern in the color of the thing (#80): food bought, counted and opened is food; weight and a note have none
+const BUTTON: Record<Entry["type"], ButtonKind> = { walk: "walk", food: "food", restock: "food", stockcheck: "food", opened: "food", training: "training", pee: "pee", poop: "poop", weight: "ink", note: "ink" };
 
 export function EntryDetail({ id }: { id: number }) {
   const router = useRouter();
@@ -192,8 +194,7 @@ export function EntryDetail({ id }: { id: number }) {
             <View testID="delete-sheet" style={styles.sheet}>
               <Text style={[styles.sheetTitle, { color: theme.ink }]}>Eintrag löschen?</Text>
               <Text style={[styles.small, { color: theme.muted }]}>{`${entry.count ? `Die ganze Zählung (${countLine(entry.count)})` : TYPE_LABEL[entry.type]} – das lässt sich nicht rückgängig machen.`}</Text>
-              <BigButton kind="neutral" size="s" label="Abbrechen" onPress={() => setAsking(false)} />
-              <BigButton kind="neutral" size="m" label="Ja, löschen" onPress={() => void remove(entry)} />
+              <ButtonRow side={[<BigButton key="no" kind="side" size="m" label="Abbrechen" onPress={() => setAsking(false)} />]} main={<BigButton kind="danger" size="m" label="Ja, löschen" onPress={() => void remove(entry)} />} />
             </View>
           </Sheet>
         </>
@@ -201,8 +202,7 @@ export function EntryDetail({ id }: { id: number }) {
       bottom={
         <>
           {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-          <BigButton kind="neutral" size="s" label="Löschen" onPress={() => setAsking(true)} />
-          <BigButton kind={BUTTON[entry.type] ?? "neutral"} size="m" icon="check" label="Speichern" onPress={() => void save(entry, form)} />
+          <ButtonRow side={[<TrashButton key="trash" onPress={() => setAsking(true)} />]} main={<BigButton kind={BUTTON[entry.type]} size="m" icon="check" label="Speichern" onPress={() => void save(entry, form)} />} />
         </>
       }
     />

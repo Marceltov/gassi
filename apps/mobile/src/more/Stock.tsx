@@ -12,6 +12,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
+import { ButtonRow } from "../ui/ButtonRow";
 import { Screen } from "../ui/Screen";
 import { StepButton } from "../ui/Stepper";
 import { TapToEdit } from "../ui/TapToEdit";
@@ -169,14 +170,7 @@ export function Stock() {
             </Text>
           ) : null}
           {changed ? (
-            <View style={styles.pair}>
-              <View style={styles.side}>
-                <BigButton kind="neutral" size="m" label="Verwerfen" onPress={() => setEdits({})} />
-              </View>
-              <View style={styles.main}>
-                <BigButton kind="food" size="m" icon="check" label="Zählung speichern" disabled={unsized > 0} onPress={save} />
-              </View>
-            </View>
+            <ButtonRow side={[<BigButton key="undo" kind="side" size="m" label="Verwerfen" onPress={() => setEdits({})} />]} main={<BigButton kind="food" size="m" icon="check" label="Zählung speichern" disabled={unsized > 0} onPress={save} />} />
           ) : (
             <BigButton
               kind="food"
@@ -219,8 +213,5 @@ const styles = StyleSheet.create({
   value: { textAlign: "center", fontSize: 16, fontWeight: "700" },
   was: { marginTop: -6, fontSize: 11, lineHeight: 12 },
   warn: { fontSize: 14, fontWeight: "700" },
-  pair: { flexDirection: "row", gap: 8 },
-  side: { flex: 1 },
-  main: { flex: 2 },
   message: { fontSize: 15, fontWeight: "600" },
 });

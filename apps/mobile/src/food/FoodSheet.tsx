@@ -127,7 +127,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
             },
           }))}
         />
-        <BigButton kind="neutral" size="s" label="Zurück" onPress={() => setChoosingCan(false)} />
+        <BigButton kind="side" size="s" label="Zurück" onPress={() => setChoosingCan(false)} />
       </View>
     );
   return (
@@ -159,7 +159,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
           </Pressable>
         </View>
       ))}
-      {openable.length ? <BigButton kind="neutral" size="s" label="+ Dose aufgemacht" onPress={() => setChoosingCan(true)} /> : null}
+      {openable.length ? <BigButton kind="side" size="s" label="+ Dose aufgemacht" onPress={() => setChoosingCan(true)} /> : null}
       <BigButton kind="food" size="m" icon="check" label="Eintragen" onPress={submit} />
     </View>
   );

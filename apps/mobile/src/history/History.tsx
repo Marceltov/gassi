@@ -94,7 +94,7 @@ export function History() {
               ))}
             </View>
           ))}
-          {more ? <BigButton kind="neutral" size="m" label={loadingMore ? "Lädt …" : "Ältere zeigen"} onPress={loadMore} /> : null}
+          {more ? <BigButton kind="side" size="m" label={loadingMore ? "Lädt …" : "Ältere zeigen"} onPress={loadMore} /> : null}
           {entries?.some((e) => e.route) ? (
             // the small maps leave out their credit line: it is here instead
             <Text accessibilityRole="link" onPress={() => void Linking.openURL(OSM_COPYRIGHT)} style={[styles.credit, { color: theme.muted }]}>

@@ -1,8 +1,8 @@
 // A row of two or three choices, one of them on (Nass | Trocken).
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { type ButtonKind, useTheme } from "../theme";
+import { type TileKind, useTheme } from "../theme";
 
-type Props<T extends string> = { options: readonly { value: T; label: string }[]; value: T; onChange: (v: T) => void; kind?: ButtonKind };
+type Props<T extends string> = { options: readonly { value: T; label: string }[]; value: T; onChange: (v: T) => void; kind?: TileKind | "neutral" };
 
 export function Segments<T extends string>({ options, value, onChange, kind = "neutral" }: Props<T>) {
   const theme = useTheme();

@@ -7,6 +7,7 @@ import { useGassi } from "../data/GassiProvider";
 import type { Dog } from "../data/store";
 import { useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
+import { ButtonRow } from "../ui/ButtonRow";
 import { Field } from "../ui/Field";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
@@ -78,11 +79,11 @@ export function Dogs() {
                   ))}
                 </View>
                 {message ? <Text style={[styles.message, { color: theme.ink }]}>{message}</Text> : null}
-                <BigButton kind="walk" size="m" icon={editing.dog ? "check" : "add"} label={editing.dog ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />
+                {/* a second side action goes above the row (#80) */}
                 {editing.dog ? (
-                  <BigButton kind="neutral" size="s" label={editing.dog.archived ? "Zurückholen" : "Archivieren"} onPress={() => editing.dog && archive(editing.dog, !editing.dog.archived)} />
+                  <BigButton kind="side" size="s" label={editing.dog.archived ? "Zurückholen" : "Archivieren"} onPress={() => editing.dog && archive(editing.dog, !editing.dog.archived)} />
                 ) : null}
-                <BigButton kind="neutral" size="s" label="Abbrechen" onPress={() => setEditing(null)} />
+                <ButtonRow side={[<BigButton key="no" kind="side" size="m" label="Abbrechen" onPress={() => setEditing(null)} />]} main={<BigButton kind="ink" size="m" icon={editing.dog ? "check" : "add"} label={editing.dog ? "Speichern" : "Hinzufügen"} disabled={!editing.name.trim()} onPress={() => save(editing)} />} />
               </View>
             ) : null}
           </Sheet>
@@ -90,7 +91,7 @@ export function Dogs() {
       }
       bottom={
         <>
-          <BigButton kind="walk" size="m" icon="add" label="Hund hinzufügen" onPress={() => open(null)} />
+          <BigButton kind="ink" size="m" icon="add" label="Hund hinzufügen" onPress={() => open(null)} />
         </>
       }
     />

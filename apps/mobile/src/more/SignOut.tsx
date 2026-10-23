@@ -6,6 +6,7 @@ import { forgetDevice } from "../data/api";
 import { useGassi } from "../data/GassiProvider";
 import { useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
+import { ButtonRow } from "../ui/ButtonRow";
 import { Sheet } from "../ui/Sheet";
 
 /** How long signing out here waits for the server before it signs out locally anyway. */
@@ -32,8 +33,7 @@ export function SignOutSheet({ open, onClose }: { open: boolean; onClose: () => 
       <View testID="signout-sheet" style={styles.sheet}>
         <Text style={[styles.title, { color: theme.ink }]}>{TITLE}</Text>
         <Text style={[styles.small, { color: theme.muted }]}>Danach brauchst du einen neuen Link oder Code, um dich hier wieder anzumelden.</Text>
-        <BigButton kind="neutral" size="m" label="Ja, abmelden" onPress={() => void signOut()} />
-        <BigButton kind="neutral" size="s" label="Abbrechen" onPress={onClose} />
+        <ButtonRow side={[<BigButton key="no" kind="side" size="m" label="Abbrechen" onPress={onClose} />]} main={<BigButton kind="danger" size="m" label="Ja, abmelden" onPress={() => void signOut()} />} />
       </View>
     </Sheet>
   );
