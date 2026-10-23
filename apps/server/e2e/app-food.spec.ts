@@ -160,7 +160,11 @@ test("+ Dose aufgemacht: two cans in one feeding, each its own entry; × takes o
     await expect(sheet).toBeHidden();
     await context.setOffline(false);
     await expect.poll(async () => (await openedOf()).map((e) => e.unitG).sort()).toEqual([200, 400]);
-    made.push(...(await openedOf()).map((e) => e.id), (await newest(me)).id);
+    // the cans were opened before the feeding: in Verlauf (newest first) they come after it
+    const [cans, feeding] = [await openedOf(), await newest(me)];
+    const ids = (await me.entries({})).entries.map((e) => e.id);
+    for (const c of cans) expect(ids.indexOf(c.id)).toBeGreaterThan(ids.indexOf(feeding.id));
+    made.push(...cans.map((e) => e.id), feeding.id);
     expect((await me.stock()).wet.sizes.map((x) => [x.unitG, x.cans])).toEqual([[200, 1], [400, 2]]);
 
     // a double tap is one feeding and one can

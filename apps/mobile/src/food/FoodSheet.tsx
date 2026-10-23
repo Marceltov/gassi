@@ -3,7 +3,7 @@
 // the dogs that are on get together. A feeding names no can: a can opened is its own entry ("+ Dose aufgemacht", a list
 // of the sizes with how many closed cans are left; several, also of different sizes), one closed can less in Vorrat.
 // All dogs unless some are switched off. It opens at once from what was kept, and Eintragen goes through the queue
-// (the feeding, then each can), so it works without reception.
+// (each can, then the feeding), so it works without reception.
 import { clampPortion, FOOD_MAX_G, type FoodKind, newId, openableSizes, perDog, portionFor, prefillFood, quickPortions } from "@gassi/domain";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -101,9 +101,10 @@ function FoodForm({ onClose }: { onClose: () => void }) {
   const openable = kind === "wet" && facts.stock ? openableSizes(facts.stock) : [];
   const submit = () => {
     const at = new Date().toISOString();
-    send({ id: submitId, at, kind: "food", foodKind: kind, amountG: total, ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
-    // each can its own id from the form's, so a double tap opens none twice
+    // the cans first, as they were opened before the feeding: at the same time Verlauf (newest first) lists them under
+    // it; each its own id from the form's, so a double tap opens none twice
     opened.forEach((unitG, i) => send({ id: `${submitId}-open-${i}`, at, kind: "can.open", unitG }));
+    send({ id: submitId, at, kind: "food", foodKind: kind, amountG: total, ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
     // the next opening (maybe without reception) starts from this feeding, as it would from the server's answer
     saveFacts(personId, withFeeding(facts, { foodKind: kind, amountG: portion }));
     onClose();
