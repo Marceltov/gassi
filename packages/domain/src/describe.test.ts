@@ -65,3 +65,13 @@ test("food, weight, restock and stock", () => {
 test("a distance reads in metres under a kilometre, else in km with one decimal", () => {
   expect([formatDistance(0), formatDistance(849.6), formatDistance(1000), formatDistance(3149)]).toEqual(["0 m", "850 m", "1,0 km", "3,1 km"]);
 });
+
+test("an encounter reads in short", () => {
+  expect(text(entry({ type: "dogEncounter", details: { reaction: 2, handling: "wideBerth", distance: "near" } }))).toBe("Hundebegegnung, 2 fiept · großer Bogen · nah von Hirsch");
+  expect(text(entry({ type: "personEncounter", details: { who: "Oma Inge", rating: 7, place: "home", sounds: ["growls", "whines"] } }))).toBe("Menschenbegegnung, Oma Inge · bei uns · 7/10 · knurrt · fiept von Hirsch");
+});
+
+test("both encounters can say what he said; a poop its consistency", () => {
+  expect(text(entry({ type: "dogEncounter", details: { reaction: 3, sounds: ["screeches"], attention: "none" } }))).toBe("Hundebegegnung, 3 bellt · kreischt · ansprechbar: nicht von Hirsch");
+  expect(text(entry({ type: "personEncounter", details: { who: "Paketbote", rating: 2, insecurity: 8, moods: ["afraid"] } }))).toBe("Menschenbegegnung, Paketbote · 2/10 · ängstlich · unsicher 8/10 von Hirsch");
+});

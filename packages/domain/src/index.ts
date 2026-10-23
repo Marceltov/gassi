@@ -4,6 +4,7 @@ export * from "./commandQueue";
 export * from "./commands";
 export * from "./describe";
 export * from "./dogs";
+export * from "./details";
 export * from "./entry";
 export * from "./entryTypes";
 export * from "./exerciseTotals";

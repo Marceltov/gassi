@@ -66,7 +66,7 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
   const several = new Set(shown.taps.map((t) => t.dogId)).size > 1 || dogs.filter((d) => !d.archived).length > 1;
   const dogName = (id: number) => dogs.find((d) => d.id === id)?.name ?? "Hund";
   // what a row says after its time: "Pipi", "Poopoo · weich · Toffee", "Training · 4 Min. · Sitz 4/5"
-  const itemText = (i: WalkItem) => (i.kind === "tap" ? tapLine(i.tap, several ? dogName(i.tap.dogId) : null) : trainingLine(i.training));
+  const itemText = (i: WalkItem) => (i.kind === "tap" ? tapLine(i.tap, several && i.tap.dogId !== null ? dogName(i.tap.dogId) : null) : trainingLine(i.training));
   const everyone = [...people, ...shown.walkers.filter((w) => !people.some((p) => p.id === w.id))];
   const walkerIds = shown.walkers.map((w) => w.id);
   const toggle = (id: string) => {

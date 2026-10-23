@@ -2,7 +2,8 @@
 // in grams (food, restocks, weight), food kind, can size (restocks), note and the details only some kinds have (a
 // poop's consistency). The input schemas are shared by the server and its clients.
 import { z } from "zod";
-import { CONSISTENCIES, ENTRY_TYPES, type EntryType, FOOD_KINDS, type FoodKind, minutesBetween } from "./entryTypes";
+import { type EntryDetails, entryDetails } from "./details";
+import { ENTRY_TYPES, type EntryType, FOOD_KINDS, type FoodKind, minutesBetween } from "./entryTypes";
 
 export type Entry = {
   id: number;
@@ -21,18 +22,6 @@ export type Entry = {
   createdAt: string;
   updatedAt: string;
 };
-
-/** What only some kinds of entries have, each optional: a poop's consistency (#86). Kept as one JSON column. */
-export const entryDetails = z.object({ consistency: z.enum(CONSISTENCIES).optional() }).strict();
-export type EntryDetails = z.output<typeof entryDetails>;
-/** The kinds that may have each detail. */
-const DETAIL_TYPES: Record<keyof EntryDetails, readonly EntryType[]> = { consistency: ["poop"] };
-
-/** A German message when `details` has one `type` can't have, else null. */
-export function checkDetails(type: EntryType, details: EntryDetails | null): string | null {
-  const wrong = Object.keys(details ?? {}).find((k) => !DETAIL_TYPES[k as keyof EntryDetails].includes(type));
-  return wrong ? "Das passt nicht zu dieser Art von Eintrag." : null;
-}
 
 /** `details` with `key` set to `value`, or taken out for null; none left is null. */
 export function withDetail<K extends keyof EntryDetails>(details: EntryDetails | null, key: K, value: EntryDetails[K] | null): EntryDetails | null {

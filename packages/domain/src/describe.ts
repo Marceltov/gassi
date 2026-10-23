@@ -1,6 +1,6 @@
 // How an entry reads in a list, the same in the apps.
-import type { EntryDetails } from "./entry";
-import { CONSISTENCY_LABEL, type EntryType, FOOD_LABEL, type FoodKind, TYPE_LABEL } from "./entryTypes";
+import { detailLine, type EntryDetails } from "./details";
+import { type EntryType, FOOD_LABEL, type FoodKind, TYPE_LABEL } from "./entryTypes";
 import { exerciseRate, type ExerciseTotal, trainingParts } from "./exerciseTotals";
 import { countLine, formatCanCount } from "./food";
 import { cansOf } from "./stock";
@@ -63,7 +63,9 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
       return plain([TYPE_LABEL.restock, kind].filter(Boolean).join(" "), amount);
     }
     case "poop":
-      return plain(TYPE_LABEL.poop, e.details?.consistency ? CONSISTENCY_LABEL[e.details.consistency] : "");
+    case "dogEncounter":
+    case "personEncounter":
+      return plain(TYPE_LABEL[e.type], detailLine(e.type, e.details ?? null));
     case "opened":
       return plain(TYPE_LABEL.opened, e.unitG ? `${e.unitG}-g-Dose` : "");
     case "stockcheck":

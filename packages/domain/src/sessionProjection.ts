@@ -68,6 +68,7 @@ function step(v: SessionsView, c: Command, user: Person, people: readonly Person
     }
     case "log":
     case "log.consistency":
+    case "log.entry":
     case "food":
     case "can.open":
       return v;
