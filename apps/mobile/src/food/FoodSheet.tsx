@@ -1,9 +1,9 @@
 // Futter geben: a sheet pre-filled with the newest feeding (kind and grams per dog), a switch for wet or dry, − and + in
-// 10 g steps per dog, quick amounts (recent portions per dog), the dogs, the stock, and one tap on "400 g eintragen",
-// which says what they get together (for the dogs that are on). A wet feeding comes out of the can size last used; only
+// 10 g steps per dog, quick amounts (recent portions per dog), the dogs, and one tap on Eintragen, which records what
+// the dogs that are on get together. A wet feeding comes out of the can size last used; only
 // when two sizes have cans left does the sheet ask which. All dogs unless some are switched off. It opens at once from
 // what was kept, and Eintragen goes through the queue, so it works without reception.
-import { canChoices, clampPortion, FOOD_MAX_G, type FoodKind, newId, perDog, portionFor, prefillFood, quickPortions, stockLine } from "@gassi/domain";
+import { canChoices, clampPortion, FOOD_MAX_G, type FoodKind, newId, perDog, portionFor, prefillFood, quickPortions } from "@gassi/domain";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
@@ -102,7 +102,6 @@ function FoodForm({ onClose }: { onClose: () => void }) {
     setUnitG(next);
   };
   const quick = quickPortions(facts.recent, kind);
-  const stock = facts.stock ? stockLine(facts.stock, kind) : null;
   const submit = () => {
     send({ id: submitId, at: new Date().toISOString(), kind: "food", foodKind: kind, amountG: total, ...(can ? { unitG: can } : {}), ...(chosen.length < active.length ? { dogIds: chosen.map((d) => d.id) } : {}) });
     // the next opening (maybe without reception) starts from this feeding, as it would from the server's answer
@@ -134,8 +133,7 @@ function FoodForm({ onClose }: { onClose: () => void }) {
           ))}
         </View>
       ) : null}
-      {stock ? <Text testID="food-stock" style={[styles.stock, { color: theme.muted }]}>{stock}</Text> : null}
-      <BigButton kind="food" size="m" icon="check" label={`${total} g eintragen`} onPress={submit} />
+      <BigButton kind="food" size="m" icon="check" label="Eintragen" onPress={submit} />
     </View>
   );
 }
@@ -146,5 +144,4 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   quick: { flexGrow: 1, alignItems: "center", borderRadius: 10, borderWidth: 1, paddingVertical: 9, paddingHorizontal: 10 },
   quickText: { fontSize: 14, fontWeight: "600" },
-  stock: { fontSize: 12, textAlign: "center" },
 });

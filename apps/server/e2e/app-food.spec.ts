@@ -1,4 +1,4 @@
-// The food sheet: Futter geben → "60 g eintragen", in grams per dog, pre-filled from the newest feeding, also without
+// The food sheet: Futter geben → Eintragen, in grams per dog, pre-filled from the newest feeding, also without
 // reception. Most tests feed one dog, where per dog is all of it.
 import { createClient } from "@gassi/api-client";
 import { expect, test } from "@playwright/test";
@@ -39,7 +39,7 @@ test.describe("one dog", () => {
     expect(await newest(client)).toMatchObject({ foodKind: "dry", byName: "Hirsch" });
   });
 
-  test("switching to wet takes that kind's last portion; the quick amounts and the stock line follow", async ({ page }) => {
+  test("switching to wet takes that kind's last portion and its quick amounts", async ({ page }) => {
     await asHirsch().restock({ foodKind: "wet", sizes: [{ unitG: 400, cans: 9 }] });
     await feed(90, "wet");
     await feed(55, "dry");
@@ -52,8 +52,7 @@ test.describe("one dog", () => {
     await expect(sheet.getByTestId("food-amount")).toHaveText("90 g");
     await expect(sheet.getByRole("button", { name: "90 g", exact: true })).toBeVisible(); // a recent portion
     await expect(sheet.getByRole("button", { name: /Dose/ })).toHaveCount(0); // grams only, no cans
-    await expect(sheet.getByTestId("food-stock")).toContainText("noch ");
-    await sheet.getByRole("button", { name: "10 g mehr" }).click();
+      await sheet.getByRole("button", { name: "10 g mehr" }).click();
     await expect(sheet.getByTestId("food-amount")).toHaveText("100 g");
     await sheet.getByRole("button", { name: "90 g", exact: true }).click();
     await expect(sheet.getByTestId("food-amount")).toHaveText("90 g");
@@ -100,7 +99,7 @@ test("a wet feeding comes out of the last used can; the sheet asks which only wh
     await expect(sheet.getByTestId("food-amount")).toHaveText(`${400 / dogs} g`); // the server's answer is in, per dog
     await expect(sheet.getByRole("tab", { name: "800-g-Dose" })).toHaveAttribute("aria-selected", "true");
     await sheet.getByRole("tab", { name: "400-g-Dose" }).click();
-    await sheet.getByRole("button", { name: "eintragen" }).click();
+    await sheet.getByRole("button", { name: "Eintragen" }).click();
     await expect(sheet).toBeHidden();
     const me = createClient({ baseUrl: BASE_URL, token });
     await expect.poll(async () => (await newest(me)).unitG).toBe(400);
@@ -111,9 +110,8 @@ test("a wet feeding comes out of the last used can; the sheet asks which only wh
     bought.push(...counted.entries);
     await page.goto("/");
     await page.getByRole("button", { name: "Futter geben" }).click();
-    await expect(sheet.getByTestId("food-stock")).toContainText("2 × 800 g");
-    await expect(sheet.getByRole("tab", { name: /Dose/ })).toHaveCount(0);
-    await sheet.getByRole("button", { name: "eintragen" }).click();
+    await expect(sheet.getByRole("tab", { name: /Dose/ })).toHaveCount(0); // once the server's answer is in
+    await sheet.getByRole("button", { name: "Eintragen" }).click();
     await expect.poll(async () => (await newest(me)).unitG).toBe(800);
     await me.deleteEntry({ id: (await newest(me)).id });
   } finally {
@@ -121,7 +119,7 @@ test("a wet feeding comes out of the last used can; the sheet asks which only wh
   }
 });
 
-test("with two dogs the grams are per dog: the button says what they get together, a dog switched off gets nothing", async ({ page }) => {
+test("with two dogs the grams are per dog: Eintragen records what they get together, a dog switched off gets nothing", async ({ page }) => {
   const dogs = (await asHirsch().dogs()).dogs.filter((d) => !d.archived);
   test.skip(dogs.length !== 2, "needs exactly two dogs");
   await feed(300, "dry"); // both dogs: 150 g each
@@ -131,11 +129,9 @@ test("with two dogs the grams are per dog: the button says what they get togethe
   const sheet = page.getByTestId("food-sheet");
   await expect(sheet.getByTestId("food-amount")).toHaveText("150 g");
   await expect(sheet.getByText("je Hund")).toBeVisible();
-  await expect(sheet.getByRole("button", { name: "300 g eintragen" })).toBeVisible();
   await sheet.getByRole("button", { name: "10 g mehr" }).click();
-  await expect(sheet.getByRole("button", { name: "320 g eintragen" })).toBeVisible();
   await sheet.getByRole("button", { name: dogs[1].name }).click(); // off
-  await sheet.getByRole("button", { name: "160 g eintragen" }).click();
+  await sheet.getByRole("button", { name: "Eintragen" }).click();
   await expect(sheet).toBeHidden();
   const client = createClient({ baseUrl: BASE_URL, token });
   await expect.poll(async () => (await newest(client)).amountG).toBe(160);

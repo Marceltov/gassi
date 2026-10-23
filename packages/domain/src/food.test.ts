@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { buyingSizes, canChoices, countWeight, clampPortion, countLine, formSizes, mergeSizes, stillHidden, countTitle, formatCanCount, perDog, portionFor, prefillFood, quickPortions, stockLine, stockParts, stockSummary } from "./food";
+import { buyingSizes, canChoices, countWeight, clampPortion, countLine, formSizes, mergeSizes, stillHidden, countTitle, formatCanCount, perDog, portionFor, prefillFood, quickPortions, stockParts, stockSummary } from "./food";
 import type { CanStock, Stock, WetStock } from "./stock";
 
 const can = (unitG: number, cans: number): CanStock => ({ unitG, grams: cans * unitG, cans, belowZero: false, lastAt: null });
@@ -39,17 +39,6 @@ test("a can size's count: whole and half cans × grams", () => {
   expect(formatCanCount(can(400, 0.5))).toBe("½ × 400 g");
   expect(formatCanCount(can(400, 2.75))).toBe("2¾ × 400 g");
   expect(formatCanCount(can(400, 1.25))).toBe("1¼ × 400 g");
-});
-
-test("the stock line says what is left per can size and for how long", () => {
-  const stock: Stock = { wet: wetStock([can(400, 3), can(800, 2)], { daysLeft: 9.2 }), dry: { grams: 1200, daysLeft: 1, belowZero: false } };
-  expect(stockLine(stock, "wet")).toBe("Vorrat: noch 3 × 400 g · 2 × 800 g · reicht etwa 9 Tage");
-  expect(stockLine(stock, "dry")).toBe("Vorrat: noch 1,2 kg · reicht etwa 1 Tag");
-  expect(stockLine({ ...stock, dry: { grams: null, daysLeft: null, belowZero: false } }, "dry")).toBeNull();
-  expect(stockLine({ ...stock, dry: { grams: 0, daysLeft: 0, belowZero: true } }, "dry")).toBe("Vorrat aufgebraucht");
-  expect(stockLine({ ...stock, dry: { grams: 300, daysLeft: 0.4, belowZero: false } }, "dry")).toBe("Vorrat: noch 300 g · reicht weniger als einen Tag");
-  expect(stockLine({ ...stock, dry: { grams: 0, daysLeft: 0, belowZero: false } }, "dry")).toBe("Vorrat aufgebraucht");
-  expect(stockLine({ ...stock, wet: wetStock([can(400, 0), can(800, 0)]) }, "wet")).toBe("Vorrat aufgebraucht");
 });
 
 test("the stock in parts, for the stock screen: per can size, the total, for how long, and whether it ran out", () => {

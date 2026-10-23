@@ -84,15 +84,6 @@ export function stockParts(stock: Stock, kind: FoodKind): { left: string | null;
   return { left, sizes, amount, lasts, empty };
 }
 
-/** The stock of a kind in one line: "Vorrat: noch 3 × 400 g · 2 × 800 g · reicht etwa 9 Tage", "Vorrat
- * aufgebraucht"; null when it isn't known. */
-export function stockLine(stock: Stock, kind: FoodKind): string | null {
-  const { left, lasts, empty } = stockParts(stock, kind);
-  if (empty) return "Vorrat aufgebraucht";
-  if (left === null) return null;
-  return `Vorrat: noch ${left}${lasts ? ` · ${lasts}` : ""}`;
-}
-
 /** Both kinds' stock in one line, the same form for each: "Nass: 3 × 400 g, 2 × 800 g · Trocken: 1,2 kg", "Nass:
  * aufgebraucht"; a kind never entered stays out; null when neither is known. */
 export function stockSummary(stock: Stock): string | null {
