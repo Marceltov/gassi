@@ -1,6 +1,6 @@
 import type { Output } from "@gassi/api-client";
 import { expect, test } from "vitest";
-import { bumpRep, bumpTreat, editInput, formOf, historyQuery, pickDog, trainingInput } from "./form";
+import { bumpRep, bumpTreat, countEdits, editInput, formOf, historyQuery, pickDog, trainingInput } from "./form";
 
 type Entry = Output<"entry">;
 const entry = (more: Partial<Entry>): Entry => ({
@@ -62,4 +62,18 @@ test("picking a dog: one for pee, at least one for a walk", () => {
 test("the history query leaves out what isn't filtered", () => {
   expect(historyQuery({}, 0)).toEqual({});
   expect(historyQuery({ by: "bille", type: "walk", dog: 2 }, 50)).toEqual({ by: "bille", type: "walk", dog: "2", offset: 50 });
+});
+
+test("an opened can changed to another size sends that size, one can of it", () => {
+  const e = entry({ type: "opened", dogIds: [], amountG: 400, unitG: 400 });
+  expect(editInput(e, { ...formOf(e), unitG: 800 })).toMatchObject({ unitG: 800, amountG: 800 });
+});
+
+test("a wet count: this row sends its cans, the other rows changed go as edits of their own at the count's time", () => {
+  const e = entry({ id: 7, type: "stockcheck", dogIds: [], amountG: 1200, unitG: 400, count: [{ id: 7, unitG: 400, amountG: 1200 }, { id: 8, unitG: 800, amountG: 800 }, { id: 9, unitG: 200, amountG: 400 }] });
+  const f = formOf(e);
+  expect(f.count).toEqual([{ id: 7, unitG: 400, cans: 3 }, { id: 8, unitG: 800, cans: 1 }, { id: 9, unitG: 200, cans: 2 }]);
+  const changed = { ...f, at: "2026-10-20T11:00:00.000Z", count: [{ id: 7, unitG: 400, cans: 4 }, { id: 8, unitG: 800, cans: 0 }, { id: 9, unitG: 200, cans: 2 }] };
+  expect(editInput(e, changed)).toMatchObject({ id: 7, amountG: 1600, unitG: 400 });
+  expect(countEdits(e, changed)).toEqual([{ id: 8, at: "2026-10-20T11:00:00.000Z", endedAt: null, dogIds: [], amountG: 0, foodKind: "wet", unitG: 800, note: null }]);
 });

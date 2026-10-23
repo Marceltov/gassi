@@ -22,8 +22,8 @@ export function StepButton({ label, sign, disabled, small, onPress }: StepProps)
 }
 
 /** An amount between − and +: `step` names one step for the screen reader ("10 g" weniger / mehr), `sub` what the
- * amount is of, under it ("je Hund"). */
-export function AmountStepper({ value, sub, step, testID, onStep, atMin, atMax }: { value: string; sub?: string; step: string; testID?: string; onStep: (d: 1 | -1) => void; atMin: boolean; atMax: boolean }) {
+ * amount is of, under it ("je Hund"; `subTestID` names it for a test). */
+export function AmountStepper({ value, sub, step, testID, subTestID, onStep, atMin, atMax }: { value: string; sub?: string; step: string; testID?: string; subTestID?: string; onStep: (d: 1 | -1) => void; atMin: boolean; atMax: boolean }) {
   const theme = useTheme();
   return (
     <View style={styles.row}>
@@ -32,7 +32,11 @@ export function AmountStepper({ value, sub, step, testID, onStep, atMin, atMax }
         <Text testID={testID} style={[styles.amount, { color: theme.ink }]}>
           {value}
         </Text>
-        {sub ? <Text style={[styles.sub, { color: theme.muted }]}>{sub}</Text> : null}
+        {sub ? (
+          <Text testID={subTestID} style={[styles.sub, { color: theme.muted }]}>
+            {sub}
+          </Text>
+        ) : null}
       </View>
       <StepButton label={`${step} mehr`} sign="+" disabled={atMax} onPress={() => onStep(1)} />
     </View>

@@ -1,10 +1,10 @@
 // One entry from Verlauf, to be put right afterwards: its time (and end), the dogs, for a walk who went, for food the
 // amount and kind, for weight the weight, for a training its repetitions per exercise and dog and its treats, a note;
-// Speichern sends it all, Löschen asks first. What it is and who entered it stay on top, the buttons at the bottom
-// (#71). A wet count (one row per can size) is one thing here: its sizes in one line,
+// Speichern sends it all, Löschen asks first. What it is, who entered it and what it is about (large, fact.ts: #81)
+// stay on top, the buttons at the bottom (#71). A wet count (one row per can size) is one thing here: its sizes as rows,
 // its time moved and its rows deleted together. Both need the server (the writes' client): they say so without
 // reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
-import { clampPortion, countLine, countTitle, describeEntry, dogRule, FOOD_MAX_G, formatKg, keepsOne, trainingSummaryLine, TYPE_LABEL } from "@gassi/domain";
+import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, type Stock, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -13,6 +13,7 @@ import { type Gassi, useGassi } from "../data/GassiProvider";
 import { type ButtonKind, radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
+import { ChoiceList } from "../ui/ChoiceList";
 import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
 import { Icon, type IconName } from "../ui/Icon";
 import { TYPE_ICON } from "../ui/icons";
@@ -21,7 +22,8 @@ import { Segments } from "../ui/Segments";
 import { Sheet } from "../ui/Sheet";
 import { AmountStepper, StepButton } from "../ui/Stepper";
 import { LAST_WALKER } from "../walk/lastOne";
-import { bumpRep, bumpTreat, editInput, type Entry, type Form, formOf, pickDog, trainingInput } from "./form";
+import { factOf } from "./fact";
+import { bumpRep, bumpTreat, countEdits, editInput, type Entry, type Form, formOf, pickDog, trainingInput } from "./form";
 import { TIME_ZONE } from "../time";
 import { TimeField } from "./TimeField";
 
@@ -35,6 +37,7 @@ export function EntryDetail({ id }: { id: number }) {
   const [form, setForm] = useState<Form | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const [stock, setStock] = useState<Stock | null>(null); // an opened can's sizes to choose from
   const busy = useRef(false); // a second tap on Speichern or Löschen while the first is on its way does nothing
 
   useEffect(() => {
@@ -45,6 +48,7 @@ export function EntryDetail({ id }: { id: number }) {
         if (!alive) return;
         setEntry(e);
         setForm(formOf(e));
+        if (e.type === "opened") void api.stock().then((s) => alive && setStock(s), () => undefined);
       },
       (e) => alive && setMessage(errorMessage(e)),
     );
@@ -70,6 +74,8 @@ export function EntryDetail({ id }: { id: number }) {
     run(async () => {
       if (!writeApi) return;
       await writeApi.editEntry(editInput(e, f));
+      // a count's other sizes after this one, which moves them all to its time
+      for (const other of countEdits(e, f)) await writeApi.editEntry(other);
       if (e.type === "training") await writeApi.editTraining(trainingInput(e, f));
     });
   // a deleted walk has no summary to go back to: the first screen of the tab it was opened on (Verlauf, or Start right
@@ -98,6 +104,16 @@ export function EntryDetail({ id }: { id: number }) {
     else setMessage(LAST_WALKER);
   };
   const running = !!entry.clientKey && !entry.endedAt;
+  const fact = factOf(entry, form, { dogName: (did) => dogs.find((d) => d.id === did)?.name ?? "Hund", exerciseName: (eid) => exercises.find((x) => x.id === eid)?.name ?? "Übung", timeZone: TIME_ZONE });
+  // food bought or counted is changed where it is shown: cans or half kilos between − and +, a count per size
+  const amount = form.amountG ?? 0;
+  const stepper =
+    fact && "big" in fact && (entry.type === "restock" || entry.type === "stockcheck")
+      ? entry.unitG
+        ? { step: "1 Dose", by: entry.unitG, least: entry.unitG }
+        : { step: "0,5 kg", by: 500, least: entry.type === "restock" ? 500 : 0 }
+      : null;
+  const sizes = [...new Set([...(stock?.wet.sizes.map((s) => s.unitG) ?? []), ...(form.unitG ? [form.unitG] : [])])].sort((a, b) => a - b);
   const timed = entry.type === "walk" || entry.type === "training";
 
   return (
@@ -108,17 +124,32 @@ export function EntryDetail({ id }: { id: number }) {
             <Icon name={TYPE_ICON[entry.type]} size={24} color={theme.muted} />
             <Text style={[styles.title, { color: theme.ink }]}>{entry.count ? countTitle(entry.at, TIME_ZONE) : TYPE_LABEL[entry.type]}</Text>
           </View>
-          {entry.count || entry.type === "opened" ? (
-            // what was counted, or which can was opened ("400-g-Dose"), to check before deleting it
-            <Text testID="count-line" style={[styles.countLine, { color: theme.ink }]}>
-              {entry.count ? countLine(entry.count) : describeEntry(entry).extra}
-            </Text>
-          ) : null}
           <Text style={[styles.small, { color: theme.muted }]}>{`eingetragen von ${entry.byName}`}</Text>
+          {stepper && fact && "big" in fact ? (
+            <AmountStepper testID="fact-big" subTestID="fact-sub" value={fact.big} sub={fact.sub} step={stepper.step} onStep={(d) => change({ amountG: Math.max(stepper.least, amount + d * stepper.by) })} atMin={amount - stepper.by < stepper.least} atMax={false} />
+          ) : fact && "big" in fact ? (
+            <FactView fact={fact} />
+          ) : null}
         </>
       }
       top={
         <>
+          {fact && "rows" in fact ? (
+            <View style={styles.rows}>
+              {form.count.map((r) => (
+                <View key={r.id} testID="fact-row" style={[styles.row, { backgroundColor: theme.surface }]}>
+                  <Text style={[styles.rowLabel, { color: theme.muted }]}>{`Dosen à ${r.unitG} g`}</Text>
+                  <Counter value={r.cans} what={`Dosen à ${r.unitG} g`} onStep={(d) => change({ count: form.count.map((x) => (x.id === r.id ? { ...x, cans: Math.max(0, x.cans + d) } : x)) })} />
+                </View>
+              ))}
+              <Text testID="fact-sum" style={[styles.factSum, { color: theme.muted }]}>
+                {fact.sum}
+              </Text>
+            </View>
+          ) : null}
+          {entry.type === "opened" && sizes.length > 1 ? (
+            <ChoiceList accent={theme.food} choices={sizes.map((u) => ({ key: u, label: `${u}-g-Dose`, on: u === form.unitG, onPress: () => change({ unitG: u }) }))} />
+          ) : null}
           <View style={styles.times}>
             <TimeField label={timed ? "Beginn" : "Zeit"} value={form.at} onChange={(at) => change({ at })} />
             {form.endedAt !== null ? <TimeField label="Ende" value={form.endedAt} onChange={(endedAt) => change({ endedAt })} /> : null}
@@ -180,8 +211,8 @@ export function EntryDetail({ id }: { id: number }) {
 
 type Names = Pick<Gassi, "dogs" | "exercises" | "treatKinds">;
 
-// A training's repetitions per exercise (and dog, when several train) as counts of "klappt" and "klappt nicht", more exercises from the
-// household's list, and the treats per kind.
+// A training's repetitions per exercise (and dog, when several train) as counts of "klappt" and "klappt nicht", more
+// exercises from the household's list ("Übungen"), and the treats per kind ("Leckerli"), each a section of its own.
 function TrainingFields({ form, change, names }: { form: Form; change: (c: Partial<Form>) => void; names: Names }) {
   const theme = useTheme();
   const reps = form.reps.filter((r) => form.dogIds.includes(r.dogId));
@@ -194,43 +225,60 @@ function TrainingFields({ form, change, names }: { form: Form; change: (c: Parti
   const add = (eid: number) => change({ reps: [...form.reps, ...form.dogIds.map((dogId) => ({ exerciseId: eid, dogId, ok: 0, fail: 0 }))] });
   const kinds = [...names.treatKinds.map((k) => ({ id: k.id, name: k.name })), ...form.treats.filter((t) => !names.treatKinds.some((k) => k.id === t.treatKindId)).map((t) => ({ id: t.treatKindId, name: "Leckerli" }))];
   const treatCount = (kid: number) => form.treats.find((t) => t.treatKindId === kid)?.count ?? 0;
-  const summary = trainingSummaryLine(
-    reps.map((r) => ({ name: exerciseName(r.exerciseId), ok: r.ok, fail: r.fail })),
-    form.treats.reduce((n, t) => n + t.count, 0),
-  );
 
+  // what was trained is on top (the fact); here the rows to correct it
   return (
-    <View style={[styles.card, { backgroundColor: theme.surface }]}>
-      <Text testID="edit-training-summary" style={[styles.summary, { color: theme.ink }]}>
-        {summary}
-      </Text>
-      {exerciseIds.flatMap((eid) =>
-        form.dogIds.map((did) => {
-          const label = several ? `${exerciseName(eid)} ${dogName(did)}` : exerciseName(eid);
-          return (
-            <View key={`${eid}/${did}`} style={styles.repRow}>
-              <Text style={[styles.repName, { color: theme.ink }]} numberOfLines={2}>
-                {label}
-              </Text>
-              <Counter sign="check" value={count(eid, did, "ok")} what={`${label} klappt`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "ok", d) })} />
-              <Counter sign="cross" value={count(eid, did, "fail")} what={`${label} klappt nicht`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "fail", d) })} />
-            </View>
-          );
-        }),
-      )}
-      {addable.length ? (
-        <View style={styles.chips}>
-          {addable.map((x) => (
-            <Chip key={x.id} label={`+ ${x.name}`} a11y={`Übung ${x.name} dazu`} on={false} onPress={() => add(x.id)} />
-          ))}
-        </View>
+    <>
+      <View testID="training-exercises" style={[styles.card, { backgroundColor: theme.surface }]}>
+        <Text style={[styles.section, { color: theme.muted }]}>Übungen</Text>
+        {exerciseIds.flatMap((eid) =>
+          form.dogIds.map((did) => {
+            const label = several ? `${exerciseName(eid)} ${dogName(did)}` : exerciseName(eid);
+            return (
+              <View key={`${eid}/${did}`} style={styles.repRow}>
+                <Text style={[styles.repName, { color: theme.ink }]} numberOfLines={2}>
+                  {label}
+                </Text>
+                <Counter sign="check" value={count(eid, did, "ok")} what={`${label} klappt`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "ok", d) })} />
+                <Counter sign="cross" value={count(eid, did, "fail")} what={`${label} klappt nicht`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "fail", d) })} />
+              </View>
+            );
+          }),
+        )}
+        {addable.length ? (
+          <View style={styles.chips}>
+            {addable.map((x) => (
+              <Chip key={x.id} label={`+ ${x.name}`} a11y={`Übung ${x.name} dazu`} on={false} onPress={() => add(x.id)} />
+            ))}
+          </View>
+        ) : null}
+      </View>
+      {kinds.length ? (
+      <View testID="training-treats" style={[styles.card, { backgroundColor: theme.surface }]}>
+        <Text style={[styles.section, { color: theme.muted }]}>Leckerli</Text>
+        {kinds.map((k) => (
+          <View key={k.id} style={styles.repRow}>
+            <Text style={[styles.repName, { color: theme.ink }]}>{k.name}</Text>
+            <Counter value={treatCount(k.id)} what={k.name} onStep={(d) => change({ treats: bumpTreat(form.treats, k.id, d) })} />
+          </View>
+        ))}
+      </View>
       ) : null}
-      {kinds.map((k) => (
-        <View key={k.id} style={styles.repRow}>
-          <Text style={[styles.repName, { color: theme.ink }]}>{k.name}</Text>
-          <Counter value={treatCount(k.id)} what={k.name} onStep={(d) => change({ treats: bumpTreat(form.treats, k.id, d) })} />
-        </View>
-      ))}
+    </>
+  );
+}
+
+/** What the entry is about, large, with a line under it. */
+function FactView({ fact }: { fact: { big: string; sub: string } }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.fact}>
+      <Text testID="fact-big" style={[styles.big, { color: theme.ink }]}>
+        {fact.big}
+      </Text>
+      <Text testID="fact-sub" style={[styles.factSub, { color: theme.muted }]}>
+        {fact.sub}
+      </Text>
     </View>
   );
 }
@@ -260,7 +308,13 @@ function Counter({ sign, value, what, onStep }: { sign?: IconName; value: number
 }
 
 const styles = StyleSheet.create({
-  countLine: { fontSize: 18, fontWeight: "700" },
+  fact: { alignItems: "center", paddingVertical: 4 },
+  big: { fontSize: 34, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  factSub: { fontSize: 14, textAlign: "center" },
+  rows: { gap: 6 },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", height: 44, borderRadius: radius.tile, paddingHorizontal: 14 },
+  rowLabel: { fontSize: 15, fontWeight: "600" },
+  factSum: { fontSize: 13, textAlign: "right" },
   title: { fontSize: 22, fontWeight: "700" },
   heading: { flexDirection: "row", alignItems: "center", gap: 8 },
   small: { fontSize: 13 },
@@ -269,7 +323,7 @@ const styles = StyleSheet.create({
   group: { gap: 6 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   card: { borderRadius: radius.tile, padding: 12, gap: 8 },
-  summary: { fontSize: 15, fontWeight: "700" },
+  section: { fontSize: 13, fontWeight: "700" },
   repRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   repName: { flex: 1, fontSize: 15 },
   counter: { flexDirection: "row", alignItems: "center", gap: 4 },

@@ -222,6 +222,7 @@ test("from a walk's summary: its pee is deleted, its start moved, then the walk 
 test("a training reads Sitz 2/3 in the list; its repetitions are changed in its detail", async ({ page }) => {
   const client = asHirsch();
   const sitz = (await client.exercises()).exercises.find((e) => e.name === "Sitz") ?? (await client.addExercise({ name: "Sitz" }));
+  if (!(await client.treatKinds()).treatKinds.length) await client.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false });
   const dog = await firstDog();
   const key = `history-training-${Date.now()}`;
   const rep = (n: number, ok: boolean) => ({ id: `${key}-${n}`, at: minutesAgo(10 - n), kind: "training.rep" as const, trainingKey: key, exerciseId: sitz.id, dogId: dog.id, ok, delta: 1 as const });
@@ -244,7 +245,10 @@ test("a training reads Sitz 2/3 in the list; its repetitions are changed in its 
   await row.click();
   await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${training.id}`);
   await page.getByRole("button", { name: "Sitz klappt: eins mehr" }).click();
-  await expect(page.getByTestId("edit-training-summary")).toHaveText("Sitz 3/4");
+  await expect(page.getByTestId("fact-sub")).toHaveText("Sitz 3/4");
+  // exercises and treats in sections of their own
+  await expect(page.getByTestId("training-exercises").getByText("Übungen", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("training-treats").getByText("Leckerli", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Speichern" }).click();
 
   await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
@@ -279,7 +283,7 @@ test("a walk's summary counts what happened, lists it by time, and a training op
   await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${walk.trainings[0].id}`);
 });
 
-test("Verlauf, an entry and a walk's summary fit a small and a big phone; every row is two lines of one height and names its dogs", async ({ page }) => {
+test("Verlauf, an entry and a walk's summary fit a small and a big phone; every row is two lines of one height (a count a line per size, taller) and names its dogs", async ({ page }) => {
   const client = asHirsch();
   const dogs = (await client.dogs()).dogs.filter((d) => !d.archived);
   const food = await client.logEntry({ type: "food", foodKind: "wet", amountG: 120 });
@@ -292,6 +296,18 @@ test("Verlauf, an entry and a walk's summary fit a small and a big phone; every 
   const height = async (id: number) => (await page.getByTestId(`entry-${id}`).boundingBox())!.height;
   expect(await height(pee.id)).toBe(await height(food.id)); // a long note is cut short
   expect(await height(walk.id)).toBe(await height(food.id)); // a walk too
+  // a count is one row, a line per size: taller, never shorter
+  const counted = (await client.correctStock({ foodKind: "wet", sizes: [{ unitG: 200, cans: "1" }, { unitG: 400, cans: "2" }, { unitG: 800, cans: "3" }] })).entries;
+  made.push(...counted.map((e) => e.id));
+  await page.reload();
+  const ids = counted.map((e) => e.id);
+  await expect(page.getByTestId(new RegExp(`^entry-(${ids.join("|")})$`))).toHaveCount(1); // one row for the count
+  const shown = ids.at(-1)!; // the newest of its rows stands for it
+  await expect(page.getByTestId(`entry-${shown}-size`)).toHaveText(["1 × 200 g", "2 × 400 g", "3 × 800 g"]);
+  expect(await height(shown)).toBeGreaterThan(await height(food.id));
+  // its icon stays at the top, next to its heading and first line, not in the middle of the row
+  const [dot, title] = await Promise.all([page.getByTestId(`entry-${shown}-dot`).boundingBox(), page.getByTestId(`entry-${shown}-title`).boundingBox()]);
+  expect(dot!.y).toBeLessThan(title!.y + title!.height);
   for (const d of dogs) await expect(page.getByTestId(`entry-${food.id}-more`)).toContainText(d.name); // all of them, too
   await expect(page.getByTestId(`entry-${pee.id}-more`)).toContainText(dogs[0].name);
   // what the entry says is bold, what kind it is isn't
@@ -302,7 +318,7 @@ test("Verlauf, an entry and a walk's summary fit a small and a big phone; every 
   await expectFits(page, `/verlauf/runde/${walk.id}`, "Fertig");
 });
 
-test("a walk's small map in Verlauf shows the walk, not the city around it, and leaves the icon and the lines where they are in every row", async ({ page }) => {
+test("a walk's map in Verlauf is wide under its two lines, shows the walk, and leaves the icon and the lines where they are in every row", async ({ page }) => {
   const walk = await pastWalk(2);
   const t = (s: number) => new Date(Date.parse(walk.startedAt) + s * 1000).toISOString();
   // 1,3 km to the north and back
@@ -317,6 +333,11 @@ test("a walk's small map in Verlauf shows the walk, not the city around it, and 
   const [box, drawn] = await Promise.all([thumb.boundingBox(), line.boundingBox()]);
   // the walk reaches across most of the box, with a thin margin
   expect(Math.max(drawn!.width / box!.width, drawn!.height / box!.height)).toBeGreaterThan(0.75);
+  // under the two lines, as wide as most of the row and tall enough to see the route
+  const [row, title] = await Promise.all([page.getByTestId(`entry-${walk.id}`).boundingBox(), page.getByTestId(`entry-${walk.id}-more`).boundingBox()]);
+  expect(box!.y).toBeGreaterThanOrEqual(title!.y + title!.height);
+  expect(box!.height).toBeGreaterThanOrEqual(100);
+  expect(box!.width).toBeGreaterThan(row!.width / 2);
   // the icon and the lines start where they do in a row without a map
   const food = await asHirsch().logEntry({ type: "food", foodKind: "wet", amountG: 80 });
   made.push(food.id);
@@ -340,10 +361,68 @@ test("an opened can shows in Verlauf and, deleted, goes back into Vorrat", async
   await expect(page.getByTestId(`entry-${opened.id}-title`)).toHaveText("Dose aufgemacht");
   await expect(page.getByTestId(`entry-${opened.id}-extra`)).toHaveText("400-g-Dose");
   await page.getByTestId(`entry-${opened.id}`).click();
-  await expect(page.getByTestId("count-line")).toHaveText("400-g-Dose"); // which can, before deleting it
+  await expect(page.getByTestId("fact-big")).toHaveText("400 g"); // which can, large, before deleting it
   await page.getByRole("button", { name: "Löschen", exact: true }).click();
   await page.getByRole("button", { name: "Ja, löschen" }).click();
   await expect(page.getByTestId(`entry-${opened.id}`)).toHaveCount(0);
   expect((await client.stock()).wet.sizes.find((s) => s.unitG === 400)?.cans).toBe(3);
   await expectFits(page, "/mehr/vorrat", "Nassfutter");
+});
+
+test("an entry's detail shows what it is about large on top: a purchase's cans, a count's rows, a pee's time and dog", async ({ page }) => {
+  const client = asHirsch();
+  const dog = await firstDog();
+  const bought = (await client.restock({ foodKind: "wet", sizes: [{ unitG: 400, cans: 12 }] })).entries;
+  const counted = (await client.correctStock({ foodKind: "wet", sizes: [{ unitG: 400, cans: "12" }, { unitG: 800, cans: "2" }] })).entries;
+  const pee = await client.logEntry({ type: "pee", dogIds: [dog.id], at: minutesAgo(30) });
+  made.push(...bought.map((e) => e.id), ...counted.map((e) => e.id), pee.id);
+
+  await signIn(page);
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${bought[0].id}`);
+  await expect(page.getByTestId("fact-big")).toHaveText("12 Dosen");
+  await expect(page.getByTestId("fact-sub")).toHaveText("à 400 g · 4,8 kg");
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${counted[0].id}`);
+  await expect(page.getByTestId("fact-row")).toHaveText([/^Dosen à 400 g.*12/, /^Dosen à 800 g.*2/]);
+  await expect(page.getByTestId("fact-sum")).toHaveText("zusammen 6,4 kg");
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${pee.id}`);
+  await expect(page.getByTestId("fact-big")).toHaveText(/^\d\d:\d\d$/);
+  await expect(page.getByTestId("fact-sub")).toContainText(dog.name);
+  // the large fact sits above the fields, and the page still fits
+  const [big, field] = await Promise.all([page.getByTestId("fact-big").boundingBox(), page.getByText("Zeit", { exact: true }).boundingBox()]);
+  expect(big!.y).toBeLessThan(field!.y);
+  await expectFits(page, `/verlauf/eintrag/${counted[0].id}`, "Speichern");
+});
+
+test("a purchase's cans, a count's sizes and an opened can's size can be changed in their detail", async ({ page }) => {
+  const client = asHirsch();
+  const bought = (await client.restock({ foodKind: "wet", sizes: [{ unitG: 400, cans: 12 }, { unitG: 800, cans: 1 }] })).entries;
+  const counted = (await client.correctStock({ foodKind: "wet", sizes: [{ unitG: 400, cans: "12" }, { unitG: 800, cans: "2" }] })).entries;
+  const at = new Date(Date.parse(counted[0].at) + 1000).toISOString();
+  await client.commands({ commands: [{ id: `open-${Date.now()}`, at, kind: "can.open", unitG: 400 }] });
+  const opened = (await client.entries({ type: "opened" })).entries[0];
+  made.push(...bought.map((e) => e.id), ...counted.map((e) => e.id), opened.id);
+  const save = async () => {
+    await page.getByRole("button", { name: "Speichern" }).click();
+    await expect(page).toHaveURL(/\/verlauf$/);
+  };
+
+  await signIn(page);
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${bought[0].id}`);
+  await page.getByRole("button", { name: "1 Dose mehr" }).click();
+  await expect(page.getByTestId("fact-big")).toHaveText("13 Dosen");
+  await save();
+  expect((await client.entry({ id: bought[0].id })).amountG).toBe(13 * 400);
+
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${counted[0].id}`);
+  await page.getByRole("button", { name: "Dosen à 800 g: eins mehr" }).click();
+  await page.getByRole("button", { name: "Dosen à 400 g: eins weniger" }).click();
+  await expect(page.getByTestId("fact-sum")).toHaveText("zusammen 6,8 kg");
+  await save();
+  expect((await client.stock()).wet.sizes.filter((s) => s.unitG === 400 || s.unitG === 800).map((s) => [s.unitG, s.cans])).toEqual([[400, 10], [800, 3]]); // 11 counted, 1 opened
+
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${opened.id}`);
+  await page.getByRole("button", { name: "800-g-Dose" }).click();
+  await expect(page.getByTestId("fact-big")).toHaveText("800 g");
+  await save();
+  expect(await client.entry({ id: opened.id })).toMatchObject({ unitG: 800, amountG: 800 });
 });

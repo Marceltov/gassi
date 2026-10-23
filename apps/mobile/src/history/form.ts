@@ -1,11 +1,13 @@
 // An entry's detail as a form, and what it sends: an edit carries every field (a left-out note or amount would become
-// empty), walkers only for a walk; a training's repetitions and treats go in their own call and replace what it had.
+// empty), walkers only for a walk; a training's repetitions and treats go in their own call and replace what it had; a
+// wet count's other rows (one entry per can size) go as edits of their own, those whose cans changed.
 import type { Input, Output } from "@gassi/api-client";
-import { dogRule, type EntryType, keepsOne } from "@gassi/domain";
+import { cansOf, dogRule, type EntryType, keepsOne } from "@gassi/domain";
 
 export type Entry = Output<"entry">;
 type Rep = Entry["reps"][number];
 type TreatCount = Entry["treatCounts"][number];
+type CountRow = { id: number; unitG: number; cans: number };
 
 export type Form = {
   at: string;
@@ -14,6 +16,8 @@ export type Form = {
   walkerIds: string[];
   amountG: number | null;
   foodKind: Entry["foodKind"];
+  unitG: number | null; // an opened can's size
+  count: CountRow[]; // a wet count's closed cans per size
   note: string;
   reps: Rep[];
   treats: TreatCount[];
@@ -26,23 +30,35 @@ export const formOf = (e: Entry): Form => ({
   walkerIds: e.walkerIds,
   amountG: e.amountG,
   foodKind: e.foodKind,
+  unitG: e.unitG,
+  count: (e.count ?? []).map((r) => ({ id: r.id, unitG: r.unitG, cans: cansOf(r.amountG, r.unitG) })),
   note: e.note ?? "",
   reps: e.reps,
   treats: e.treatCounts,
 });
 
 export function editInput(e: Entry, f: Form): Input<"editEntry"> {
+  const row = f.count.find((r) => r.id === e.id);
   return {
     id: e.id,
     at: f.at,
     endedAt: f.endedAt,
     dogIds: f.dogIds,
-    amountG: f.amountG,
+    // an opened can is one can of its size; a count's row its closed cans
+    amountG: e.type === "opened" ? f.unitG : row ? row.cans * row.unitG : f.amountG,
     foodKind: f.foodKind,
-    unitG: e.unitG,
+    unitG: e.type === "opened" ? f.unitG : e.unitG,
     note: f.note.trim() || null,
     ...(e.type === "walk" ? { walkers: f.walkerIds } : {}),
   };
+}
+
+/** A wet count's other rows whose cans changed, each at the count's time (moving this row moves them all). */
+export function countEdits(e: Entry, f: Form): Input<"editEntry">[] {
+  const was = new Map((e.count ?? []).map((r) => [r.id, cansOf(r.amountG, r.unitG)]));
+  return f.count
+    .filter((r) => r.id !== e.id && r.cans !== was.get(r.id))
+    .map((r) => ({ id: r.id, at: f.at, endedAt: null, dogIds: [], amountG: r.cans * r.unitG, foodKind: "wet" as const, unitG: r.unitG, note: null }));
 }
 
 /** The training's repetitions for the dogs it is now for, and its treats. */

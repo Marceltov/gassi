@@ -52,6 +52,8 @@ test("food, weight, restock and stock", () => {
   expect(text(entry({ type: "stockcheck", foodKind: "dry", amountG: 3500 }))).toBe("Bestand Trockenfutter, 3,5 kg von Hirsch");
   expect(text(entry({ type: "stockcheck", foodKind: "wet", amountG: 1000, unitG: 400 }))).toBe("Bestand Nassfutter, 2 × 400 g von Hirsch"); // closed cans
   expect(text(entry({ type: "opened", foodKind: "wet", amountG: 400, unitG: 400 }))).toBe("Dose aufgemacht, 400-g-Dose von Hirsch");
+  // a wet count's row names all its sizes
+  expect(text(entry({ type: "stockcheck", foodKind: "wet", amountG: 4800, unitG: 400, count: [{ unitG: 400, amountG: 4800 }, { unitG: 800, amountG: 1600 }] }))).toBe("Bestand Nassfutter, 12 × 400 g, 2 × 800 g von Hirsch");
 });
 
 test("a distance reads in metres under a kilometre, else in km with one decimal", () => {

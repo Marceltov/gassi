@@ -1,8 +1,9 @@
-// One entry in Verlauf: the time, the type's icon in a dot of its color (and a strip of it on the left edge), two lines,
-// a small map for a tracked walk and who. The icon and the lines start at the same place in every row. The first line is
+// One entry in Verlauf: the time, the type's icon in a dot of its color (and a strip of it on the left edge), two lines
+// and who; a tracked walk its map under them, as wide as the lines. The icon and the lines start at the same place in every row. The first line is
 // what kind it is ("Gassi"), the second what it says in bold ("42 Min. · 3,1 km"), then the dogs, what happened on a
-// walk and the note. Every row has the same height (#71): each line is cut short rather than wrapping. Tapping opens it.
-import { describeEntry } from "@gassi/domain";
+// walk and the note. A row is that high and its lines are cut short rather than wrapping (#71), unless it has more to
+// show: a wet count has a line per size, a tracked walk its map. Taller, never shorter. Tapping opens it.
+import { cansOf, describeEntry, formatCanCount } from "@gassi/domain";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { TrackMap } from "../map/TrackMap";
@@ -13,6 +14,8 @@ import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
 import type { Entry } from "./form";
 
 const ROW_HEIGHT = 60;
+const MAP_HEIGHT = 110;
+const LINES_LEFT = 50; // the time's width and the gap: the map starts where the dot does
 
 type Props = { entry: Entry; dogs: string; onPress: () => void };
 
@@ -25,6 +28,7 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
   const routes = useMemo(() => (routeKey !== "null" ? [JSON.parse(routeKey) as [number, number][]] : []), [routeKey]);
   const rest = [dogs, d.during, entry.note ?? ""].filter(Boolean).join(" · ");
   const tone = theme[TYPE_TONE[entry.type]];
+  const sizes = entry.type === "stockcheck" && entry.count?.length ? entry.count : null; // a wet count: a line each
   return (
     <Pressable
       testID={`entry-${entry.id}`}
@@ -32,37 +36,56 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
       onPress={onPress}
       style={({ pressed }) => [styles.row, { backgroundColor: theme.surface, borderLeftColor: tone, opacity: pressed ? 0.7 : 1 }]}
     >
-      <Text style={[styles.time, { color: theme.muted }]}>{hhmm(entry.at)}</Text>
-      <View style={[styles.dot, { backgroundColor: tone }]}>
-        <Icon name={TYPE_ICON[entry.type]} size={14} color="#fff" />
-      </View>
-      <View style={styles.main}>
-        <Text testID={`entry-${entry.id}-title`} style={[styles.title, { color: theme.ink }]} numberOfLines={1}>
-          {d.title}
-        </Text>
-        <Text testID={`entry-${entry.id}-more`} style={[styles.small, { color: theme.muted }]} numberOfLines={1}>
-          {d.extra ? <Text testID={`entry-${entry.id}-extra`} style={[styles.figures, { color: theme.ink }]}>{d.extra}</Text> : null}
-          {d.extra && rest ? " · " : ""}
-          {rest || (d.extra ? "" : " ")}
-        </Text>
+      <View style={styles.line}>
+        {/* the time, the icon and who stay at the height of the first two lines, also in a taller row */}
+        <View style={styles.band}>
+          <Text style={[styles.time, { color: theme.muted }]}>{hhmm(entry.at)}</Text>
+        </View>
+        <View style={styles.band}>
+          <View testID={`entry-${entry.id}-dot`} style={[styles.dot, { backgroundColor: tone }]}>
+            <Icon name={TYPE_ICON[entry.type]} size={14} color="#fff" />
+          </View>
+        </View>
+        <View style={styles.main}>
+          <Text testID={`entry-${entry.id}-title`} style={[styles.title, { color: theme.ink }]} numberOfLines={1}>
+            {d.title}
+          </Text>
+          {sizes ? (
+            sizes.map((r) => (
+              <Text key={r.unitG} testID={`entry-${entry.id}-size`} style={[styles.small, styles.figures, { color: theme.ink }]} numberOfLines={1}>
+                {formatCanCount({ unitG: r.unitG, cans: cansOf(r.amountG, r.unitG) })}
+              </Text>
+            ))
+          ) : (
+            <Text testID={`entry-${entry.id}-more`} style={[styles.small, { color: theme.muted }]} numberOfLines={1}>
+              {d.extra ? <Text testID={`entry-${entry.id}-extra`} style={[styles.figures, { color: theme.ink }]}>{d.extra}</Text> : null}
+              {d.extra && rest ? " · " : ""}
+              {rest || (d.extra ? "" : " ")}
+            </Text>
+          )}
+        </View>
+        <View style={styles.band}>
+          <Text style={[styles.by, { color: theme.muted }]} numberOfLines={2}>
+            {d.by.replace(/^von /, "")}
+          </Text>
+        </View>
       </View>
       {routes.length ? (
-        <View style={styles.thumb}>
-          <TrackMap routes={routes} height={40} still />
+        <View style={styles.map}>
+          <TrackMap routes={routes} height={MAP_HEIGHT} still />
         </View>
       ) : null}
-      <Text style={[styles.by, { color: theme.muted }]} numberOfLines={2}>
-        {d.by.replace(/^von /, "")}
-      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: radius.tile, paddingLeft: 10, paddingRight: 12, height: ROW_HEIGHT, borderLeftWidth: 4 },
+  row: { gap: 8, borderRadius: radius.tile, paddingLeft: 10, paddingRight: 12, paddingVertical: 8, borderLeftWidth: 4 },
+  line: { flexDirection: "row", alignItems: "flex-start", gap: 10, minHeight: ROW_HEIGHT - 16 },
+  band: { height: ROW_HEIGHT - 16, justifyContent: "center" },
+  main: { flex: 1, gap: 2, minHeight: ROW_HEIGHT - 16, justifyContent: "center" },
   time: { width: 40, fontSize: 13, fontVariant: ["tabular-nums"] },
-  thumb: { width: 56, height: 40, borderRadius: 8, overflow: "hidden", pointerEvents: "none" },
-  main: { flex: 1, gap: 2 },
+  map: { marginLeft: LINES_LEFT, height: MAP_HEIGHT, borderRadius: 10, overflow: "hidden", pointerEvents: "none" },
   dot: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   title: { fontSize: 15 },
   figures: { fontWeight: "700" }, // what the entry says, not what kind it is

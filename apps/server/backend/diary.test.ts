@@ -144,7 +144,7 @@ describe("a wet count is one thing", () => {
 
   test("its rows show the whole count", async () => {
     const { d, entries } = await twoSizes();
-    expect((await d.get(entries[1].id))?.count).toEqual([{ unitG: 400, amountG: 1200 }, { unitG: 800, amountG: 800 }]);
+    expect((await d.get(entries[1].id))?.count).toMatchObject([{ unitG: 400, amountG: 1200 }, { unitG: 800, amountG: 800 }]);
     expect((await d.get(entries[0].id))?.count).toHaveLength(2);
   });
 
@@ -155,6 +155,14 @@ describe("a wet count is one thing", () => {
     expect(await counts(d)).toEqual([[400, 3], [800, 1]]);
     await d.edit(entries[1].id, { at: "2026-10-20T11:00:00Z", amountG: 800, foodKind: "wet", unitG: 800 });
     expect(await counts(d)).toEqual([[400, 3], [800, 1]]);
+  });
+
+  test("a count's rows each carry their id, so each size can be corrected afterwards", async () => {
+    const { d, entries } = await twoSizes();
+    const view = await d.get(entries[0].id);
+    expect(view?.count).toEqual([{ id: entries[0].id, unitG: 400, amountG: 1200 }, { id: entries[1].id, unitG: 800, amountG: 800 }]);
+    await d.edit(entries[1].id, { at: entries[1].at, amountG: 2400, foodKind: "wet", unitG: 800 });
+    expect(await counts(d)).toEqual([[400, 3], [800, 3]]);
   });
 
   test("a count can't be moved onto another count's time", async () => {
