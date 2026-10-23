@@ -6,7 +6,7 @@ import { useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Screen } from "../ui/Screen";
 import { InviteCard, OpenInvites, useInvites } from "./Invite";
-import { Group, Row } from "./List";
+import { Group, Row } from "../ui/List";
 
 export function Household() {
   const theme = useTheme();
