@@ -133,6 +133,12 @@ test("Vorrat: + Eingekauft takes cans per size from 0, a new size in a row of it
   await sheet.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
   await sheet.getByTestId("buy-new").getByLabel("Dosengröße in Gramm").fill("1234");
   await sheet.getByRole("button", { name: "1 Dose à 1234 g mehr" }).click();
+  // the grams of a known size and of an added one line up
+  const right = async (id: string) => {
+    const b = (await sheet.getByTestId(`buy-${id}-size`).boundingBox())!;
+    return Math.round(b.x + b.width);
+  };
+  expect(await right("1234")).toBe(await right("800"));
   // a row without grams holds up the button until it is taken away with ×
   await sheet.getByRole("button", { name: "Dosengröße hinzufügen" }).click();
   await sheet.getByRole("button", { name: "1 Dose neuer Größe mehr" }).click();

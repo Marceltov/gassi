@@ -102,9 +102,9 @@ function RestockForm({ onDone, stock }: { onDone: () => void; stock: Stock | nul
                   <View style={styles.rowField}>
                     <Text style={[styles.labelText, { color: theme.muted }]}>Dosen à</Text>
                     {r.key.startsWith("x") ? (
-                      <TapToEdit label="Dosengröße in Gramm" value={r.size} onChange={(size) => setEdits((e) => ({ ...e, [r.key]: { ...e[r.key], size } }))} startEditing warn={!unitG} inputMode="numeric" keyboardType="number-pad" width={56} style={styles.gramValue} />
+                      <TapToEdit testID={`buy-${id}-size`} label="Dosengröße in Gramm" value={r.size} onChange={(size) => setEdits((e) => ({ ...e, [r.key]: { ...e[r.key], size } }))} startEditing warn={!unitG} inputMode="numeric" keyboardType="number-pad" width={56} style={styles.gramValue} />
                     ) : (
-                      <Text style={[styles.size, { color: theme.ink }]}>{r.size}</Text>
+                      <Text testID={`buy-${id}-size`} style={[styles.size, { color: theme.ink }]}>{r.size}</Text>
                     )}
                     <Text style={[styles.labelText, { color: theme.muted }]}>g</Text>
                   </View>
@@ -153,7 +153,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.tile, borderWidth: 2, paddingVertical: 4, paddingHorizontal: 10 },
   rowField: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   labelText: { fontSize: 14, fontWeight: "600" },
-  size: { fontSize: 16, fontWeight: "700" },
+  // as wide as an added row's field, so the grams of all rows line up
+  size: { width: 56, textAlign: "right", fontSize: 16, fontWeight: "700", paddingHorizontal: 4 },
   gramValue: { textAlign: "right" },
   value: { minWidth: 40, textAlign: "center", fontSize: 16, fontWeight: "700" },
   remove: { width: 24, alignItems: "center", justifyContent: "center" },
