@@ -361,7 +361,7 @@ test("an entry's detail shows what it is about large on top: a purchase's cans, 
   await expect(page.getByTestId("fact-big")).toHaveText("12 Dosen");
   await expect(page.getByTestId("fact-sub")).toHaveText("à 400 g · 4,8 kg");
   await page.goto(`${BASE_URL}/verlauf/eintrag/${counted[0].id}`);
-  await expect(page.getByTestId("fact-row")).toHaveText(["Dosen à 400 g12", "Dosen à 800 g2"]);
+  await expect(page.getByTestId("fact-row")).toHaveText([/^Dosen à 400 g.*12/, /^Dosen à 800 g.*2/]);
   await expect(page.getByTestId("fact-sum")).toHaveText("zusammen 6,4 kg");
   await page.goto(`${BASE_URL}/verlauf/eintrag/${pee.id}`);
   await expect(page.getByTestId("fact-big")).toHaveText(/^\d\d:\d\d$/);
@@ -370,4 +370,38 @@ test("an entry's detail shows what it is about large on top: a purchase's cans, 
   const [big, field] = await Promise.all([page.getByTestId("fact-big").boundingBox(), page.getByText("Zeit", { exact: true }).boundingBox()]);
   expect(big!.y).toBeLessThan(field!.y);
   await expectFits(page, `/verlauf/eintrag/${counted[0].id}`, "Speichern");
+});
+
+test("a purchase's cans, a count's sizes and an opened can's size can be changed in their detail", async ({ page }) => {
+  const client = asHirsch();
+  const bought = (await client.restock({ foodKind: "wet", sizes: [{ unitG: 400, cans: 12 }, { unitG: 800, cans: 1 }] })).entries;
+  const counted = (await client.correctStock({ foodKind: "wet", sizes: [{ unitG: 400, cans: "12" }, { unitG: 800, cans: "2" }] })).entries;
+  const at = new Date(Date.parse(counted[0].at) + 1000).toISOString();
+  await client.commands({ commands: [{ id: `open-${Date.now()}`, at, kind: "can.open", unitG: 400 }] });
+  const opened = (await client.entries({ type: "opened" })).entries[0];
+  made.push(...bought.map((e) => e.id), ...counted.map((e) => e.id), opened.id);
+  const save = async () => {
+    await page.getByRole("button", { name: "Speichern" }).click();
+    await expect(page).toHaveURL(/\/verlauf$/);
+  };
+
+  await signIn(page);
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${bought[0].id}`);
+  await page.getByRole("button", { name: "1 Dose mehr" }).click();
+  await expect(page.getByTestId("fact-big")).toHaveText("13 Dosen");
+  await save();
+  expect((await client.entry({ id: bought[0].id })).amountG).toBe(13 * 400);
+
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${counted[0].id}`);
+  await page.getByRole("button", { name: "Dosen à 800 g: eins mehr" }).click();
+  await page.getByRole("button", { name: "Dosen à 400 g: eins weniger" }).click();
+  await expect(page.getByTestId("fact-sum")).toHaveText("zusammen 6,8 kg");
+  await save();
+  expect((await client.stock()).wet.sizes.filter((s) => s.unitG === 400 || s.unitG === 800).map((s) => [s.unitG, s.cans])).toEqual([[400, 10], [800, 3]]); // 11 counted, 1 opened
+
+  await page.goto(`${BASE_URL}/verlauf/eintrag/${opened.id}`);
+  await page.getByRole("button", { name: "800-g-Dose" }).click();
+  await expect(page.getByTestId("fact-big")).toHaveText("800 g");
+  await save();
+  expect(await client.entry({ id: opened.id })).toMatchObject({ unitG: 800, amountG: 800 });
 });

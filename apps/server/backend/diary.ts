@@ -30,7 +30,7 @@ export type EntryView = Entry & {
   count: CountRow[] | null;
 };
 /** One can size of a wet count. */
-export type CountRow = { unitG: number; amountG: number };
+export type CountRow = { id: number; unitG: number; amountG: number };
 
 // A wet count is one stockcheck per can size at the same time: its rows are moved and deleted together.
 const isWetCount = (e: Entry) => e.type === "stockcheck" && e.foodKind === "wet";
@@ -356,9 +356,9 @@ export class Diary {
   private async counts(entries: readonly Entry[]): Promise<Map<string, CountRow[]>> {
     const ats = [...new Set(entries.filter(isWetCount).map((e) => e.at))];
     if (!ats.length) return new Map();
-    const rows = await this.deps.db.selectFrom("entry").select(["at", "unit_g", "amount_g"]).where("type", "=", "stockcheck").where("food_kind", "=", "wet").where("at", "in", ats).orderBy("unit_g").execute();
+    const rows = await this.deps.db.selectFrom("entry").select(["id", "at", "unit_g", "amount_g"]).where("type", "=", "stockcheck").where("food_kind", "=", "wet").where("at", "in", ats).orderBy("unit_g").execute();
     const byAt = new Map<string, CountRow[]>();
-    for (const r of rows) byAt.set(r.at, [...(byAt.get(r.at) ?? []), { unitG: r.unit_g ?? 0, amountG: r.amount_g ?? 0 }]);
+    for (const r of rows) byAt.set(r.at, [...(byAt.get(r.at) ?? []), { id: r.id, unitG: r.unit_g ?? 0, amountG: r.amount_g ?? 0 }]);
     return byAt;
   }
 

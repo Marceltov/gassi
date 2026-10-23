@@ -4,7 +4,7 @@
 // stay on top, the buttons at the bottom (#71). A wet count (one row per can size) is one thing here: its sizes as rows,
 // its time moved and its rows deleted together. Both need the server (the writes' client): they say so without
 // reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
-import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, TYPE_LABEL } from "@gassi/domain";
+import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, keepsOne, type Stock, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -13,6 +13,7 @@ import { type Gassi, useGassi } from "../data/GassiProvider";
 import { type ButtonKind, radius, useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
+import { ChoiceList } from "../ui/ChoiceList";
 import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
 import { Icon, type IconName } from "../ui/Icon";
 import { TYPE_ICON } from "../ui/icons";
@@ -21,8 +22,8 @@ import { Segments } from "../ui/Segments";
 import { Sheet } from "../ui/Sheet";
 import { AmountStepper, StepButton } from "../ui/Stepper";
 import { LAST_WALKER } from "../walk/lastOne";
-import { type Fact, factOf } from "./fact";
-import { bumpRep, bumpTreat, editInput, type Entry, type Form, formOf, pickDog, trainingInput } from "./form";
+import { factOf } from "./fact";
+import { bumpRep, bumpTreat, countEdits, editInput, type Entry, type Form, formOf, pickDog, trainingInput } from "./form";
 import { TIME_ZONE } from "../time";
 import { TimeField } from "./TimeField";
 
@@ -36,6 +37,7 @@ export function EntryDetail({ id }: { id: number }) {
   const [form, setForm] = useState<Form | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const [stock, setStock] = useState<Stock | null>(null); // an opened can's sizes to choose from
   const busy = useRef(false); // a second tap on Speichern or Löschen while the first is on its way does nothing
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export function EntryDetail({ id }: { id: number }) {
         if (!alive) return;
         setEntry(e);
         setForm(formOf(e));
+        if (e.type === "opened") void api.stock().then((s) => alive && setStock(s), () => undefined);
       },
       (e) => alive && setMessage(errorMessage(e)),
     );
@@ -71,6 +74,8 @@ export function EntryDetail({ id }: { id: number }) {
     run(async () => {
       if (!writeApi) return;
       await writeApi.editEntry(editInput(e, f));
+      // a count's other sizes after this one, which moves them all to its time
+      for (const other of countEdits(e, f)) await writeApi.editEntry(other);
       if (e.type === "training") await writeApi.editTraining(trainingInput(e, f));
     });
   // a deleted walk has no summary to go back to: the first screen of the tab it was opened on (Verlauf, or Start right
@@ -99,6 +104,16 @@ export function EntryDetail({ id }: { id: number }) {
     else setMessage(LAST_WALKER);
   };
   const running = !!entry.clientKey && !entry.endedAt;
+  const fact = factOf(entry, form, { dogName: (did) => dogs.find((d) => d.id === did)?.name ?? "Hund", exerciseName: (eid) => exercises.find((x) => x.id === eid)?.name ?? "Übung", timeZone: TIME_ZONE });
+  // food bought or counted is changed where it is shown: cans or half kilos between − and +, a count per size
+  const amount = form.amountG ?? 0;
+  const stepper =
+    fact && "big" in fact && (entry.type === "restock" || entry.type === "stockcheck")
+      ? entry.unitG
+        ? { step: "1 Dose", by: entry.unitG, least: entry.unitG }
+        : { step: "0,5 kg", by: 500, least: entry.type === "restock" ? 500 : 0 }
+      : null;
+  const sizes = [...new Set([...(stock?.wet.sizes.map((s) => s.unitG) ?? []), ...(form.unitG ? [form.unitG] : [])])].sort((a, b) => a - b);
   const timed = entry.type === "walk" || entry.type === "training";
 
   return (
@@ -110,11 +125,31 @@ export function EntryDetail({ id }: { id: number }) {
             <Text style={[styles.title, { color: theme.ink }]}>{entry.count ? countTitle(entry.at, TIME_ZONE) : TYPE_LABEL[entry.type]}</Text>
           </View>
           <Text style={[styles.small, { color: theme.muted }]}>{`eingetragen von ${entry.byName}`}</Text>
-          <FactView fact={factOf(entry, form, { dogName: (did) => dogs.find((d) => d.id === did)?.name ?? "Hund", exerciseName: (eid) => exercises.find((x) => x.id === eid)?.name ?? "Übung", timeZone: TIME_ZONE })} />
+          {stepper && fact && "big" in fact ? (
+            <AmountStepper testID="fact-big" subTestID="fact-sub" value={fact.big} sub={fact.sub} step={stepper.step} onStep={(d) => change({ amountG: Math.max(stepper.least, amount + d * stepper.by) })} atMin={amount - stepper.by < stepper.least} atMax={false} />
+          ) : fact && "big" in fact ? (
+            <FactView fact={fact} />
+          ) : null}
         </>
       }
       top={
         <>
+          {fact && "rows" in fact ? (
+            <View style={styles.rows}>
+              {form.count.map((r) => (
+                <View key={r.id} testID="fact-row" style={[styles.row, { backgroundColor: theme.surface }]}>
+                  <Text style={[styles.rowLabel, { color: theme.muted }]}>{`Dosen à ${r.unitG} g`}</Text>
+                  <Counter value={r.cans} what={`Dosen à ${r.unitG} g`} onStep={(d) => change({ count: form.count.map((x) => (x.id === r.id ? { ...x, cans: Math.max(0, x.cans + d) } : x)) })} />
+                </View>
+              ))}
+              <Text testID="fact-sum" style={[styles.factSum, { color: theme.muted }]}>
+                {fact.sum}
+              </Text>
+            </View>
+          ) : null}
+          {entry.type === "opened" && sizes.length > 1 ? (
+            <ChoiceList accent={theme.food} choices={sizes.map((u) => ({ key: u, label: `${u}-g-Dose`, on: u === form.unitG, onPress: () => change({ unitG: u }) }))} />
+          ) : null}
           <View style={styles.times}>
             <TimeField label={timed ? "Beginn" : "Zeit"} value={form.at} onChange={(at) => change({ at })} />
             {form.endedAt !== null ? <TimeField label="Ende" value={form.endedAt} onChange={(endedAt) => change({ endedAt })} /> : null}
@@ -225,31 +260,16 @@ function TrainingFields({ form, change, names }: { form: Form; change: (c: Parti
   );
 }
 
-/** What the entry is about, large: one value with a line under it, or a row per can size with what they come to. */
-function FactView({ fact }: { fact: Fact | null }) {
+/** What the entry is about, large, with a line under it. */
+function FactView({ fact }: { fact: { big: string; sub: string } }) {
   const theme = useTheme();
-  if (!fact) return null;
-  if ("big" in fact)
-    return (
-      <View style={styles.fact}>
-        <Text testID="fact-big" style={[styles.big, { color: theme.ink }]}>
-          {fact.big}
-        </Text>
-        <Text testID="fact-sub" style={[styles.factSub, { color: theme.muted }]}>
-          {fact.sub}
-        </Text>
-      </View>
-    );
   return (
-    <View style={styles.rows}>
-      {fact.rows.map((r) => (
-        <View key={r.label} testID="fact-row" style={[styles.row, { backgroundColor: theme.surface }]}>
-          <Text style={[styles.rowLabel, { color: theme.muted }]}>{r.label}</Text>
-          <Text style={[styles.rowValue, { color: theme.ink }]}>{r.value}</Text>
-        </View>
-      ))}
-      <Text testID="fact-sum" style={[styles.factSum, { color: theme.muted }]}>
-        {fact.sum}
+    <View style={styles.fact}>
+      <Text testID="fact-big" style={[styles.big, { color: theme.ink }]}>
+        {fact.big}
+      </Text>
+      <Text testID="fact-sub" style={[styles.factSub, { color: theme.muted }]}>
+        {fact.sub}
       </Text>
     </View>
   );
@@ -286,7 +306,6 @@ const styles = StyleSheet.create({
   rows: { gap: 6 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", height: 44, borderRadius: radius.tile, paddingHorizontal: 14 },
   rowLabel: { fontSize: 15, fontWeight: "600" },
-  rowValue: { fontSize: 18, fontWeight: "700", fontVariant: ["tabular-nums"] },
   factSum: { fontSize: 13, textAlign: "right" },
   title: { fontSize: 22, fontWeight: "700" },
   heading: { flexDirection: "row", alignItems: "center", gap: 8 },
