@@ -186,15 +186,23 @@ test("Markiert shows only for a dog set to mark; it isn't a pee; a poop asks its
     await sheet.getByRole("button", { name: "weich" }).click();
     await expect(sheet).toHaveCount(0);
     await expect(taps).toContainText("Poopoo · weich");
-    // closed without an answer, the poop has none; tapped in the list, it asks again
+    // closed without an answer, the poop has none; in the list (newest on top) it opens its entry, which sets one (#99)
     await page.getByRole("button", { name: "Poopoo", exact: true }).click();
     await expect(sheet).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(sheet).toHaveCount(0);
-    await page.getByRole("button", { name: /^Poopoo, .*Konsistenz wählen$/ }).click();
-    await sheet.getByRole("button", { name: "hart" }).click();
+    await page.getByRole("button", { name: /^\d\d:\d\d Poopoo ändern$/ }).click();
+    await page.getByRole("button", { name: "hart" }).click();
+    await page.getByRole("button", { name: "Speichern" }).click();
     await expect(taps).toContainText("Poopoo · hart");
-    await page.getByRole("button", { name: "Markiert", exact: true }).click();
+    await expect(taps.getByRole("button").first()).toHaveAccessibleName(/Poopoo · hart ändern$/);
+    // a marking too many is deleted from the list
+    for (let i = 0; i < 2; i++) await page.getByRole("button", { name: "Markiert", exact: true }).click();
+    await expect(taps.getByRole("button", { name: /Markiert ändern$/ })).toHaveCount(4);
+    await taps.getByRole("button", { name: /Markiert ändern$/ }).first().click();
+    await page.getByRole("button", { name: "Löschen", exact: true }).click();
+    await page.getByRole("button", { name: "Ja, löschen" }).click();
+    await expect(taps.getByRole("button", { name: /Markiert ändern$/ })).toHaveCount(3);
 
     const key = (await client.sessions()).walk!.key;
     await expect.poll(async () => (await client.walkByKey({ key })).summary.poops.map((p) => p.consistency)).toEqual(["soft", "hard"]);
