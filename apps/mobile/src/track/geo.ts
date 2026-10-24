@@ -6,4 +6,4 @@ import type { TrackPoint } from "@gassi/domain";
 type OnPoint = (p: TrackPoint) => void;
 
 /** Calls `onPoint` with each new position and `onDenied` when location is refused; returns the stop. */
-export const watchPosition: (onPoint: OnPoint, onDenied: () => void) => () => void = () => () => {};
+export const watchPosition: (walkKey: string, onPoint: OnPoint, onDenied: () => void) => () => void = () => () => {};

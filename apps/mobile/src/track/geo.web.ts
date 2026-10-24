@@ -6,7 +6,7 @@ import type * as Native from "./geo.ts";
 
 const DENIED = 1; // GeolocationPositionError.PERMISSION_DENIED
 
-export function watchPosition(onPoint: (p: TrackPoint) => void, onDenied: () => void): () => void {
+export function watchPosition(_walkKey: string, onPoint: (p: TrackPoint) => void, onDenied: () => void): () => void {
   if (typeof navigator === "undefined" || !navigator.geolocation) return () => {};
   const id = navigator.geolocation.watchPosition(
     ({ coords, timestamp }) => onPoint({ t: new Date(timestamp).toISOString(), lat: coords.latitude, lon: coords.longitude, ele: coords.altitude ?? null, acc: coords.accuracy ?? null }),
@@ -18,5 +18,5 @@ export function watchPosition(onPoint: (p: TrackPoint) => void, onDenied: () => 
   return () => navigator.geolocation.clearWatch(id);
 }
 
-const sameAsNative: typeof Native = { watchPosition };
+const sameAsNative: Pick<typeof Native, "watchPosition"> = { watchPosition };
 void sameAsNative;
