@@ -3,6 +3,7 @@
 // batch, once made, is sent again as it is until the server has it: the server stores each (track, seq) once, so a
 // batch that grew between tries would lose its new points. One track id per phone and walk; a reload goes on with it.
 // Only one tab records (a Web Lock where the browser has one); the others wait for it to let go.
+import { trackPointSchema } from "@gassi/api-client";
 import { createLiveFilter, newId, type TrackPoint } from "@gassi/domain";
 import { loadKept, saveKept } from "../data/kept";
 import { watchPosition } from "./geo";
@@ -91,7 +92,8 @@ export function createRecorder({ walkKey, upload, geo = { watch: watchPosition }
     unwatch = geo.watch(
       (p) => {
         const r = all()[walkKey];
-        if (!r || r.points.at(-1)?.t === p.t) return;
+        // a point the contract refuses (a laptop's accuracy of kilometres) would hold up every batch after it
+        if (!r || r.points.at(-1)?.t === p.t || !trackPointSchema.safeParse(p).success) return;
         save(walkKey, { ...r, points: [...r.points, p] });
         live.add(p);
         [lastFix, denied] = [Date.now(), false];

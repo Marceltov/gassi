@@ -184,3 +184,15 @@ test("a recorder takes back a recording that was taken for over (the app opened 
   await again.stop();
   expect(up.batches.flatMap((b) => b.points)).toHaveLength(10);
 });
+
+test("a position the server would refuse (accuracy of kilometres, a height out of range) isn't kept", async () => {
+  let handlers: { onPoint: (p: TrackPoint) => void } | null = null;
+  const geo: Geo = { watch: (onPoint) => ((handlers = { onPoint }), () => {}) };
+  const up = fakeUpload();
+  const r = createRecorder({ walkKey: "w", geo, upload: up.send, locks: null });
+  handlers!.onPoint({ ...point(0), acc: 25_000 }); // a laptop's guess from its network
+  handlers!.onPoint({ ...point(5), ele: 12_000 });
+  handlers!.onPoint(point(10));
+  await r.stop();
+  expect(up.batches.flatMap((b) => b.points).map((p) => p.t)).toEqual([point(10).t]);
+});
