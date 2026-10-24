@@ -23,6 +23,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("walk.pause"), walkKey: key }),
   z.object({ ...base, kind: z.literal("walk.resume"), walkKey: key }),
   z.object({ ...base, kind: z.literal("walk.stop"), walkKey: key }),
+  // this device records the walk's route from `at` (#104): the one that starts a walk does, another takes over with this
+  z.object({ ...base, kind: z.literal("walk.record"), walkKey: key }),
   z.object({ ...base, kind: z.literal("training.start"), trainingKey: key, walkKey: key.optional(), dogIds }),
   z.object({ ...base, kind: z.literal("training.stop"), trainingKey: key }),
   z.object({ ...base, kind: z.literal("training.rep"), trainingKey: key, exerciseId: z.number().int().positive(), dogId, ok: z.boolean(), delta: z.union([z.literal(1), z.literal(-1)]) }),
