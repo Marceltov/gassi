@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Command } from "@gassi/domain";
+import { Devices } from "./auth/devices";
 import { Catalog } from "./catalog";
 import { freshDatabase } from "./db/testing";
 import { DogRepository } from "./dogs";
@@ -45,7 +46,7 @@ describe("walks", () => {
   test("a running walk shows who walks, since when and whether it is paused", async () => {
     const s = sessions();
     await s.apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" }), cmd(10, { kind: "walk.pause", walkKey: "w" })]);
-    expect((await s.current()).walk).toEqual({ key: "w", startedAt: at(0), dogIds: [1], walkers: [HIRSCH], pauses: [{ startedAt: at(10), endedAt: null }], paused: true });
+    expect((await s.current()).walk).toEqual({ key: "w", startedAt: at(0), dogIds: [1], walkers: [HIRSCH], pauses: [{ startedAt: at(10), endedAt: null }], paused: true, recorder: null });
   });
 
   test("second start joins the running walk", async () => {
@@ -477,5 +478,35 @@ describe("changing walkers and dogs", () => {
     const walker = cmd(30, { kind: "walk.walker", walkKey: "w", personId: "bille", on: true });
     const dog = cmd(31, { kind: "walk.dog", walkKey: "w", dogId: bruno, on: true });
     expect(await s.apply(HIRSCH, [walker, dog])).toEqual({ applied: [], dropped: [walker.id, dog.id] });
+  });
+});
+
+describe("who records the route (#104)", () => {
+  const phone = async (personId: string, name: string) => (await new Devices(db(), () => new Date("2026-10-20T08:00:00Z")).create(personId, { kind: "web", name })).device;
+
+  test("the starting device records", async () => {
+    const mine = await phone(HIRSCH.id, "Marcels Handy");
+    await sessions().apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" })], mine);
+    expect((await sessions().current()).walk!.recorder).toEqual({ deviceId: mine.id, name: "Marcels Handy" });
+  });
+
+  test("a join doesn't take over", async () => {
+    const mine = await phone(HIRSCH.id, "Marcels Handy");
+    await sessions().apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" })], mine);
+    await sessions().apply(HERZII, [cmd(1, { kind: "walk.start", walkKey: "w2" })], await phone(HERZII.id, "Herziis Handy"));
+    expect((await sessions().current()).walk!.recorder).toEqual({ deviceId: mine.id, name: "Marcels Handy" });
+  });
+
+  test("walk.record hands over", async () => {
+    await sessions().apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" })], await phone(HIRSCH.id, "Marcels Handy"));
+    const hers = await phone(HERZII.id, "Herziis Handy");
+    await sessions().apply(HERZII, [cmd(1, { kind: "walk.start", walkKey: "w2" }), cmd(10, { kind: "walk.record", walkKey: "w2" })], hers);
+    expect((await sessions().current()).walk!.recorder).toEqual({ deviceId: hers.id, name: "Herziis Handy" });
+  });
+
+  test("walk.record after the end is dropped", async () => {
+    const mine = await phone(HIRSCH.id, "Marcels Handy");
+    await sessions().apply(HIRSCH, [cmd(0, { kind: "walk.start", walkKey: "w" }), cmd(30, { kind: "walk.stop", walkKey: "w" })], mine);
+    expect(await sessions().apply(HERZII, [cmd(40, { kind: "walk.record", walkKey: "w", id: "late" })], await phone(HERZII.id, "Herziis Handy"))).toEqual({ applied: [], dropped: ["late"] });
   });
 });

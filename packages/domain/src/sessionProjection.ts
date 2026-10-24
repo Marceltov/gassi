@@ -7,7 +7,9 @@ import type { Command } from "./commands";
 import { keepsOne, resolveDogs } from "./sessionRules";
 
 export type Person = { id: string; name: string };
-export type WalkView = { key: string; startedAt: string; dogIds: number[]; walkers: Person[]; pauses: { startedAt: string; endedAt: string | null }[]; paused: boolean };
+/** The device that records the walk's route now (#104): the one that started it, or the last to take over. */
+export type RecordingDevice = { deviceId: number; name: string };
+export type WalkView = { key: string; startedAt: string; dogIds: number[]; walkers: Person[]; pauses: { startedAt: string; endedAt: string | null }[]; paused: boolean; recorder: RecordingDevice | null };
 /** How often an exercise went well (`ok`) and badly (`fail`) with one dog. */
 export type Rep = { exerciseId: number; dogId: number; ok: number; fail: number };
 export type TrainingView = { key: string; startedAt: string; dogIds: number[]; walkKey: string | null; reps: Rep[]; treats: Record<number, number> };
@@ -15,14 +17,15 @@ export type SessionsView = { walk: WalkView | null; training: TrainingView | nul
 
 const byTime = (a: Command, b: Command) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
 
-function step(v: SessionsView, c: Command, user: Person, people: readonly Person[], activeDogs: readonly number[]): SessionsView {
+function step(v: SessionsView, c: Command, user: Person, people: readonly Person[], activeDogs: readonly number[], device: { id: number; name: string } | null): SessionsView {
   const { walk, training } = v;
+  const here = device && { deviceId: device.id, name: device.name };
   // without the active dogs, a start shows the dogs it names (none: the server's answer brings them)
   const dogsFor = (requested: readonly number[] | undefined) => (activeDogs.length ? resolveDogs(requested, activeDogs) : [...(requested ?? [])]);
   switch (c.kind) {
     case "walk.start":
     case "walk.join": {
-      if (!walk) return c.kind === "walk.start" ? { ...v, walk: { key: c.walkKey, startedAt: c.at, dogIds: dogsFor(c.dogIds), walkers: [user], pauses: [], paused: false } } : v;
+      if (!walk) return c.kind === "walk.start" ? { ...v, walk: { key: c.walkKey, startedAt: c.at, dogIds: dogsFor(c.dogIds), walkers: [user], pauses: [], paused: false, recorder: here } } : v;
       // A start from this phone lends its key: the server joins it to the walk that really runs, and if the shown walk
       // is an old one (a page cached by the service worker), the taps still reach the walk just started.
       const keyed = c.kind === "walk.start" ? { ...walk, key: c.walkKey } : walk;
@@ -48,6 +51,8 @@ function step(v: SessionsView, c: Command, user: Person, people: readonly Person
       return !walk || !walk.paused ? v : { ...v, walk: { ...walk, paused: false, pauses: walk.pauses.map((p) => (p.endedAt === null ? { ...p, endedAt: c.at } : p)) } };
     case "walk.stop":
       return { walk: null, training: training?.walkKey ? null : training };
+    case "walk.record":
+      return walk && here ? { ...v, walk: { ...walk, recorder: here } } : v;
     case "training.start":
       return training ? { ...v, training: { ...training, key: c.trainingKey } } : { ...v, training: { key: c.trainingKey, startedAt: c.at, dogIds: dogsFor(c.dogIds), walkKey: c.walkKey ?? null, reps: [], treats: {} } };
     case "training.stop":
@@ -79,7 +84,7 @@ function step(v: SessionsView, c: Command, user: Person, people: readonly Person
 
 /** The server's view with the `pending` commands by `user` applied, in time order. `people` are the household's
  * members, whose names a pending walker change shows; `activeDogs` the ids of its active dogs, which a pending start
- * takes. */
-export function project(view: SessionsView, pending: readonly Command[], user: Person, people: readonly Person[] = [user], activeDogs: readonly number[] = []): SessionsView {
-  return [...pending].sort(byTime).reduce((v, c) => step(v, c, user, people, activeDogs), view);
+ * takes; `device` this device, which a pending start or take-over shows as recording the route. */
+export function project(view: SessionsView, pending: readonly Command[], user: Person, people: readonly Person[] = [user], activeDogs: readonly number[] = [], device: { id: number; name: string } | null = null): SessionsView {
+  return [...pending].sort(byTime).reduce((v, c) => step(v, c, user, people, activeDogs, device), view);
 }

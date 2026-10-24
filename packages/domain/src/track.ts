@@ -100,9 +100,27 @@ export function simplify(points: readonly { lat: number; lon: number }[], max: n
   return picked.map((p) => [p.lat, p.lon]);
 }
 
-/** The track a walk shows: a watch's (the best GPS), else the longest. The index, or null without tracks. */
-export function chooseTrack(tracks: readonly { source: TrackSource; distanceM: number }[]): number | null {
-  if (tracks.length === 0) return null;
-  const rank = (t: { source: TrackSource; distanceM: number }) => (t.source === "watch" ? 1e12 : 0) + t.distanceM;
-  return tracks.reduce((best, t, i) => (rank(t) > rank(tracks[best]) ? i : best), 0);
+/** Who recorded a walk's route from when: each phone's points count from its `from` until the next recorder's. */
+export type Recorder = { deviceId: number; from: string };
+
+/** The route a walk shows (#104), raw: a watch's track when there is one (the best GPS); else each recorder's points for
+ * its own time, joined; a walk without recorders (from before them) shows its track with the most points. Only points
+ * within the walk (a running one up to now), in time order, each time once. */
+export function joinTracks(
+  tracks: readonly { deviceId: number | null; source: TrackSource; points: readonly TrackPoint[] }[],
+  recorders: readonly Recorder[],
+  walk: { at: string; endedAt: string | null },
+): TrackPoint[] {
+  const within = (q: TrackPoint) => q.t >= walk.at && (walk.endedAt === null || q.t <= walk.endedAt);
+  const watch = tracks.find((t) => t.source === "watch");
+  let points: TrackPoint[];
+  if (watch) points = watch.points.filter(within);
+  else if (recorders.length === 0) points = [...tracks].sort((a, b) => b.points.length - a.points.length)[0]?.points.filter(within) ?? [];
+  else {
+    const turns = [...recorders].sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+    const recorderAt = (t: string) => turns.findLast((r) => r.from <= t)?.deviceId ?? turns[0].deviceId;
+    points = tracks.flatMap((t) => t.points.filter((q) => within(q) && t.deviceId === recorderAt(q.t)));
+  }
+  const seen = new Set<string>();
+  return byTime(points).filter((q) => !seen.has(q.t) && !!seen.add(q.t));
 }

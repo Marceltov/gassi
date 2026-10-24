@@ -4,7 +4,7 @@ import { project, type SessionsView } from "./sessionProjection";
 
 const HIRSCH = { id: "marcel", name: "Hirsch" };
 const HERZII = { id: "bille", name: "Herzii" };
-const walking: SessionsView = { walk: { key: "w", startedAt: "2026-10-20T09:00:00.000Z", dogIds: [1], walkers: [HIRSCH], pauses: [], paused: false }, training: null };
+const walking: SessionsView = { walk: { key: "w", startedAt: "2026-10-20T09:00:00.000Z", dogIds: [1], walkers: [HIRSCH], pauses: [], paused: false, recorder: { deviceId: 3, name: "Herziis Handy" } }, training: null };
 const c = (at: string, body: object) => ({ id: at, at: `2026-10-20T09:${at}:00.000Z`, ...body }) as Command;
 
 test("without pending commands the server's view is shown as it is", () => {
@@ -19,7 +19,7 @@ test("a pending pause shows the walk as paused, a pending resume ends the pause"
 });
 
 test("a pending start shows a walk by me, a pending join adds me once", () => {
-  expect(project({ walk: null, training: null }, [c("00", { kind: "walk.start", walkKey: "k", dogIds: [2] })], HIRSCH).walk).toEqual({ key: "k", startedAt: "2026-10-20T09:00:00.000Z", dogIds: [2], walkers: [HIRSCH], pauses: [], paused: false });
+  expect(project({ walk: null, training: null }, [c("00", { kind: "walk.start", walkKey: "k", dogIds: [2] })], HIRSCH).walk).toEqual({ key: "k", startedAt: "2026-10-20T09:00:00.000Z", dogIds: [2], walkers: [HIRSCH], pauses: [], paused: false, recorder: null });
   const joined = project(walking, [c("01", { kind: "walk.join", walkKey: "w" }), c("02", { kind: "walk.join", walkKey: "w" })], HERZII);
   expect(joined.walk!.walkers).toEqual([HIRSCH, HERZII]);
 });
@@ -41,7 +41,7 @@ test("pending treat taps show, treats never below 0, in time order", () => {
 });
 
 test("a pending start from this phone gives its key to the walk and training shown (a cached page may hold an old one)", () => {
-  const cached: SessionsView = { walk: { key: "old", startedAt: "2026-10-19T09:00:00.000Z", dogIds: [1], walkers: [HIRSCH], pauses: [], paused: false }, training: { key: "old-t", startedAt: "2026-10-19T09:05:00.000Z", dogIds: [1], walkKey: "old", reps: [], treats: {} } };
+  const cached: SessionsView = { walk: { key: "old", startedAt: "2026-10-19T09:00:00.000Z", dogIds: [1], walkers: [HIRSCH], pauses: [], paused: false, recorder: null }, training: { key: "old-t", startedAt: "2026-10-19T09:05:00.000Z", dogIds: [1], walkKey: "old", reps: [], treats: {} } };
   const v = project(cached, [c("00", { kind: "walk.start", walkKey: "new" }), c("01", { kind: "training.start", trainingKey: "new-t", walkKey: "new" })], HIRSCH);
   expect(v.walk!.key).toBe("new");
   expect(v.training!.key).toBe("new-t");
@@ -111,5 +111,22 @@ describe("the dogs of a pending start", () => {
   test("without the active dogs a start keeps the dogs it names", () => {
     expect(project(none, [c("00", { kind: "walk.start", walkKey: "k", dogIds: [2] })], HIRSCH).walk!.dogIds).toEqual([2]);
     expect(project(none, [c("00", { kind: "walk.start", walkKey: "k" })], HIRSCH).walk!.dogIds).toEqual([]);
+  });
+});
+
+describe("who records the route (#104)", () => {
+  const PHONE = { id: 7, name: "Marcels Handy" };
+
+  test("a pending start records on this device", () => {
+    const v = project({ walk: null, training: null }, [c("00", { kind: "walk.start", walkKey: "k" })], HIRSCH, [HIRSCH], [1], PHONE);
+    expect(v.walk!.recorder).toEqual({ deviceId: 7, name: "Marcels Handy" });
+  });
+
+  test("a pending walk.record takes over", () => {
+    expect(project(walking, [c("05", { kind: "walk.record", walkKey: "w" })], HIRSCH, [HIRSCH], [1], PHONE).walk!.recorder).toEqual({ deviceId: 7, name: "Marcels Handy" });
+  });
+
+  test("joining keeps the recorder", () => {
+    expect(project(walking, [c("05", { kind: "walk.start", walkKey: "k2" })], HERZII, [HIRSCH, HERZII], [1], PHONE).walk!.recorder).toEqual({ deviceId: 3, name: "Herziis Handy" });
   });
 });

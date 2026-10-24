@@ -42,7 +42,8 @@ the same app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay
 - `apps/mobile` (`@gassi/mobile`): the Expo Router app for the web now and Android in step 3 (ADR 0006). Screens in
   `app/` stay thin and render from `src/` (start, walk, food, training, history, week, more). `src/data` holds the
   device, the command queue and the household snapshot behind modules with a `.web.ts` file (localStorage); other
-  platform parts the same way (`.web.tsx`: maps, pickers, sheet). No domain rules here; writes other than taps need the
+  platform parts the same way (`.web.tsx`: maps, pickers, sheet). `src/track` records the walk's route on the phone
+  that records it (ADR 0014): positions (`geo.web.ts`), batches kept and sent (`recorder.ts`), the wake lock. No domain rules here; writes other than taps need the
   server and say `OFFLINE`. `public/` holds the web page template, manifest and service worker. Its e2e tests run
   against the server's build in `apps/server/e2e` (`app-*.spec.ts`).
 - Tests sit next to the code. Outside calls are injected (`fetch`, `now`, the database), not mocked:

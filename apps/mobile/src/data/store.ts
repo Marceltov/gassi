@@ -19,6 +19,8 @@ export type TreatKind = Output<"treatKinds">["treatKinds"][number];
 export type GassiState = {
   /** who signed in (null only while signed out) */
   me: Person | null;
+  /** this device as the server knows it (null until its first answer): the walk names it when it records the route */
+  device: { id: number; name: string } | null;
   household: Household | null;
   people: Person[];
   dogs: Dog[];
@@ -64,8 +66,8 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
   // What the server showed last time (or only who signed in), until it answers now.
   const kept = loadSnapshot(device.person.id);
   let household: Known = kept
-    ? { me: kept.me, household: kept.household, people: kept.people, dogs: kept.dogs, exercises: kept.exercises, treatKinds: kept.treatKinds }
-    : { me: device.person, household: null, people: [device.person], dogs: [], exercises: [], treatKinds: [] };
+    ? { me: kept.me, device: kept.device ?? null, household: kept.household, people: kept.people, dogs: kept.dogs, exercises: kept.exercises, treatKinds: kept.treatKinds }
+    : { me: device.person, device: null, household: null, people: [device.person], dogs: [], exercises: [], treatKinds: [] };
   let serverView = kept?.view ?? NOTHING_RUNS;
   // counts the queue's answers: a sessions answer asked for before one of them is older than it and is not shown
   let answers = 0;
@@ -73,10 +75,10 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
   const listeners = new Set<() => void>();
 
   function update() {
-    const { me, people, dogs } = household;
+    const { me, people, dogs, device: here } = household;
     const pending = queue.pending();
     const activeDogs = dogs.filter((d) => !d.archived).map((d) => d.id);
-    state = { ...household, me, view: project(serverView, pending, me, people, activeDogs), pending, unsent: pending.length, online };
+    state = { ...household, me, view: project(serverView, pending, me, people, activeDogs, here), pending, unsent: pending.length, online };
     listeners.forEach((fn) => fn());
   }
   // only while this device is the signed-in one: an answer that comes after a 401 (or Abmelden) keeps nothing
@@ -112,7 +114,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
   async function loadHousehold() {
     try {
       const [me, people, dogs, exercises, treatKinds] = await Promise.all([api.me(), api.people(), api.dogs(), api.exercises(), api.treatKinds()]);
-      household = { me: me.person, household: me.household, people: people.people, dogs: dogs.dogs, exercises: exercises.exercises, treatKinds: treatKinds.treatKinds };
+      household = { me: me.person, device: { id: me.device.id, name: me.device.name }, household: me.household, people: people.people, dogs: dogs.dogs, exercises: exercises.exercises, treatKinds: treatKinds.treatKinds };
       keep();
     } catch {
       // no reception, signed out (the 401 already cleared the device), or an answer that didn't fit: keep showing

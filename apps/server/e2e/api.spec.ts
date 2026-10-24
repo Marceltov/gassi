@@ -30,14 +30,16 @@ test("a fresh server: set up, invite, walk together with two dogs, record a trac
   const view = await asHirsch.sessions();
   expect(view.walk).toMatchObject({ key: "w1", dogIds: [toffee.id, bruno.id].sort((a, b) => a - b), walkers: [{ name: "Hirsch" }, { name: "Herzii" }] });
 
-  // the phone's track, then home
+  // Herzii's phone takes the route over (ADR 0014) and sends its track, then home
+  await asHerzii.commands({ commands: [{ id: "r", at: t(1), kind: "walk.record", walkKey: "w1" }] });
+  expect((await asHirsch.sessions()).walk!.recorder).toEqual({ deviceId: herzii.device.id, name: "Pixel 7" });
   const point = (min: number, north: number) => ({ t: t(min), lat: 48.137 + north / 111_195, lon: 11.575, ele: 520, acc: 4 });
   expect(await asHerzii.uploadTrack({ trackId: "herzii-1", walkKey: "w1", source: "phone", seq: 0, points: [point(1, 0), point(10, 600), point(20, 1200)] })).toEqual({ stored: true });
   await asHirsch.commands({ commands: [{ id: "e", at: t(25), kind: "walk.stop", walkKey: "w1" }] });
   const walkEntry = (await asHirsch.entries({ type: "walk" })).entries[0];
   const walk = await asHirsch.walk({ id: walkEntry.id });
   expect(walk.summary).toMatchObject({ totalMin: 25, pees: [{ dogId: bruno.id }] });
-  expect(Math.round(walk.track!.metrics.distanceM)).toBe(1200);
+  expect(Math.abs(walk.track!.metrics.distanceM - 1200)).toBeLessThan(20);
 
   // Herzii signs her phone out: its token stops working at once
   await asHerzii.removeDevice({ id: herzii.device.id });

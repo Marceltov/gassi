@@ -11,6 +11,14 @@ const NOW = new Date("2026-10-20T12:00:00Z");
 const tracks = () => new Tracks(db(), () => NOW);
 const sessions = () => new Sessions({ db: db(), names: new Map([[HIRSCH.id, HIRSCH.name], [HERZII.id, HERZII.name]]), now: () => NOW });
 const pt = (s: number, north: number): TrackPoint => ({ t: new Date(Date.parse("2026-10-20T09:00:00Z") + s * 1000).toISOString(), lat: 48.137 + north / 111_195, lon: 11.575, ele: null, acc: 5 });
+const at = (s: number) => new Date(Date.parse("2026-10-20T09:00:00Z") + s * 1000).toISOString();
+// a walk north at 1.4 m/s from `from` to `to` seconds, a point every 5 s, `east` metres east
+const line = (from: number, to: number, east: number): TrackPoint[] =>
+  Array.from({ length: (to - from) / 5 + 1 }, (_, i) => {
+    const s = from + i * 5;
+    return { t: at(s), lat: 48.137 + (s * 1.4) / 111_195, lon: 11.575 + east / (111_195 * Math.cos((48.137 * Math.PI) / 180)), ele: null, acc: 5 };
+  });
+const recorder = (entryId: number, deviceId: number, s: number) => db().insertInto("walk_recorder").values({ entry_id: entryId, device_id: deviceId, from_at: at(s) }).execute();
 const device = async (personId: string, kind: "phone" | "watch") => (await new Devices(db(), () => NOW).create(personId, { kind, name: kind })).device.id;
 
 async function walk(key = "w") {
@@ -30,6 +38,44 @@ describe("Tracks", () => {
     expect(shown?.source).toBe("phone");
     expect(Math.round(shown!.metrics.distanceM)).toBe(1000);
     expect(shown!.points.map((p) => p.t)).toEqual([pt(0, 0).t, pt(600, 1000).t]); // simplified: a straight line
+  });
+
+  test("shows the recorders' pieces joined and filtered", async () => {
+    const entryId = await walk();
+    const [mine, hers] = [await device(HIRSCH.id, "phone"), await device(HERZII.id, "phone")];
+    await recorder(entryId, mine, 0);
+    await recorder(entryId, hers, 600);
+    // both record 20 minutes, 1.4 m/s north; hers 40 m east of mine to tell them apart
+    await tracks().addBatch(mine, { trackId: "mine", walkKey: "w", source: "phone", seq: 0, points: line(0, 1200, 0) });
+    await tracks().addBatch(hers, { trackId: "hers", walkKey: "w", source: "phone", seq: 0, points: line(0, 1200, 40) });
+    const shown = (await tracks().forWalk(entryId))!;
+    const east = (p: TrackPoint) => (p.lon - 11.575) * 111_195 * Math.cos((48.137 * Math.PI) / 180);
+    expect(shown.points.filter((p) => p.t < at(590)).every((p) => Math.abs(east(p)) < 5)).toBe(true);
+    expect(shown.points.filter((p) => p.t > at(700)).every((p) => Math.abs(east(p) - 40) < 5)).toBe(true);
+    expect(Math.abs(shown.metrics.distanceM - 1680)).toBeLessThan(100);
+  });
+
+  test("a handover arriving late cuts the old phone's late points", async () => {
+    const entryId = await walk();
+    const [mine, hers] = [await device(HIRSCH.id, "phone"), await device(HERZII.id, "phone")];
+    await recorder(entryId, mine, 0);
+    await tracks().addBatch(mine, { trackId: "mine", walkKey: "w", source: "phone", seq: 0, points: line(0, 1200, 0) });
+    await recorder(entryId, hers, 600); // heard of only now
+    const shown = (await tracks().forWalk(entryId))!;
+    expect(shown.points.every((p) => p.t <= at(600))).toBe(true);
+  });
+
+  test("no usable points: no track", async () => {
+    const entryId = await walk();
+    await tracks().addBatch(await device(HIRSCH.id, "phone"), { trackId: "bad", walkKey: "w", source: "phone", seq: 0, points: line(0, 600, 0).map((p) => ({ ...p, acc: 60 })) });
+    expect(await tracks().forWalk(entryId)).toBeNull();
+  });
+
+  test("a batch for an ended walk is still stored", async () => {
+    const entryId = await walk();
+    await sessions().apply(HIRSCH, [{ id: "stop", at: at(1200), kind: "walk.stop", walkKey: "w" }]);
+    expect(await tracks().addBatch(await device(HIRSCH.id, "phone"), { trackId: "late", walkKey: "w", source: "phone", seq: 0, points: line(0, 600, 0) })).toEqual({ stored: true });
+    expect(await tracks().forWalk(entryId)).not.toBeNull();
   });
 
   test("the watch track is shown, even when a phone recorded a longer one", async () => {

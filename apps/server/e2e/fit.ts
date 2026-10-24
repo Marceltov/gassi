@@ -32,7 +32,8 @@ export async function expectFits(page: Page, path: string, ready: string | RegEx
         })
         .map((e) => e.getAttribute("aria-label") ?? e.textContent);
       const small = all
-        .filter((e) => ["INPUT", "TEXTAREA"].includes(e.tagName) && e.offsetParent !== null && parseFloat(getComputedStyle(e).fontSize) < 16)
+        // text fields only: a switch's checkbox takes no typing, so the iPhone doesn't zoom into it
+        .filter((e) => (e.tagName === "TEXTAREA" || (e.tagName === "INPUT" && !["checkbox", "radio"].includes((e as HTMLInputElement).type))) && e.offsetParent !== null && parseFloat(getComputedStyle(e).fontSize) < 16)
         .map((e) => e.getAttribute("aria-label") ?? e.tagName);
       const heads = [...document.querySelectorAll<HTMLElement>('[data-testid="screen-head"]')].filter((e) => e.offsetParent !== null);
       for (const h of heads) if (h.getBoundingClientRect().top < 0) off.push(h.textContent);

@@ -97,6 +97,8 @@ const walkView = z.object({
   walkers: z.array(personSchema),
   pauses: z.array(z.object({ startedAt: z.string(), endedAt: z.string().nullable() })),
   paused: z.boolean(),
+  // the device that records the route now (#104)
+  recorder: z.object({ deviceId: z.number(), name: z.string() }).nullable(),
 });
 const trainingView = z.object({
   key: z.string(),

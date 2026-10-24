@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { type DescribableEntry, describeEntry, formatDistance } from "./describe";
+import { type DescribableEntry, describeEntry, formatDistance, formatSpeed } from "./describe";
 
 const entry = (more: Partial<DescribableEntry>): DescribableEntry => ({
   type: "walk",
@@ -74,4 +74,9 @@ test("an encounter reads in short", () => {
 test("both encounters can say what he said; a poop its consistency", () => {
   expect(text(entry({ type: "dogEncounter", details: { reaction: 3, sounds: ["screeches"], attention: "none" } }))).toBe("Hundebegegnung, 3 bellt · kreischt · ansprechbar: nicht von Hirsch");
   expect(text(entry({ type: "personEncounter", details: { who: "Paketbote", rating: 2, insecurity: 8, moods: ["afraid"] } }))).toBe("Menschenbegegnung, Paketbote · 2/10 · ängstlich · unsicher 8/10 von Hirsch");
+});
+
+test("a walk's speed reads in km/h with one decimal (#104)", () => {
+  expect(formatSpeed(1.03)).toBe("3,7 km/h");
+  expect(formatSpeed(0)).toBe("0,0 km/h");
 });

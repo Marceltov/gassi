@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contrast, danger, gradients, kinds, onColor, WHITE } from "./colors";
+import { contrast, danger, gradients, kinds, onColor, warn, WHITE } from "./colors";
 
 describe("white text on the kind colors", () => {
   for (const [kind, [light, dark]] of Object.entries(gradients)) {
@@ -21,13 +21,14 @@ describe("white text on the kind colors", () => {
   });
 });
 
-describe("danger", () => {
+describe("danger and warn", () => {
   // the page and the card of each theme (theme.ts)
   const grounds = { dark: ["#111418", "#1c2026"], light: ["#f3f4f6", "#ffffff"] } as const;
-  for (const scheme of ["dark", "light"] as const)
-    it(`${scheme}: reads as text on the page and on a card`, () => {
-      for (const ground of grounds[scheme]) expect(contrast(danger[scheme], ground)).toBeGreaterThanOrEqual(4.5);
-    });
+  for (const [name, color] of [["danger", danger], ["warn", warn]] as const)
+    for (const scheme of ["dark", "light"] as const)
+      it(`${name}, ${scheme}: reads as text on the page and on a card`, () => {
+        for (const ground of grounds[scheme]) expect(contrast(color[scheme], ground)).toBeGreaterThanOrEqual(4.5);
+      });
 });
 
 describe("onColor", () => {
