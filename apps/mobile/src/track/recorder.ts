@@ -2,7 +2,8 @@
 // (kept.ts, so a reload, a closed app or no reception loses nothing) and sent in batches with a sequence number. A
 // batch, once made, is sent again as it is until the server has it: the server stores each (track, seq) once, so a
 // batch that grew between tries would lose its new points. One track id per phone and walk; a reload goes on with it.
-// Only one tab records (a Web Lock where the browser has one); the others wait for it to let go.
+// Only one tab records (a Web Lock where the browser has one); the others wait for it to let go. A batch the server
+// refuses for good (its walk's start never reached it) is tried again while the walk runs, and given up once it is over.
 import { trackPointSchema } from "@gassi/api-client";
 import { createLiveFilter, newId, type TrackPoint } from "@gassi/domain";
 import { loadKept, saveKept } from "../data/kept";
@@ -12,6 +13,9 @@ export type Batch = { trackId: string; walkKey: string; source: "phone"; seq: nu
 export type Geo = { watch(onPoint: (p: TrackPoint) => void, onDenied: () => void): () => void };
 export type Locks = { request(name: string, fn: () => Promise<void>): Promise<void> };
 export type RecordingStatus = "on" | "noSignal" | "denied";
+
+/** What `upload` throws when the server refuses a batch for good (400: "Diese Runde gibt es nicht."). */
+export class RejectedBatch extends Error {}
 
 const BATCH_MS = 30_000;
 const NO_FIX_MS = 30_000;
@@ -49,8 +53,11 @@ async function flush(walkKey: string, upload: (b: Batch) => Promise<unknown>): P
       const { seq, to } = r.inflight!;
       try {
         await upload({ trackId: r.trackId, walkKey, source: "phone", seq, points: r.points.slice(r.sent, to) });
-      } catch {
-        return; // no reception, or the server is away: the batch waits as it is
+      } catch (e) {
+        // refused for good after the walk: nothing will take it, so the recording goes; else (no reception, the
+        // server away, a start still queued) the batch waits as it is
+        if (e instanceof RejectedBatch && all()[walkKey]?.ended) save(walkKey, null);
+        return;
       }
       const now = all()[walkKey] ?? r;
       save(walkKey, { ...now, sent: to, nextSeq: seq + 1, inflight: null });

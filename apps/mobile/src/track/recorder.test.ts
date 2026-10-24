@@ -1,7 +1,7 @@
 import type { TrackPoint } from "@gassi/domain";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { loadKept } from "../data/kept";
-import { createRecorder, type Batch, type Geo, type Locks, sendLeftovers } from "./recorder";
+import { createRecorder, type Batch, type Geo, type Locks, RejectedBatch, sendLeftovers } from "./recorder";
 
 const T0 = Date.parse("2026-10-24T09:00:00Z");
 const point = (s: number): TrackPoint => ({ t: new Date(T0 + s * 1000).toISOString(), lat: 48.137 + (s * 1.4) / 111_195, lon: 11.575, ele: null, acc: 5 });
@@ -195,4 +195,23 @@ test("a position the server would refuse (accuracy of kilometres, a height out o
   handlers!.onPoint(point(10));
   await r.stop();
   expect(up.batches.flatMap((b) => b.points).map((p) => p.t)).toEqual([point(10).t]);
+});
+
+test("a batch the server refuses for good is tried again while its walk runs, and given up once it is over", async () => {
+  const geo = fakeGeo();
+  const tries: number[] = [];
+  // "Diese Runde gibt es nicht.": the walk's start never reached the server
+  const refuse = async (b: Batch) => {
+    tries.push(b.seq);
+    throw new RejectedBatch();
+  };
+  const r = createRecorder({ walkKey: "w", geo, upload: refuse, locks: null });
+  await walkFor(geo, 0, 65);
+  expect(tries.length).toBeGreaterThan(1); // the start may still be on its way: kept
+  expect(Object.keys(loadKept("recordings") as object)).toEqual(["w"]);
+  await r.stop();
+  expect(loadKept("recordings")).toEqual({});
+  const before = tries.length;
+  await sendLeftovers(refuse, null);
+  expect(tries.length).toBe(before);
 });

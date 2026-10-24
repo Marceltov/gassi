@@ -4,10 +4,11 @@
 // useRecording() gives the walk screen what it shows: whether this phone records, how recording goes, the distance and
 // route so far, who records, and `takeOver`. `sent` counts the batches that reached the server, so the summary asks
 // again once the last one is there.
+import { ApiError } from "@gassi/api-client";
 import { newId, type TrackPoint } from "@gassi/domain";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useGassi } from "../data/GassiProvider";
-import { type Batch, createRecorder, type Recorder, type RecordingStatus, sendLeftovers } from "./recorder";
+import { type Batch, createRecorder, type Recorder, type RecordingStatus, RejectedBatch, sendLeftovers } from "./recorder";
 import { useScreenOn } from "./screenOn";
 import { holdScreen } from "./wakeLock";
 
@@ -67,7 +68,11 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   const upload = useCallback(
     async (b: Batch) => {
       if (!api) throw new Error("signed out");
-      await api.uploadTrack(b);
+      try {
+        await api.uploadTrack(b);
+      } catch (e) {
+        throw e instanceof ApiError && e.status === 400 ? new RejectedBatch() : e;
+      }
       setSent((n) => n + 1);
     },
     [api],
