@@ -188,3 +188,14 @@ test("no reception is no sync error", async () => {
   await store.refresh();
   expect(store.get()).toMatchObject({ online: false, syncError: null });
 });
+
+test("a sync error goes to the server's log too", async () => {
+  const server = household();
+  server.handlers["GET /api/sessions"] = () => ({ walk: "kaputt", training: null });
+  server.handlers["POST /api/client-errors"] = (body) => ({ received: (body as { errors: unknown[] }).errors.length });
+  const store = createGassiStore({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: server.fetch, version: "0.3.0" });
+  await store.refresh();
+  await settle();
+  const sent = server.calls.filter((c) => c.route === "POST /api/client-errors");
+  expect(sent).toEqual([expect.objectContaining({ body: { version: "0.3.0", errors: [expect.objectContaining({ part: "Runde und Training", message: expect.stringMatching(/^Die Antwort des Servers passt nicht/) })] } })]);
+});

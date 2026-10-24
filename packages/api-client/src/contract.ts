@@ -324,6 +324,16 @@ export const contract = {
     output: issueSchema,
     messages: { kind: "Wunsch oder Fehler?", title: "Worum geht es? Kurz, höchstens 120 Zeichen.", text: "Höchstens 5000 Zeichen." },
   }),
+  // what went wrong in the app (a sync that failed, a crash), into the server's log for debugging (#106)
+  reportErrors: endpoint({
+    method: "POST",
+    path: "/api/client-errors",
+    input: z.object({
+      errors: z.array(z.object({ at: z.string().max(40), part: z.string().max(40), message: z.string().max(2000) })).min(1).max(20),
+      version: z.string().max(20),
+    }),
+    output: z.object({ received: z.number() }),
+  }),
 };
 
 export type Contract = typeof contract;

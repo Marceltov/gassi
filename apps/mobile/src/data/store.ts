@@ -8,6 +8,7 @@ import { type Command, createCommandQueue, type Person, project, RejectedCommand
 import { apiFor, errorMessage, NO_ANSWER_STATUS, WRITE_TIMEOUT_MS } from "./api";
 import { type Device, loadDevice } from "./device";
 import { onReconnect } from "./network";
+import { createErrorReports } from "./reports";
 import { onStoredElsewhere, storage } from "./storage";
 import { loadSnapshot, saveSnapshot } from "./snapshot";
 
@@ -47,6 +48,8 @@ export type GassiStore = {
   send(cmd: Command): void;
   /** Reloads the household, and sends what is queued, then reloads the sessions. */
   refresh(): Promise<void>;
+  /** Sends what went wrong outside the store (a crash) to the server's log, like the store's own sync errors. */
+  reportError(part: string, message: string): void;
   /** Listens to other tabs' taps and to reception coming back; returns the stop. */
   start(): () => void;
 };
@@ -61,7 +64,8 @@ const quiet = (e: unknown) => e instanceof ApiError && (e.status === 0 || e.stat
 
 const NOTHING_RUNS: SessionsView = { walk: null, training: null };
 
-export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: typeof fetch } = {}): GassiStore {
+/** `version`: the app's, sent with the error reports. */
+export function createGassiStore(device: Device, { fetch: fetchFn, version = "?" }: { fetch?: typeof fetch; version?: string } = {}): GassiStore {
   let online = true;
   const onReached = (reached: boolean) => {
     if (reached !== online) {
@@ -81,8 +85,16 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
   // counts the queue's answers: a sessions answer asked for before one of them is older than it and is not shown
   let answers = 0;
   const errors: Record<Part, string | null> = { household: null, commands: null, sessions: null };
+  // the same error goes to the server's log too (reports.ts), once a minute at most
+  const reports = createErrorReports({ send: (errors) => api.reportErrors({ errors, version }) });
   const failed = (part: Part, e: unknown) => {
-    if (!quiet(e)) errors[part] = `${PARTS[part]}: ${e instanceof ApiError ? e.message : errorMessage(e) + (e instanceof Error ? ` (${e.message})` : "")}`;
+    if (quiet(e)) return;
+    errors[part] = e instanceof ApiError ? e.message : errorMessage(e) + (e instanceof Error ? ` (${e.message})` : "");
+    void reports.report(PARTS[part], errors[part]);
+  };
+  const syncError = () => {
+    const part = (Object.keys(errors) as Part[]).find((p) => errors[p] !== null);
+    return part ? `${PARTS[part]}: ${errors[part]}` : null;
   };
   let state: GassiState;
   const listeners = new Set<() => void>();
@@ -91,7 +103,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
     const { me, people, dogs, device: here } = household;
     const pending = queue.pending();
     const activeDogs = dogs.filter((d) => !d.archived).map((d) => d.id);
-    state = { ...household, me, view: project(serverView, pending, me, people, activeDogs, here), pending, unsent: pending.length, online, syncError: Object.values(errors).find((e) => e !== null) ?? null };
+    state = { ...household, me, view: project(serverView, pending, me, people, activeDogs, here), pending, unsent: pending.length, online, syncError: syncError() };
     listeners.forEach((fn) => fn());
   }
   // only while this device is the signed-in one: an answer that comes after a 401 (or Abmelden) keeps nothing
@@ -158,6 +170,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
   async function refresh() {
     await Promise.all([loadHousehold(), loadSessions()]);
     update();
+    void reports.flush(); // what waited without reception
   }
 
   return {
@@ -172,6 +185,9 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
       void queue.push(cmd);
     },
     refresh,
+    reportError(part, message) {
+      void reports.report(part, message);
+    },
     start() {
       // another tab's taps (the queue re-reads storage) show here too; reception back sends the queued ones at once
       const stopWatching = onStoredElsewhere(queueKey, () => queue.refresh());

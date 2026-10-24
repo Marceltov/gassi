@@ -1,0 +1,19 @@
+// Errors nobody caught, for the server's log (reports.ts): on Android React Native's global handler, which then still
+// shows the error screen or ends the app as before. A crash that ends the app may end it before its report is out.
+// The web listens to the browser (crashes.web.ts).
+import { errorText } from "./reports";
+
+type Handler = (error: unknown, isFatal?: boolean) => void;
+type ErrorUtils = { getGlobalHandler(): Handler; setGlobalHandler(h: Handler): void };
+
+/** Calls `fn` with each uncaught error; returns the stop. */
+export function onCrash(fn: (message: string) => void): () => void {
+  const utils = (globalThis as { ErrorUtils?: ErrorUtils }).ErrorUtils;
+  if (!utils) return () => {};
+  const before = utils.getGlobalHandler();
+  utils.setGlobalHandler((error, isFatal) => {
+    fn(errorText(error));
+    before(error, isFatal);
+  });
+  return () => utils.setGlobalHandler(before);
+}

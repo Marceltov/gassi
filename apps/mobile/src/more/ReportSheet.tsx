@@ -1,7 +1,6 @@
 // "Wunsch oder Fehler melden" (#39): Wunsch or Fehler, a short title and a text (the keyboard's microphone dictates
 // it), sent to the server, which files it on GitHub as who sent it from which device; the app version goes with it.
 // Needs the server: without reception it says so (useWrite).
-import Constants from "expo-constants";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme";
@@ -10,12 +9,12 @@ import { ButtonRow } from "../ui/ButtonRow";
 import { Field } from "../ui/Field";
 import { Segments } from "../ui/Segments";
 import { Sheet } from "../ui/Sheet";
+import { APP_VERSION } from "../version";
 import { useWrite } from "./useWrite";
 
 export const KIND_LABEL = { wish: "Wunsch", bug: "Fehler" } as const;
 type Kind = keyof typeof KIND_LABEL;
 const KINDS = (Object.keys(KIND_LABEL) as Kind[]).map((value) => ({ value, label: KIND_LABEL[value] }));
-const VERSION = Constants.expoConfig?.version ?? "?";
 
 /** `onDone`: after it was filed (the list reloads and shows it). */
 export function ReportSheet({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
@@ -32,7 +31,7 @@ function ReportForm({ onClose, onDone }: { onClose: () => void; onDone: () => vo
   const [kind, setKind] = useState<Kind>("wish");
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
-  const send = () => void run((api) => api.reportIssue({ kind, title, text, version: VERSION })).then((ok) => ok && onDone());
+  const send = () => void run((api) => api.reportIssue({ kind, title, text, version: APP_VERSION })).then((ok) => ok && onDone());
 
   return (
     <View testID="report-sheet" style={styles.form}>
