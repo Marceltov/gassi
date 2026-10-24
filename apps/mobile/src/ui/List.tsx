@@ -6,12 +6,14 @@ import { onColor } from "../colors";
 import { type ListTone, radius, useTheme } from "../theme";
 import { Icon, type IconName } from "./Icon";
 
-export function Group({ title, children }: { title?: string; children: ReactNode }) {
+/** `note`: a line under the group that says more about its rows (what a switch costs). */
+export function Group({ title, note, children }: { title?: string; note?: string; children: ReactNode }) {
   const theme = useTheme();
   return (
     <View style={styles.wrap}>
       {title ? <Text style={[styles.title, { color: theme.muted }]}>{title}</Text> : null}
       <View style={[styles.group, { backgroundColor: theme.surface }]}>{children}</View>
+      {note ? <Text style={[styles.note, { color: theme.muted }]}>{note}</Text> : null}
     </View>
   );
 }
@@ -70,6 +72,7 @@ const styles = StyleSheet.create({
   smallText: { fontSize: 13, fontWeight: "600" },
   wrap: { gap: 4 },
   title: { fontSize: 13, marginLeft: 4, marginTop: 6 },
+  note: { fontSize: 13, marginLeft: 4 },
   group: { borderRadius: radius.tile + 2, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 48, paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   square: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },

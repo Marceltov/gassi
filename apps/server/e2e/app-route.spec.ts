@@ -87,6 +87,19 @@ test.describe("with location allowed", () => {
     }
   });
 
+  test("holds the screen while recording, with the switch on", async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as unknown as { held: string[] };
+      w.held = [];
+      Object.defineProperty(navigator, "wakeLock", { value: { request: async (type: string) => (w.held.push(type), { release: async () => undefined, addEventListener() {} }) } });
+    });
+    await signIn(page);
+    await page.goto("/mehr");
+    await page.getByRole("switch", { name: "Bildschirm auf der Runde anlassen" }).click();
+    await startWalk(page);
+    await expect.poll(() => page.evaluate(() => (window as unknown as { held: string[] }).held)).toContain("screen");
+  });
+
   test("no fix says kein GPS-Signal", async ({ page }) => {
     await page.clock.install();
     await signIn(page);

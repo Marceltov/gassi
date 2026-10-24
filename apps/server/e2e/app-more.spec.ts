@@ -36,6 +36,18 @@ test("Mehr lists Gewicht and Vorrat first, then the settings, and the Garmin wat
   await expect(page.getByTestId("more-Haushalt")).toContainText("Hirsch");
 });
 
+test("the screen-on switch is kept on this device (#104)", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/mehr");
+  const toggle = page.getByRole("switch", { name: "Bildschirm auf der Runde anlassen" });
+  await expect(toggle).not.toBeChecked();
+  await expect(page.getByText("Damit die Strecke auch in der Tasche weiterläuft. Kostet Akku.")).toBeVisible();
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  await page.reload();
+  await expect(page.getByRole("switch", { name: "Bildschirm auf der Runde anlassen" })).toBeChecked();
+});
+
 test("Gewicht: 12,4 kg today shows on top, on today in the calendar, on the curve and on Mehr", async ({ page }) => {
   const token = await signIn(page);
   await page.goto("/mehr");

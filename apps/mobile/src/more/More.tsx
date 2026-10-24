@@ -1,17 +1,20 @@
 // Mehr: the data first (Gewicht, Vorrat), then the settings (Hunde, Übungen, Leckerli; Haushalt; Meine Geräte) and
-// the Garmin watch, which comes later. Each row says in short what is behind it; without reception the rows that need
+// the Garmin watch, which comes later; then this device's "Bildschirm auf der Runde anlassen" (#104), where the browser
+// can keep the screen on. Each row says in short what is behind it; without reception the rows that need
 // the server stay without that line. Then Wünsche und Fehler (when the server has GitHub set up) and the link to the
 // source code, which the AGPL asks a server to offer its users, and last Abmelden on this device (asked first). Its
 // screens have no Zurück: the tab bar stays, and the Mehr tab leads back here.
 import { formatAgo, formatKg, stockSummary } from "@gassi/domain";
 import { type Href, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Linking, StyleSheet, Text } from "react-native";
+import { Linking, StyleSheet, Switch, Text } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { useNow } from "../start/useNow";
 import { useTheme } from "../theme";
 import { Screen } from "../ui/Screen";
 import { Group, Row } from "../ui/List";
+import { setScreenOn, useScreenOn } from "../track/screenOn";
+import { wakeLockSupported } from "../track/wakeLock";
 import { SignOutSheet } from "./SignOut";
 import { useServer } from "./useServer";
 
@@ -43,6 +46,7 @@ export function More() {
   const others = people.filter((p) => p.id !== me?.id).map((p) => p.name);
   const go = (path: Href) => () => router.push(path);
   const [signingOut, setSigningOut] = useState(false);
+  const screenOn = useScreenOn();
 
   return (
     <Screen
@@ -63,6 +67,15 @@ export function More() {
             <Row testID="more-Geraete" icon="phone" tone="device" label="Meine Geräte" value={devices ? `${devices.devices.length} angemeldet` : undefined} onPress={go("/mehr/geraete")} />
             <Row testID="more-Garmin-Uhr" icon="watch" tone="garmin" label="Garmin-Uhr" value="kommt später" muted />
           </Group>
+          {wakeLockSupported() ? (
+            <Group note="Damit die Strecke auch in der Tasche weiterläuft. Kostet Akku.">
+              <Row
+                testID="more-screen-on"
+                label="Bildschirm auf der Runde anlassen"
+                right={<Switch accessibilityLabel="Bildschirm auf der Runde anlassen" value={screenOn} onValueChange={setScreenOn} trackColor={{ true: theme.walk, false: theme.neutral }} />}
+              />
+            </Group>
+          ) : null}
           <Group>
             {github ? <Row testID="more-Wuensche" icon="feedback" label="Wünsche und Fehler" value={issues ? `${issues.issues.filter((i) => i.open).length} offen` : undefined} onPress={go("/mehr/wuensche")} /> : null}
             <Row testID="more-Quellcode" icon="code" label="Quellcode" value="AGPL-3.0 · GitHub" onPress={() => void Linking.openURL(SOURCE)} />

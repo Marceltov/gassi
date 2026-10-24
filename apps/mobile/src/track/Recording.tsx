@@ -1,12 +1,15 @@
 // The running walk's route for every screen (#104, ADR 0014): while a walk runs and this device is its recorder, a
 // recorder (recorder.ts) runs here, whichever tab is open; it stops at the walk's end (sending the rest) and lets go
-// when another phone takes over. useRecording() gives the walk screen what it shows: whether this phone records, how
-// recording goes, the distance and route so far, who records, and `takeOver`. `sent` counts the batches that reached
-// the server, so the summary asks again once the last one is there.
+// when another phone takes over; with "Bildschirm auf der Runde anlassen" on, it keeps the screen on meanwhile.
+// useRecording() gives the walk screen what it shows: whether this phone records, how recording goes, the distance and
+// route so far, who records, and `takeOver`. `sent` counts the batches that reached the server, so the summary asks
+// again once the last one is there.
 import { newId, type TrackPoint } from "@gassi/domain";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useGassi } from "../data/GassiProvider";
 import { type Batch, createRecorder, type Recorder, type RecordingStatus, sendLeftovers } from "./recorder";
+import { useScreenOn } from "./screenOn";
+import { holdScreen } from "./wakeLock";
 
 export type Recording = {
   mine: boolean;
@@ -87,6 +90,10 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
       else r.close();
     };
   }, [key, mine, api, upload, store]);
+
+  // "Bildschirm auf der Runde anlassen": the screen stays on while this phone records
+  const screenOn = useScreenOn();
+  useEffect(() => (key && mine && screenOn ? holdScreen() : undefined), [key, mine, screenOn]);
 
   const takeOver = useCallback(() => {
     if (key) send({ id: newId(), at: new Date().toISOString(), kind: "walk.record", walkKey: key });
