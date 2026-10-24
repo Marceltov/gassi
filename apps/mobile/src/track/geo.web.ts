@@ -25,5 +25,8 @@ export const recordingGeo = (): Geo => ({ watch: watchPosition });
 /** The browser's recording can't be ended behind the app's back. */
 export const backgroundStopped = async (): Promise<boolean> => false;
 
-const sameAsNative: typeof Native = { recordingGeo, backgroundStopped };
+/** Nothing records in the background here. */
+export const stopStaleBackground = async (): Promise<void> => {};
+
+const sameAsNative: typeof Native = { recordingGeo, backgroundStopped, stopStaleBackground };
 void sameAsNative;

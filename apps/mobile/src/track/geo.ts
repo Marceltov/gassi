@@ -3,7 +3,7 @@
 // the browser (geo.web.ts).
 import type { Geo } from "./recorder";
 import { backgroundStopped, startBackground, stopBackground } from "./background";
-import { pointEvents } from "./headless";
+import { pointEvents, staleBackground } from "./headless";
 
 /** Positions for the walk that started at `startedAt` (the notification says since when). */
 export function recordingGeo(startedAt: string): Geo {
@@ -18,3 +18,6 @@ export function recordingGeo(startedAt: string): Geo {
 }
 
 export { backgroundStopped };
+
+/** Stops a background recording that is no longer this phone's (headless.ts `staleBackground`). */
+export const stopStaleBackground = (running: string | null, mine: boolean): Promise<void> => (staleBackground(running, mine) ? stopBackground() : Promise.resolve());

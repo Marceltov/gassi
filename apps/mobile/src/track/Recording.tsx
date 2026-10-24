@@ -8,7 +8,7 @@
 import { newId, type TrackPoint } from "@gassi/domain";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useGassi } from "../data/GassiProvider";
-import { backgroundStopped, recordingGeo } from "./geo";
+import { backgroundStopped, recordingGeo, stopStaleBackground } from "./geo";
 import { type Batch, createRecorder, type Recorder, type RecordingStatus, sendLeftovers, uploadWith } from "./recorder";
 import { useScreenOn } from "./screenOn";
 import { holdScreen } from "./wakeLock";
@@ -78,6 +78,11 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     },
     [api],
   );
+
+  // Android: a service still recording a walk that ended or went to another phone while the app was closed stops
+  useEffect(() => {
+    if (device) void stopStaleBackground(key, mine);
+  }, [device, key, mine]);
 
   // what an earlier page, a recording handed over or a Zuhause without reception left unsent
   useEffect(() => {

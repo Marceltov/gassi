@@ -8,8 +8,7 @@ import * as TaskManager from "expo-task-manager";
 import { AppState, PermissionsAndroid, Platform } from "react-native";
 import { apiFor } from "../data/api";
 import { loadDevice } from "../data/device";
-import { kinds } from "../colors";
-import { backgroundWalk, beginBackground, clearBackground, distanceOf, type Location as Delivered, notificationBody, onLocations, pointEvents, queuedFor } from "./headless";
+import { backgroundWalk, beginBackground, clearBackground, distanceOf, endedEarly, type Location as Delivered, locationOptions, notificationBody, onLocations, pointEvents, queuedFor } from "./headless";
 import { uploadWith } from "./recorder";
 
 const TASK = "gassi-recording";
@@ -31,12 +30,7 @@ async function stopService(): Promise<void> {
   if (await Location.hasStartedLocationUpdatesAsync(TASK)) await Location.stopLocationUpdatesAsync(TASK);
 }
 
-const options = (body: string): Location.LocationTaskOptions => ({
-  accuracy: Location.Accuracy.High,
-  timeInterval: 5000,
-  distanceInterval: 5,
-  foregroundService: { notificationTitle: "Runde läuft", notificationBody: body, notificationColor: kinds.walk, killServiceOnDestroy: false },
-});
+const options = (body: string): Location.LocationTaskOptions => ({ accuracy: Location.Accuracy.High, ...locationOptions(body) });
 
 /** Starts (or goes on with) recording `walkKey` here; "denied" when location isn't allowed. Asks for notifications
  * once (Android 13+): without them the service runs, its notification hidden. */
@@ -48,16 +42,15 @@ export async function startBackground(walkKey: string, startedAt: string): Promi
   return "on";
 }
 
-/** Ends recording here (the walk is over). */
+/** Ends recording here (the walk is over); a recording begun meanwhile (a new walk started at once) keeps the service. */
 export async function stopBackground(): Promise<void> {
   clearBackground();
-  await stopService();
+  if (await Location.hasStartedLocationUpdatesAsync(TASK)) if (!backgroundWalk()) await Location.stopLocationUpdatesAsync(TASK);
 }
 
-/** Whether Android ended the recording of `walkKey` on its own: kept as running, but the service is gone. */
-export async function backgroundStopped(walkKey: string): Promise<boolean> {
-  return backgroundWalk()?.walkKey === walkKey && !(await Location.hasStartedLocationUpdatesAsync(TASK));
-}
+/** Whether Android ended the recording of `walkKey` on its own (the task's registration outlives a killed process,
+ * so this goes by the last position). */
+export const backgroundStopped = async (walkKey: string): Promise<boolean> => endedEarly(walkKey, Date.now());
 
 // back in the foreground: the notification's line catches up
 AppState.addEventListener("change", (state) => {

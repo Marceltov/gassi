@@ -2,7 +2,7 @@ import type { TrackPoint } from "@gassi/domain";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { loadKept } from "../data/kept";
 import { storage } from "../data/storage";
-import { backgroundWalk, beginBackground, distanceOf, type HeadlessDeps, type Location, notificationBody, onLocations, queuedFor } from "./headless";
+import { backgroundWalk, beginBackground, distanceOf, endedEarly, type HeadlessDeps, type Location, locationOptions, notificationBody, onLocations, queuedFor, staleBackground } from "./headless";
 import { type Batch, createRecorder } from "./recorder";
 
 const T0 = Date.parse("2026-10-24T12:00:00Z");
@@ -126,4 +126,25 @@ test("the notification says since when and how far", async () => {
   expect(Math.round(distanceOf("w"))).toBe(700);
   expect(notificationBody("2026-10-24T12:05:00.000Z", 0)).toMatch(/^Seit \d\d:05 · 0 m$/);
   expect(notificationBody("2026-10-24T12:05:00.000Z", 1234)).toMatch(/^Seit \d\d:05 · 1,2 km$/);
+});
+
+test("positions come every 5 s also standing still (a sniffing dog is no lost GPS, and the stop still arrives)", () => {
+  expect(locationOptions("Seit 12:00 · 0 m")).toMatchObject({ timeInterval: 5000, distanceInterval: 0, foregroundService: { notificationTitle: "Runde läuft", notificationBody: "Seit 12:00 · 0 m", killServiceOnDestroy: false } });
+});
+
+test("a background recording of a walk this phone no longer records is stale", () => {
+  expect(staleBackground("w", true)).toBe(false); // nothing kept
+  beginBackground("w", new Date(T0).toISOString());
+  expect(staleBackground("w", true)).toBe(false);
+  expect(staleBackground("w", false)).toBe(true); // taken over, or the walk ended, while the app was closed
+  expect(staleBackground(null, false)).toBe(true);
+  expect(staleBackground("other", true)).toBe(true);
+});
+
+test("ended early: positions stopped coming over 2 minutes ago while the walk still ran here", async () => {
+  recordingLeftBehind();
+  await onLocations([loc(0)], deps().deps);
+  expect(endedEarly("w", T0 + 60_000)).toBe(false);
+  expect(endedEarly("w", T0 + 121_000)).toBe(true);
+  expect(endedEarly("other", T0 + 121_000)).toBe(false);
 });
