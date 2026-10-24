@@ -1,7 +1,7 @@
 // How an entry reads in a list, the same in the apps.
 import { detailLine, type EntryDetails } from "./details";
 import { type EntryType, FOOD_LABEL, type FoodKind, TYPE_LABEL } from "./entryTypes";
-import { exerciseRate, type ExerciseTotal, trainingParts } from "./exerciseTotals";
+import { exerciseRate, type ExerciseTotal, GRADE_SIGN, GRADES, trainingParts } from "./exerciseTotals";
 import { countLine, formatCanCount } from "./food";
 import { cansOf } from "./stock";
 import { formatMinutes } from "./time";
@@ -80,7 +80,7 @@ export function describeEntry(e: DescribableEntry): { title: string; extra: stri
   }
 }
 
-/** A command without a training (#36), its one repetition and its treat: "Warten ✓ · 1 Leckerli". */
+/** A command without a training (#36), its one repetition and its treat: "Warten ✓ · 1 Leckerli", "Warten ~". */
 export function commandLine(exercises: readonly ExerciseTotal[], treats: number): string {
-  return [...exercises.map((x) => `${x.name} ${x.ok ? "✓" : "✗"}`), ...trainingParts([], treats)].join(" · ");
+  return [...exercises.map((x) => `${x.name} ${GRADE_SIGN[GRADES.find((g) => x[g] > 0) ?? "fail"]}`), ...trainingParts([], treats)].join(" · ");
 }

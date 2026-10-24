@@ -73,7 +73,7 @@ const count = z.number().int().min(0).max(10_000);
 /** Replaces a training's repetitions (per exercise and dog) and treats (per kind) afterwards. */
 export const trainingEditInput = z.object({
   id: z.coerce.number().int().positive(),
-  reps: z.array(z.object({ exerciseId: z.number().int().positive(), dogId: z.number().int().positive(), ok: count, fail: count })).max(500),
+  reps: z.array(z.object({ exerciseId: z.number().int().positive(), dogId: z.number().int().positive(), ok: count, meh: count, fail: count })).max(500),
   treats: z.array(z.object({ treatKindId: z.number().int().positive(), count })).max(100),
 });
 

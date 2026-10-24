@@ -3,7 +3,7 @@
 // (zod); a problem is an InputError with a German message the app can show.
 import { sql } from "kysely";
 import { z } from "zod";
-import { checkDetails, checkDogs, isPractice, type EntryDetails, computeStock, perDog, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput, kgToGrams } from "@gassi/domain";
+import { addCounts, type Counts, NO_COUNTS, repsOf, checkDetails, checkDogs, isPractice, type EntryDetails, computeStock, perDog, dayBounds, dogRule, type Entry, ENTRY_MESSAGES, entryEditFields, type EntryType, type ExerciseTotal, exerciseTotals, type FieldMessages, type FoodKind, isEntryType, messageFor, mondayOf, newEntryInput, pausedWithin, type Rep, RESTOCK_MESSAGES, restockInput, type Route, simplify, type Stock, STOCK_COUNT_MESSAGES, stockCountInput, trainingEditInput, type WalkDuring, weekBounds, withinWalk, type WeekInput, weekView, type WeekView, WEIGHT_MESSAGES, weightInput, kgToGrams } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
@@ -11,6 +11,7 @@ import { InputError } from "./errors";
 import type { Names, Person } from "./people";
 import { dryTreats } from "./stock";
 import { type ShownTrack, Tracks } from "./tracks";
+import { COUNT_COLUMNS, countRow, countsOf } from "./db/counts";
 
 /** An entry as the screens show it: with the display name of whoever logged it, and for walks the walkers (names and
  * ids), minutes paused, the distance and a thumbnail route of the shown track and what happened during it, for trainings the exercises practised
@@ -156,12 +157,12 @@ export class Diary {
     // treats already given keep the grams and dry flag they were logged with
     const given = await db.selectFrom("training_treat").selectAll().where("entry_id", "=", id).execute();
     // the same exercise and dog (or treat kind) twice add up
-    const repRows = new Map<string, { exercise_id: number; dog_id: number; ok_count: number; fail_count: number }>();
+    const repRows = new Map<string, { exercise_id: number; dog_id: number; counts: Counts }>();
     for (const r of reps) {
       if (!training.dogIds.includes(r.dogId)) throw new InputError("Dieser Hund gehört nicht zum Training.");
       if (!exerciseIds.some((x) => x.id === r.exerciseId)) throw new InputError("Diese Übung gibt es nicht.");
-      const row = repRows.get(`${r.exerciseId}/${r.dogId}`) ?? { exercise_id: r.exerciseId, dog_id: r.dogId, ok_count: 0, fail_count: 0 };
-      repRows.set(`${r.exerciseId}/${r.dogId}`, { ...row, ok_count: row.ok_count + r.ok, fail_count: row.fail_count + r.fail });
+      const row = repRows.get(`${r.exerciseId}/${r.dogId}`) ?? { exercise_id: r.exerciseId, dog_id: r.dogId, counts: NO_COUNTS };
+      repRows.set(`${r.exerciseId}/${r.dogId}`, { ...row, counts: addCounts(row.counts, r) });
     }
     const treatCounts = new Map<number, number>();
     for (const t of treats) {
@@ -172,7 +173,7 @@ export class Diary {
       await tx.updateTable("entry").set({ updated_at: this.deps.now().toISOString() }).where("id", "=", id).execute();
       await tx.deleteFrom("training_exercise").where("entry_id", "=", id).execute();
       await tx.deleteFrom("training_treat").where("entry_id", "=", id).execute();
-      const exerciseRows = [...repRows.values()].filter((r) => r.ok_count > 0 || r.fail_count > 0).map((r) => ({ entry_id: id, ...r }));
+      const exerciseRows = [...repRows.values()].filter((r) => repsOf(r.counts) > 0).map((r) => ({ entry_id: id, exercise_id: r.exercise_id, dog_id: r.dog_id, ...countRow(r.counts) }));
       if (exerciseRows.length) await tx.insertInto("training_exercise").values(exerciseRows).execute();
       const treatRows = [...treatCounts].filter(([, count]) => count > 0).map(([kindId, count]) => {
         const kind = given.find((g) => g.treat_kind_id === kindId) ?? kinds.find((k) => k.id === kindId)!;
@@ -313,7 +314,7 @@ export class Diary {
     const [walkers, pauses, exercises, treats, tracks, during] = await Promise.all([
       walkIds.length ? db.selectFrom("walk_walker").select(["entry_id", "person_id"]).where("entry_id", "in", walkIds).orderBy(sql`rowid`).execute() : [],
       walkIds.length ? db.selectFrom("walk_pause").select(["entry_id", "started_at", "ended_at"]).where("entry_id", "in", walkIds).execute() : [],
-      trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise_id", "dog_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute() : [],
+      trainingIds.length ? db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise_id", "dog_id", "exercise.name", ...COUNT_COLUMNS]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute() : [],
       trainingIds.length ? db.selectFrom("training_treat").select(["entry_id", "treat_kind_id", "count"]).where("entry_id", "in", trainingIds).where("count", ">", 0).orderBy("treat_kind_id").execute() : [],
       new Tracks(db, this.deps.now).shown(walkIds),
       this.during(entries.filter((e) => e.type === "walk")),
@@ -326,8 +327,8 @@ export class Diary {
     return {
       walkers: group(walkers, (w) => w.person_id),
       pauses: group(pauses, (p) => ({ startedAt: p.started_at, endedAt: p.ended_at })),
-      exercises: new Map([...group(exercises, (x) => ({ name: x.name, ok: x.ok_count, fail: x.fail_count }))].map(([id, rows]) => [id, exerciseTotals(rows)])),
-      reps: group(exercises, (x) => ({ exerciseId: x.exercise_id, dogId: x.dog_id, ok: x.ok_count, fail: x.fail_count })),
+      exercises: new Map([...group(exercises, (x) => ({ name: x.name, ...countsOf(x) }))].map(([id, rows]) => [id, exerciseTotals(rows)])),
+      reps: group(exercises, (x) => ({ exerciseId: x.exercise_id, dogId: x.dog_id, ...countsOf(x) })),
       treats: new Map([...group(treats, (t) => t.count)].map(([id, counts]) => [id, counts.reduce((n, c) => n + c, 0)])),
       treatCounts: group(treats, (t) => ({ treatKindId: t.treat_kind_id, count: t.count })),
       tracks,
@@ -346,14 +347,14 @@ export class Diary {
     const inside = (await this.entries.list({ since, until })).filter((e) => e.type === "pee" || e.type === "mark" || e.type === "poop" || e.type === "training" || e.type === "command");
     const trainingIds = inside.filter((e) => e.type === "training" || e.type === "command").map((e) => e.id);
     const reps = trainingIds.length
-      ? await this.deps.db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name", "ok_count", "fail_count"]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute()
+      ? await this.deps.db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["entry_id", "exercise.name", ...COUNT_COLUMNS]).where("entry_id", "in", trainingIds).orderBy(sql`training_exercise.rowid`).execute()
       : [];
     return new Map(
       walks.map((w) => {
         const mine = inside.filter((e) => withinWalk(e.at, w.at, endOf(w)));
         // oldest training (or command, #36) first, as the summary lists them
         const trainings = mine.filter((e) => e.type === "training" || e.type === "command").reverse();
-        const rows = trainings.flatMap((t) => reps.filter((r) => r.entry_id === t.id).map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count })));
+        const rows = trainings.flatMap((t) => reps.filter((r) => r.entry_id === t.id).map((r) => ({ name: r.name, ...countsOf(r) })));
         const count = (type: EntryType) => mine.filter((e) => e.type === type).length;
         return [w.id, { pees: count("pee"), marks: count("mark"), poops: count("poop"), exercises: exerciseTotals(rows) }];
       }),

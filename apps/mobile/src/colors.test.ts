@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contrast, danger, gradients, kinds, onColor, WHITE } from "./colors";
+import { contrast, danger, grade, gradients, kinds, onColor, WHITE } from "./colors";
 
 describe("white text on the kind colors", () => {
   for (const [kind, [light, dark]] of Object.entries(gradients)) {
@@ -27,6 +27,15 @@ describe("danger", () => {
   for (const scheme of ["dark", "light"] as const)
     it(`${scheme}: reads as text on the page and on a card`, () => {
       for (const ground of grounds[scheme]) expect(contrast(danger[scheme], ground)).toBeGreaterThanOrEqual(4.5);
+    });
+});
+
+describe("grade", () => {
+  const grounds = { dark: ["#111418", "#1c2026"], light: ["#f3f4f6", "#ffffff"] } as const;
+  for (const scheme of ["dark", "light"] as const)
+    it(`${scheme}: klappt, geht so and klappt nicht read as text on the page and on a card`, () => {
+      const { ok, meh, fail } = grade[scheme];
+      for (const ground of grounds[scheme]) for (const c of [ok, meh, fail]) expect(contrast(c, ground)).toBeGreaterThanOrEqual(4.5);
     });
 });
 

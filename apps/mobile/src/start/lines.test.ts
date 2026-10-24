@@ -17,9 +17,9 @@ test("the last feeding: its grams and kind, else how long ago", () => {
 });
 
 test("the last training: its exercises with their success and the treats, else how long ago", () => {
-  const training = { at, endedAt: "2026-10-20T08:40:00.000Z", byName: "Hirsch", exercises: [{ name: "Sitz", ok: 4, fail: 1 }], treats: 0 };
-  expect(lastTraining(training, NOW)).toBe("Sitz 4/5 zuletzt");
-  expect(lastTraining({ ...training, treats: 3 }, NOW)).toBe("Sitz 4/5 · 3 Leckerli zuletzt");
+  const training = { at, endedAt: "2026-10-20T08:40:00.000Z", byName: "Hirsch", exercises: [{ name: "Sitz", ok: 4, meh: 0, fail: 1 }], treats: 0 };
+  expect(lastTraining(training, NOW)).toBe("Sitz ✓4 ~0 ✗1 zuletzt");
+  expect(lastTraining({ ...training, treats: 3 }, NOW)).toBe("Sitz ✓4 ~0 ✗1 · 3 Leckerli zuletzt");
   expect(lastTraining({ ...training, exercises: [], treats: null }, NOW)).toBe("zuletzt vor 3 Std. 20 Min.");
   expect(lastTraining(null, NOW)).toBe("noch kein Training");
 });

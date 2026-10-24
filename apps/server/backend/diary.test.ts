@@ -223,7 +223,7 @@ describe("day filter and week", () => {
     await s.apply({ id: "bille", name: "Herzii" }, [
       { id: "2", at: "2026-10-21T08:01:00.000Z", kind: "walk.join", walkKey: "w" },
       { id: "3", at: "2026-10-21T08:10:00.000Z", kind: "training.start", trainingKey: "t", walkKey: "w" },
-      { id: "4", at: "2026-10-21T08:11:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, ok: true, delta: 1 },
+      { id: "4", at: "2026-10-21T08:11:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, grade: "ok", delta: 1 },
       { id: "5", at: "2026-10-21T08:12:00.000Z", kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: 1 },
       { id: "6", at: "2026-10-21T08:40:00.000Z", kind: "walk.stop", walkKey: "w" },
     ]);
@@ -233,7 +233,7 @@ describe("day filter and week", () => {
       { id: "bille", walks: 1, walkMin: 40, trainings: 1, ok: 1 },
       { id: "marcel", walks: 1, walkMin: 40, trainings: 0, ok: 0 },
     ]);
-    expect(w.exercises).toEqual([{ name: "Sitz", ok: 1, fail: 0 }]);
+    expect(w.exercises).toEqual([{ name: "Sitz", ok: 1, meh: 0, fail: 0 }]);
     expect(w.routes).toEqual([]);
     expect(w.treats).toBe(1);
     expect((await diary().week("bogus")).monday).toBe("2026-10-19"); // this week
@@ -256,16 +256,16 @@ describe("entries carry their walk and training details", () => {
       { id: "4", at: "2026-10-20T08:20:00.000Z", kind: "walk.join", walkKey: "w" },
       { id: "5", at: "2026-10-20T08:52:00.000Z", kind: "walk.stop", walkKey: "w" },
       { id: "6", at: "2026-10-20T09:00:00.000Z", kind: "training.start", trainingKey: "t" },
-      { id: "7", at: "2026-10-20T09:01:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, ok: true, delta: 1 },
-      { id: "7b", at: "2026-10-20T09:01:30.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, ok: false, delta: 1 },
+      { id: "7", at: "2026-10-20T09:01:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, grade: "ok", delta: 1 },
+      { id: "7b", at: "2026-10-20T09:01:30.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, grade: "fail", delta: 1 },
       ...[8, 9, 10].map((n) => ({ id: `${n}`, at: `2026-10-20T09:0${n - 6}:00.000Z`, kind: "training.treat" as const, trainingKey: "t", treatKindId: kaese.id, delta: 1 as const })),
       { id: "11", at: "2026-10-20T09:12:00.000Z", kind: "training.stop", trainingKey: "t" },
     ]);
     const [training, walk] = (await diary().history({})).entries;
     expect(walk).toMatchObject({ type: "walk", durationMin: 52, pauseMin: 8, walkers: ["Hirsch", "Herzii"], walkerIds: ["marcel", "bille"], exercises: [], treats: null, reps: [], treatCounts: [] });
-    expect(training).toMatchObject({ type: "training", durationMin: 12, pauseMin: null, walkers: [], exercises: [{ name: "Sitz", ok: 1, fail: 1 }], treats: 3 });
+    expect(training).toMatchObject({ type: "training", durationMin: 12, pauseMin: null, walkers: [], exercises: [{ name: "Sitz", ok: 1, meh: 0, fail: 1 }], treats: 3 });
     // in the shape editTraining takes, per dog and treat kind
-    expect(training.reps).toEqual([{ exerciseId: sitz.id, dogId: 1, ok: 1, fail: 1 }]);
+    expect(training.reps).toEqual([{ exerciseId: sitz.id, dogId: 1, ok: 1, meh: 0, fail: 1 }]);
     expect(training.treatCounts).toEqual([{ treatKindId: kaese.id, count: 3 }]);
     const pee = await diary().log(HIRSCH, { type: "pee", at: "2026-10-20T10:00:00Z" });
     expect(pee).toMatchObject({ walkers: [], walkerIds: [], pauseMin: null, exercises: [], treats: null, reps: [], treatCounts: [] });
@@ -284,14 +284,14 @@ describe("what happened during a walk", () => {
       { id: "4", at: "2026-10-20T08:07:00.000Z", kind: "log", type: "poop", dogId: 1 },
       { id: "4m", at: "2026-10-20T08:08:00.000Z", kind: "log", type: "mark", dogId: 1 },
       { id: "5", at: "2026-10-20T08:10:00.000Z", kind: "training.start", trainingKey: "t", walkKey: "w" },
-      { id: "6", at: "2026-10-20T08:11:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, ok: true, delta: 1 },
-      { id: "7", at: "2026-10-20T08:12:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, ok: false, delta: 1 },
+      { id: "6", at: "2026-10-20T08:11:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, grade: "ok", delta: 1 },
+      { id: "7", at: "2026-10-20T08:12:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, grade: "fail", delta: 1 },
       { id: "8", at: "2026-10-20T08:15:00.000Z", kind: "training.stop", trainingKey: "t" },
       { id: "9", at: "2026-10-20T08:30:00.000Z", kind: "walk.stop", walkKey: "w" },
       { id: "10", at: "2026-10-20T09:00:00.000Z", kind: "log", type: "pee", dogId: 1 },
     ]);
     const { entries } = await diary().history({ type: "walk" });
-    expect(entries[0].during).toEqual({ pees: 2, marks: 1, poops: 1, exercises: [{ name: "Sitz", ok: 1, fail: 1 }] });
+    expect(entries[0].during).toEqual({ pees: 2, marks: 1, poops: 1, exercises: [{ name: "Sitz", ok: 1, meh: 0, fail: 1 }] });
     const pee = (await diary().history({ type: "pee" })).entries[0];
     expect(pee.during).toBeNull();
     expect((await diary().get(entries[0].id))?.during).toEqual(entries[0].during);
@@ -411,7 +411,7 @@ describe("editing walkers and a training's repetitions afterwards", () => {
       const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"]]), now: () => clock });
       await s.apply(HIRSCH, [
         { id: "1", at: "2026-10-20T09:00:00.000Z", kind: "training.start", trainingKey: "t" },
-        { id: "2", at: "2026-10-20T09:01:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, ok: true, delta: 1 },
+        { id: "2", at: "2026-10-20T09:01:00.000Z", kind: "training.rep", trainingKey: "t", exerciseId: sitz.id, dogId: 1, grade: "ok", delta: 1 },
         { id: "3", at: "2026-10-20T09:02:00.000Z", kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: 1 },
       ]);
       const entry = (await diary().history({})).entries[0];
@@ -420,9 +420,9 @@ describe("editing walkers and a training's repetitions afterwards", () => {
 
     test("replaces both lists and shows the new exercises", async () => {
       const { entry, sitz, platz, kaese } = await training();
-      expect(entry.exercises).toEqual([{ name: "Sitz", ok: 1, fail: 0 }]);
-      const view = await diary().editTraining(entry.id, { reps: [{ exerciseId: platz.id, dogId: 1, ok: 3, fail: 1 }, { exerciseId: sitz.id, dogId: 1, ok: 0, fail: 0 }], treats: [{ treatKindId: kaese.id, count: 5 }] });
-      expect(view).toMatchObject({ exercises: [{ name: "Platz", ok: 3, fail: 1 }], treats: 5 });
+      expect(entry.exercises).toEqual([{ name: "Sitz", ok: 1, meh: 0, fail: 0 }]);
+      const view = await diary().editTraining(entry.id, { reps: [{ exerciseId: platz.id, dogId: 1, ok: 3, meh: 0, fail: 1 }, { exerciseId: sitz.id, dogId: 1, ok: 0, meh: 0, fail: 0 }], treats: [{ treatKindId: kaese.id, count: 5 }] });
+      expect(view).toMatchObject({ exercises: [{ name: "Platz", ok: 3, meh: 0, fail: 1 }], treats: 5 });
       expect(await diary().editTraining(entry.id, { reps: [], treats: [] })).toMatchObject({ exercises: [], treats: 0 });
     });
 
@@ -441,8 +441,8 @@ describe("editing walkers and a training's repetitions afterwards", () => {
     test("bumps the entry's change time and answers with the fresh entry", async () => {
       const { entry, platz } = await training();
       clock = new Date("2026-10-20T15:00:00Z");
-      const view = await diary().editTraining(entry.id, { reps: [{ exerciseId: platz.id, dogId: 1, ok: 2, fail: 0 }], treats: [] });
-      expect(view).toMatchObject({ updatedAt: "2026-10-20T15:00:00.000Z", reps: [{ exerciseId: platz.id, dogId: 1, ok: 2, fail: 0 }], treatCounts: [] });
+      const view = await diary().editTraining(entry.id, { reps: [{ exerciseId: platz.id, dogId: 1, ok: 2, meh: 0, fail: 0 }], treats: [] });
+      expect(view).toMatchObject({ updatedAt: "2026-10-20T15:00:00.000Z", reps: [{ exerciseId: platz.id, dogId: 1, ok: 2, meh: 0, fail: 0 }], treatCounts: [] });
       expect((await diary().history({})).entries[0].updatedAt).toBe("2026-10-20T15:00:00.000Z");
     });
 
@@ -450,22 +450,22 @@ describe("editing walkers and a training's repetitions afterwards", () => {
       const bruno = (await db().insertInto("dog").values({ name: "Bruno", color: "#3a6fc0", created_at: "2026-01-01T00:00:00.000Z" }).returning("id").executeTakeFirstOrThrow()).id;
       const { entry, sitz } = await training();
       await diary().edit(entry.id, { at: entry.at, endedAt: entry.endedAt, dogIds: [1, bruno] });
-      await diary().editTraining(entry.id, { reps: [{ exerciseId: sitz.id, dogId: 1, ok: 1, fail: 0 }, { exerciseId: sitz.id, dogId: bruno, ok: 2, fail: 1 }], treats: [] });
+      await diary().editTraining(entry.id, { reps: [{ exerciseId: sitz.id, dogId: 1, ok: 1, meh: 0, fail: 0 }, { exerciseId: sitz.id, dogId: bruno, ok: 2, meh: 0, fail: 1 }], treats: [] });
       const view = await diary().edit(entry.id, { at: entry.at, endedAt: entry.endedAt, dogIds: [1] });
-      expect(view).toMatchObject({ dogIds: [1], reps: [{ exerciseId: sitz.id, dogId: 1, ok: 1, fail: 0 }], exercises: [{ name: "Sitz", ok: 1, fail: 0 }] });
+      expect(view).toMatchObject({ dogIds: [1], reps: [{ exerciseId: sitz.id, dogId: 1, ok: 1, meh: 0, fail: 0 }], exercises: [{ name: "Sitz", ok: 1, meh: 0, fail: 0 }] });
     });
 
     test("refuses dogs outside the training, unknown ids, negative counts and other entries", async () => {
       const { entry, sitz, kaese } = await training();
       const food = await diary().log(HIRSCH, { type: "food", foodKind: "wet", at: "2026-10-20T09:00:00Z", amountG: 200 });
-      const rep = { exerciseId: sitz.id, dogId: 1, ok: 1, fail: 0 };
+      const rep = { exerciseId: sitz.id, dogId: 1, ok: 1, meh: 0, fail: 0 };
       await expect(diary().editTraining(entry.id, { reps: [{ ...rep, dogId: 99 }], treats: [] })).rejects.toThrow(new InputError("Dieser Hund gehört nicht zum Training."));
       await expect(diary().editTraining(entry.id, { reps: [{ ...rep, exerciseId: 999 }], treats: [] })).rejects.toThrow(new InputError("Diese Übung gibt es nicht."));
       await expect(diary().editTraining(entry.id, { reps: [], treats: [{ treatKindId: 999, count: 1 }] })).rejects.toThrow(new InputError("Diese Leckerli-Art gibt es nicht."));
       await expect(diary().editTraining(entry.id, { reps: [{ ...rep, ok: -1 }], treats: [] })).rejects.toThrow(new InputError("Die Wiederholungen stimmen nicht."));
       await expect(diary().editTraining(food.id, { reps: [], treats: [{ treatKindId: kaese.id, count: 1 }] })).rejects.toThrow(new InputError("Das ist kein Training."));
       expect(await diary().editTraining(999, { reps: [], treats: [] })).toBeNull();
-      expect((await diary().history({})).entries.find((e) => e.id === entry.id)).toMatchObject({ exercises: [{ name: "Sitz", ok: 1, fail: 0 }], treats: 1 });
+      expect((await diary().history({})).entries.find((e) => e.id === entry.id)).toMatchObject({ exercises: [{ name: "Sitz", ok: 1, meh: 0, fail: 0 }], treats: 1 });
     });
   });
 });

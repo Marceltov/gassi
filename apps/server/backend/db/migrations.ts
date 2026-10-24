@@ -162,6 +162,12 @@ const migrations: Record<string, Migration> = {
       await db.schema.alterTable("dog").addColumn("marks", "integer", (c) => c.notNull().defaultTo(0)).execute();
     },
   },
+  // A repetition can also go "geht so" (#100): its own count next to ok and fail, 0 for every repetition so far.
+  "0.5_meh": {
+    async up(db: Kysely<any>) {
+      await db.schema.alterTable("training_exercise").addColumn("meh_count", "integer", (c) => c.notNull().defaultTo(0)).execute();
+    },
+  },
 };
 
 const provider: MigrationProvider = { getMigrations: async () => migrations };

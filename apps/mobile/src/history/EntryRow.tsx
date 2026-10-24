@@ -10,6 +10,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { TrackMap } from "../map/TrackMap";
 import { radius, useTheme } from "../theme";
 import { hhmm } from "../time";
+import { Graded } from "../ui/Graded";
 import { Icon } from "../ui/Icon";
 import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
 import type { Entry } from "./form";
@@ -31,6 +32,8 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
   const tone = theme[TYPE_TONE[entry.type]];
   const sizes = entry.type === "stockcheck" && entry.count?.length ? entry.count : null; // a wet count: a line each
   // a training: its minutes on the second line, then each exercise (and the treats) on a line of its own
+  // a command's repetition and a walk's exercises have their counts colored (#100)
+  const graded = entry.type === "command" || entry.type === "walk";
   const lines = entry.type === "training" ? trainingParts(entry.exercises, entry.treats ?? 0) : [];
   const figures = lines.length ? (entry.clientKey && !entry.endedAt ? "läuft" : formatMinutes(entry.durationMin ?? 0)) : d.extra;
   return (
@@ -63,14 +66,12 @@ export function EntryRow({ entry, dogs, onPress }: Props) {
           ) : (
             <>
               <Text testID={`entry-${entry.id}-more`} style={[styles.small, { color: theme.muted }]} numberOfLines={1}>
-                {figures ? <Text testID={`entry-${entry.id}-extra`} style={[styles.figures, { color: theme.ink }]}>{figures}</Text> : null}
+                {figures ? <Graded testID={`entry-${entry.id}-extra`} style={[styles.figures, { color: theme.ink }]} text={figures} plain={!graded} /> : null}
                 {figures && rest ? " · " : ""}
-                {rest || (figures ? "" : " ")}
+                {rest ? <Graded text={rest} plain={!graded} /> : figures ? "" : " "}
               </Text>
               {lines.map((l) => (
-                <Text key={l} testID={`entry-${entry.id}-line`} style={[styles.small, styles.figures, { color: theme.ink }]} numberOfLines={1}>
-                  {l}
-                </Text>
+                <Graded key={l} testID={`entry-${entry.id}-line`} style={[styles.small, styles.figures, { color: theme.ink }]} numberOfLines={1} text={l} />
               ))}
             </>
           )}

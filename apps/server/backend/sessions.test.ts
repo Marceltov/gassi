@@ -257,8 +257,8 @@ describe("commands and treats without a training (#36)", () => {
     const warten = await catalog.addExercise("Warten");
     const kaese = await catalog.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false });
     await s.apply(HIRSCH, [
-      cmd(1, { kind: "quick.command", dogId: 1, exerciseId: warten.id, ok: true, treatKindId: kaese.id }),
-      cmd(2, { kind: "quick.command", dogId: 1, exerciseId: warten.id, ok: false }),
+      cmd(1, { kind: "quick.command", dogId: 1, exerciseId: warten.id, grade: "ok", treatKindId: kaese.id }),
+      cmd(2, { kind: "quick.command", dogId: 1, exerciseId: warten.id, grade: "fail" }),
       cmd(3, { kind: "quick.treat", dogId: 1, treatKindId: kaese.id }),
     ]);
     const all = await entries();
@@ -266,7 +266,7 @@ describe("commands and treats without a training (#36)", () => {
     const reps = await db().selectFrom("training_exercise").select(["entry_id", "ok_count", "fail_count"]).orderBy("entry_id").execute();
     expect(reps.map((r) => [r.ok_count, r.fail_count])).toEqual([[1, 0], [0, 1]]);
     expect((await db().selectFrom("training_treat").select("count").execute()).map((r) => r.count)).toEqual([1, 1]);
-    expect(await s.apply(HIRSCH, [cmd(4, { id: "gone", kind: "quick.command", dogId: 1, exerciseId: 999, ok: true })])).toEqual({ applied: [], dropped: ["gone"] });
+    expect(await s.apply(HIRSCH, [cmd(4, { id: "gone", kind: "quick.command", dogId: 1, exerciseId: 999, grade: "ok" })])).toEqual({ applied: [], dropped: ["gone"] });
     expect(await entries()).toHaveLength(3);
   });
 });
@@ -330,7 +330,7 @@ describe("trainings", () => {
     expect((await s.current()).training).toMatchObject({ treats: { [kaese.id]: 1 } });
   });
 
-  const rep = (t: number, exerciseId: number, dogId: number, ok: boolean, delta: 1 | -1 = 1) => cmd(t, { kind: "training.rep", trainingKey: "t", exerciseId, dogId, ok, delta });
+  const rep = (t: number, exerciseId: number, dogId: number, ok: boolean, delta: 1 | -1 = 1) => cmd(t, { kind: "training.rep", trainingKey: "t", exerciseId, dogId, grade: ok ? "ok" : "fail", delta });
 
   test("reps are stored per exercise and dog and never go below 0", async () => {
     const sitz = await new Catalog(db()).addExercise("Sitz");
@@ -338,8 +338,8 @@ describe("trainings", () => {
     const s = sessions();
     await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t", dogIds: [1, bruno.id] }), rep(1, sitz.id, 1, true), rep(2, sitz.id, 1, true), rep(3, sitz.id, 1, false), rep(4, sitz.id, bruno.id, true), rep(5, sitz.id, bruno.id, false, -1)]);
     expect((await s.current()).training!.reps).toEqual([
-      { exerciseId: sitz.id, dogId: 1, ok: 2, fail: 1 },
-      { exerciseId: sitz.id, dogId: bruno.id, ok: 1, fail: 0 },
+      { exerciseId: sitz.id, dogId: 1, ok: 2, meh: 0, fail: 1 },
+      { exerciseId: sitz.id, dogId: bruno.id, ok: 1, meh: 0, fail: 0 },
     ]);
   });
 
@@ -367,7 +367,7 @@ describe("trainings", () => {
     const r = rep(1, sitz.id, 1, true);
     await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t" }), r]);
     await s.apply(HERZII, [r]);
-    expect((await s.current()).training!.reps).toEqual([{ exerciseId: sitz.id, dogId: 1, ok: 1, fail: 0 }]);
+    expect((await s.current()).training!.reps).toEqual([{ exerciseId: sitz.id, dogId: 1, ok: 1, meh: 0, fail: 0 }]);
   });
 
   test("a walk's summary lists its trainings with their start, exercises and treats", async () => {
@@ -387,7 +387,7 @@ describe("trainings", () => {
       cmd(40, { kind: "walk.stop", walkKey: "w" }),
     ]);
     const walk = (await entries()).find((e) => e.type === "walk")!;
-    expect((await s.summary(walk.id)).trainings).toEqual([{ id: expect.any(Number), startedAt: at(10), min: 6, exercises: [{ name: "Sitz", ok: 2, fail: 1 }], treats: [{ name: "Käse", count: 2 }] }]);
+    expect((await s.summary(walk.id)).trainings).toEqual([{ id: expect.any(Number), startedAt: at(10), min: 6, exercises: [{ name: "Sitz", ok: 2, meh: 0, fail: 1 }], treats: [{ name: "Käse", count: 2 }] }]);
   });
 
   test("a treat tap after the training ended is dropped", async () => {

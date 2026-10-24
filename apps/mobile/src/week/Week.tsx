@@ -2,13 +2,14 @@
 // map. The week and the arrows to the week before and after stay on top as its title (#71); the map takes the height
 // that is left. A swipe sideways or ← → on a keyboard goes to the week before and after too. A walk counts fully for
 // each walker.
-import { addDays, formatMinutes, mondayOf, type PersonWeek, successRate, weekLabel } from "@gassi/domain";
+import { addDays, countsLine, formatMinutes, mondayOf, type PersonWeek, weekLabel } from "@gassi/domain";
 import { useCallback, useState } from "react";
 import { useNow } from "../start/useNow";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { TrackMap } from "../map/TrackMap";
 import { FIELD_HEIGHT, space, useTheme } from "../theme";
 import { TIME_ZONE } from "../time";
+import { Graded } from "../ui/Graded";
 import { Icon } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
 import { useArrowKeys } from "../ui/useArrowKeys";
@@ -31,18 +32,17 @@ export function Week() {
   const swipe = useSwipe(after, before);
   useArrowKeys(before, after);
 
-  const cell = (testID: string, text: string, flex: number, bold = false) => (
-    <Text testID={testID} style={[styles.cell, { flex, color: bold ? theme.ink : theme.muted, fontWeight: bold ? "700" : "400" }]}>
-      {text}
-    </Text>
+  // the training's cell has its counts colored (#100)
+  const cell = (testID: string, text: string, flex: number, { bold = false, graded = false } = {}) => (
+    <Graded testID={testID} style={[styles.cell, { flex, color: bold ? theme.ink : theme.muted, fontWeight: bold ? "700" : "400" }]} text={text} plain={!graded} />
   );
   const row = (p: PersonWeek) => (
     <View key={p.id} style={styles.line}>
-      {cell(`week-${p.name}-name`, p.name, 1.2, true)}
+      {cell(`week-${p.name}-name`, p.name, 1.2, { bold: true })}
       {cell(`week-${p.name}-walks`, `${p.walks} · ${formatMinutes(p.walkMin)}`, 1.6)}
       {cell(`week-${p.name}-km`, km(p.km), 0.8)}
       {cell(`week-${p.name}-food`, String(p.feedings), 0.8)}
-      {cell(`week-${p.name}-training`, `${p.trainings} · ${successRate(p.ok, p.fail)}`, 1.4)}
+      {cell(`week-${p.name}-training`, `${p.trainings} · ${countsLine(p)}`, 1.4, { graded: true })}
     </View>
   );
 
@@ -53,7 +53,7 @@ export function Week() {
       {week ? (
         <>
           <View style={styles.line}>
-            {["", "Runden · Zeit", "km", "Futter", "Training · Erfolg"].map((h, i) => (
+            {["", "Runden · Zeit", "km", "Futter", "Training"].map((h, i) => (
               <Text key={h || "name"} style={[styles.cell, styles.head, { flex: [1.2, 1.6, 0.8, 0.8, 1.4][i], color: theme.muted }]}>
                 {h}
               </Text>

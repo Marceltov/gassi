@@ -122,7 +122,7 @@ test("Kommando and Leckerli on a walk: a tap logs the usual one the button names
     await command.getByRole("button", { name: "klappt", exact: true }).click();
     await expect(taps).toContainText(`Kommando · ${warten.name} ✓ · 1 Leckerli`);
     const entry = await newest(token, "command");
-    expect(entry).toMatchObject({ exercises: [{ name: warten.name, ok: 1, fail: 0 }], treats: 1 });
+    expect(entry).toMatchObject({ exercises: [{ name: warten.name, ok: 1, meh: 0, fail: 0 }], treats: 1 });
 
     // now a tap logs the usual at once, as the buttons say
     const kommando = page.getByRole("button", { name: `Kommando, ${warten.name} · ${kaese.name}` });
@@ -139,6 +139,10 @@ test("Kommando and Leckerli on a walk: a tap logs the usual one the button names
     await kommando.click({ delay: 800 });
     await command.getByRole("button", { name: "klappt nicht" }).click();
     await expect(taps).toContainText(`Kommando · ${warten.name} ✗`);
+    // geht so (#100) comes with the Leckerli, like klappt
+    await kommando.click({ delay: 800 });
+    await command.getByRole("button", { name: "klappt, aber könnte besser sein" }).click();
+    await expect(taps).toContainText(`Kommando · ${warten.name} ~ · 1 Leckerli`);
     await leckerli.click({ delay: 800 });
     await page.getByTestId("treat-sheet").getByRole("button", { name: huhn.name }).click();
     await expect(taps).toContainText(`Leckerli · ${huhn.name}`);

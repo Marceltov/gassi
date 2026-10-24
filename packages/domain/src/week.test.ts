@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Entry } from "./entry";
-import { mondayOf, successRate, weekLabel, weekView } from "./week";
+import { mondayOf, weekLabel, weekView } from "./week";
 
 const TZ = "Europe/Berlin";
 let id = 0;
@@ -84,15 +84,15 @@ describe("weekView", () => {
   test("exercises, treats and training time and success per person", () => {
     const t1 = e("training", "2026-10-21T15:00:00.000Z", { endedAt: "2026-10-21T15:12:00.000Z", loggedBy: "bille" });
     const t2 = e("training", "2026-10-22T15:00:00.000Z", { endedAt: "2026-10-22T15:05:00.000Z" });
-    const w = view([t1, t2], { trainings: { [t1.id]: { exercises: [{ name: "Sitz", ok: 1, fail: 0 }, { name: "Rückruf", ok: 1, fail: 0 }], treats: 6 }, [t2.id]: { exercises: [{ name: "Rückruf", ok: 3, fail: 1 }], treats: 2 } } });
+    const w = view([t1, t2], { trainings: { [t1.id]: { exercises: [{ name: "Sitz", ok: 1, meh: 0, fail: 0 }, { name: "Rückruf", ok: 1, meh: 0, fail: 0 }], treats: 6 }, [t2.id]: { exercises: [{ name: "Rückruf", ok: 3, meh: 0, fail: 1 }], treats: 2 } } });
     expect(w.exercises).toEqual([
-      { name: "Rückruf", ok: 4, fail: 1 },
-      { name: "Sitz", ok: 1, fail: 0 },
+      { name: "Rückruf", ok: 4, meh: 0, fail: 1 },
+      { name: "Sitz", ok: 1, meh: 0, fail: 0 },
     ]);
     expect(w.treats).toBe(8);
     expect(w.byPerson).toEqual([
-      { id: "bille", name: "Herzii", walks: 0, walkMin: 0, km: 0, feedings: 0, trainings: 1, trainingMin: 12, ok: 2, fail: 0 },
-      { id: "marcel", name: "Hirsch", walks: 0, walkMin: 0, km: 0, feedings: 0, trainings: 1, trainingMin: 5, ok: 3, fail: 1 },
+      { id: "bille", name: "Herzii", walks: 0, walkMin: 0, km: 0, feedings: 0, trainings: 1, trainingMin: 12, ok: 2, meh: 0, fail: 0 },
+      { id: "marcel", name: "Hirsch", walks: 0, walkMin: 0, km: 0, feedings: 0, trainings: 1, trainingMin: 5, ok: 3, meh: 0, fail: 1 },
     ]);
     expect(w.days[2]).toMatchObject({ trainingMin: 12, bars: [{ type: "training", startMin: 17 * 60, endMin: 17 * 60 + 12 }] });
   });
@@ -107,13 +107,7 @@ describe("mondayOf", () => {
   });
 });
 
-describe("week heading and success rate", () => {
-  test("success is ok of all tries, a dash when there were none", () => {
-    expect(successRate(0, 0)).toBe("–");
-    expect(successRate(5, 1)).toBe("83 %");
-    expect(successRate(0, 3)).toBe("0 %");
-  });
-
+describe("week heading", () => {
   test("the heading names the days, with the year only across New Year", () => {
     expect(weekLabel("2026-10-19")).toBe("19.–25. Okt.");
     expect(weekLabel("2026-10-26")).toBe("26. Okt.–1. Nov.");

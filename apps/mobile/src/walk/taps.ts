@@ -3,7 +3,7 @@
 // server (ADR 0002). Before the server knows a just-ended walk, its summary is made from what the walk screen showed
 // at "Zuhause" (`Ended`), with the same helpers the server uses.
 import type { Output } from "@gassi/api-client";
-import { type Command, type Consistency, type EntryDetails, type ExerciseTotal, minutesBetween, type Person, pausedWithin, type WalkView, withinWalk } from "@gassi/domain";
+import { type Command, type Consistency, NO_COUNTS, type EntryDetails, type ExerciseTotal, minutesBetween, type Person, pausedWithin, type WalkView, withinWalk } from "@gassi/domain";
 
 export type WalkSummary = Output<"walk">["summary"];
 /** A pee, marking or poop, or a note or encounter logged on the walk; `id` is its entry's once the server has it (a tap
@@ -34,7 +34,7 @@ export const tapsOf = (commands: readonly Command[], names?: Names): Tap[] =>
     const treat = (id: number | undefined) => (id === undefined ? [] : [{ name: names?.treat(id) ?? "Leckerli", count: 1 }]);
     if (c.kind === "log") return [{ type: c.type, at: c.at, dogId: c.dogId }];
     if (c.kind === "log.entry") return [{ type: c.type, at: c.at, dogId: c.dogId ?? null, note: c.note ?? null, details: c.details ?? null }];
-    if (c.kind === "quick.command") return [{ type: "command", at: c.at, dogId: c.dogId, exercises: [{ name: names?.exercise(c.exerciseId) ?? "Übung", ok: c.ok ? 1 : 0, fail: c.ok ? 0 : 1 }], treats: treat(c.treatKindId) }];
+    if (c.kind === "quick.command") return [{ type: "command", at: c.at, dogId: c.dogId, exercises: [{ name: names?.exercise(c.exerciseId) ?? "Übung", ...NO_COUNTS, [c.grade]: 1 }], treats: treat(c.treatKindId) }];
     if (c.kind === "quick.treat") return [{ type: "treat", at: c.at, dogId: c.dogId, treats: treat(c.treatKindId) }];
     return [];
   });

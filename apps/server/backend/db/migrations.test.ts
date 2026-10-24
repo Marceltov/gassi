@@ -37,3 +37,17 @@ test("0.4 keeps a 0.3 database's entries and dogs: no details, no dog marks", as
   expect(await db.selectFrom("dog").select(["name", "marks"]).execute()).toEqual([{ name: "Toffee", marks: 0 }]);
   await db.destroy();
 });
+
+test("0.5 keeps a training's counts and gives each a geht-so count of 0", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = new Kysely<any>({ dialect: new SqliteDialect({ database: new Database(":memory:") }) });
+  await migrateTo(db, "0.4_details_marks");
+  await db.insertInto("person").values({ id: "marcel", name: "Hirsch", created_at: "2026-10-20T08:00:00Z" }).execute();
+  await db.insertInto("dog").values({ name: "Toffee", color: "#b8691a", created_at: "2026-10-20T08:00:00Z" }).execute();
+  await db.insertInto("exercise").values({ name: "Sitz" }).execute();
+  await db.insertInto("entry").values({ type: "training", at: "2026-10-20T09:00:00Z", logged_by: "marcel", created_at: "2026-10-20T09:00:00Z", updated_at: "2026-10-20T09:00:00Z" }).execute();
+  await db.insertInto("training_exercise").values({ entry_id: 1, exercise_id: 1, dog_id: 1, ok_count: 3, fail_count: 1 }).execute();
+  await migrate(db);
+  expect(await db.selectFrom("training_exercise").select(["ok_count", "meh_count", "fail_count"]).execute()).toEqual([{ ok_count: 3, meh_count: 0, fail_count: 1 }]);
+  await db.destroy();
+});

@@ -100,6 +100,7 @@ export interface TrainingExerciseTable {
   exercise_id: number;
   dog_id: number;
   ok_count: Generated<number>;
+  meh_count: Generated<number>;
   fail_count: Generated<number>;
 }
 

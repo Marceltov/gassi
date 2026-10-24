@@ -4,12 +4,13 @@
 // (sessionRules.ts) are applied by the server, whose answer replaces this view; which dogs a start takes is decided
 // here the same way, from the active dogs the phone knows.
 import type { Command } from "./commands";
+import type { Counts } from "./exerciseTotals";
 import { keepsOne, resolveDogs } from "./sessionRules";
 
 export type Person = { id: string; name: string };
 export type WalkView = { key: string; startedAt: string; dogIds: number[]; walkers: Person[]; pauses: { startedAt: string; endedAt: string | null }[]; paused: boolean };
-/** How often an exercise went well (`ok`) and badly (`fail`) with one dog. */
-export type Rep = { exerciseId: number; dogId: number; ok: number; fail: number };
+/** How often an exercise went each way (klappt, geht so, klappt nicht) with one dog. */
+export type Rep = { exerciseId: number; dogId: number } & Counts;
 export type TrainingView = { key: string; startedAt: string; dogIds: number[]; walkKey: string | null; reps: Rep[]; treats: Record<number, number> };
 export type SessionsView = { walk: WalkView | null; training: TrainingView | null };
 
@@ -56,9 +57,8 @@ function step(v: SessionsView, c: Command, user: Person, people: readonly Person
       // like the server, a rep for a dog that is not in the training is dropped (an empty list: dogs not known yet)
       if (!training || (training.dogIds.length && !training.dogIds.includes(c.dogId))) return v;
       const found = training.reps.find((r) => r.exerciseId === c.exerciseId && r.dogId === c.dogId);
-      const field = c.ok ? "ok" : "fail";
-      const next = { exerciseId: c.exerciseId, dogId: c.dogId, ok: found?.ok ?? 0, fail: found?.fail ?? 0 };
-      next[field] = Math.max(0, next[field] + c.delta);
+      const next: Rep = { exerciseId: c.exerciseId, dogId: c.dogId, ok: found?.ok ?? 0, meh: found?.meh ?? 0, fail: found?.fail ?? 0 };
+      next[c.grade] = Math.max(0, next[c.grade] + c.delta);
       return { ...v, training: { ...training, reps: found ? training.reps.map((r) => (r === found ? next : r)) : [...training.reps, next] } };
     }
     case "training.treat": {

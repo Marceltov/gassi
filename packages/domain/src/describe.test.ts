@@ -31,7 +31,7 @@ test("a walk: duration with pause, distance and who walked", () => {
 
 test("what happened during a walk: pee, markings, poop and the exercises with their success", () => {
   const during = (d: DescribableEntry["during"]) => describeEntry(entry({ endedAt: "x", durationMin: 40, during: d })).during;
-  expect(during({ pees: 2, marks: 5, poops: 1, exercises: [{ name: "Sitz", ok: 4, fail: 1 }] })).toBe("2× Pipi · 5× markiert · 1× Poopoo · Sitz 4/5");
+  expect(during({ pees: 2, marks: 5, poops: 1, exercises: [{ name: "Sitz", ok: 4, meh: 0, fail: 1 }] })).toBe("2× Pipi · 5× markiert · 1× Poopoo · Sitz ✓4 ~0 ✗1");
   expect(during({ pees: 0, marks: 0, poops: 1, exercises: [] })).toBe("1× Poopoo");
   expect(during({ pees: 0, marks: 0, poops: 0, exercises: [] })).toBe("");
   expect(during(null)).toBe("");
@@ -44,9 +44,9 @@ test("a poop says its consistency when it has one; a marking is its own kind", (
 });
 
 test("a training: duration, exercises with successes / repetitions, and treats", () => {
-  expect(text(entry({ type: "training", endedAt: "x", durationMin: 12, exercises: [{ name: "Rückruf", ok: 1, fail: 0 }, { name: "Sitz", ok: 2, fail: 1 }], treats: 6, byName: "Herzii" }))).toBe("Training, 12 Min. · Rückruf 1/1 · Sitz 2/3 · 6 Leckerli von Herzii");
+  expect(text(entry({ type: "training", endedAt: "x", durationMin: 12, exercises: [{ name: "Rückruf", ok: 1, meh: 0, fail: 0 }, { name: "Sitz", ok: 2, meh: 0, fail: 1 }], treats: 6, byName: "Herzii" }))).toBe("Training, 12 Min. · Rückruf ✓1 ~0 ✗0 · Sitz ✓2 ~0 ✗1 · 6 Leckerli von Herzii");
   expect(text(entry({ type: "training", endedAt: "x", durationMin: 5, treats: 1 }))).toBe("Training, 5 Min. · 1 Leckerli von Hirsch");
-  expect(text(entry({ type: "training", clientKey: "k", exercises: [{ name: "Sitz", ok: 1, fail: 0 }], treats: 0 }))).toBe("Training, läuft · Sitz 1/1 von Hirsch");
+  expect(text(entry({ type: "training", clientKey: "k", exercises: [{ name: "Sitz", ok: 1, meh: 0, fail: 0 }], treats: 0 }))).toBe("Training, läuft · Sitz ✓1 ~0 ✗0 von Hirsch");
 });
 
 test("food, weight, restock and stock", () => {

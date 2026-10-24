@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { entryDetails } from "./details";
 import { CONSISTENCIES } from "./entryTypes";
+import { GRADES } from "./exerciseTotals";
 
 /** The grams one feeding may have. */
 export const FOOD_MIN_G = 1;
@@ -25,7 +26,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("walk.stop"), walkKey: key }),
   z.object({ ...base, kind: z.literal("training.start"), trainingKey: key, walkKey: key.optional(), dogIds }),
   z.object({ ...base, kind: z.literal("training.stop"), trainingKey: key }),
-  z.object({ ...base, kind: z.literal("training.rep"), trainingKey: key, exerciseId: z.number().int().positive(), dogId, ok: z.boolean(), delta: z.union([z.literal(1), z.literal(-1)]) }),
+  z.object({ ...base, kind: z.literal("training.rep"), trainingKey: key, exerciseId: z.number().int().positive(), dogId, grade: z.enum(GRADES), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("training.treat"), trainingKey: key, treatKindId: z.number().int().positive(), delta: z.union([z.literal(1), z.literal(-1)]) }),
   z.object({ ...base, kind: z.literal("log"), type: z.enum(["pee", "mark", "poop"]), dogId }),
   // how a poop was (#86), set right after its tap; the poop is the one of `dogId` at `poopAt` (its log's time)
@@ -33,7 +34,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   // a note, or an encounter with a dog or a person (#91, #37, #90): for one dog except a note; checked like an entry
   z.object({ ...base, kind: z.literal("log.entry"), type: z.enum(["note", "dogEncounter", "personEncounter"]), dogId: dogId.optional(), note: z.string().trim().max(1000).optional(), details: entryDetails.optional() }),
   // a command on the go or at home, without a training (#36): one repetition, and a treat of `treatKindId` with it
-  z.object({ ...base, kind: z.literal("quick.command"), dogId, exerciseId: z.number().int().positive(), ok: z.boolean(), treatKindId: z.number().int().positive().optional() }),
+  z.object({ ...base, kind: z.literal("quick.command"), dogId, exerciseId: z.number().int().positive(), grade: z.enum(GRADES), treatKindId: z.number().int().positive().optional() }),
   // one treat on its own
   z.object({ ...base, kind: z.literal("quick.treat"), dogId, treatKindId: z.number().int().positive() }),
   // a feeding; the dogs left out, the server takes every active dog

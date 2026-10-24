@@ -5,7 +5,7 @@
 // stay on top, the buttons at the bottom (#71). A wet count (one row per can size) is one thing here: its sizes as rows,
 // its time moved and its rows deleted together. Both need the server (the writes' client): they say so without
 // reception (OFFLINE), and without an answer in time that it may have been saved (NO_ANSWER).
-import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, isPractice, keepsOne, type Stock, TYPE_LABEL } from "@gassi/domain";
+import { clampPortion, countLine, countTitle, dogRule, FOOD_MAX_G, formatKg, type Grade, GRADE_LABEL, GRADE_SIGN, GRADES, isPractice, keepsOne, type Stock, TYPE_LABEL } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -17,7 +17,8 @@ import { ButtonRow, TrashButton } from "../ui/ButtonRow";
 import { Chip } from "../ui/Chip";
 import { ChoiceList } from "../ui/ChoiceList";
 import { FOOD_KIND_OPTIONS } from "../ui/foodKinds";
-import { Icon, type IconName } from "../ui/Icon";
+import { Graded } from "../ui/Graded";
+import { Icon } from "../ui/Icon";
 import { TYPE_ICON } from "../ui/icons";
 import { Screen } from "../ui/Screen";
 import { Segments } from "../ui/Segments";
@@ -132,7 +133,7 @@ export function EntryDetail({ id }: { id: number }) {
           {stepper && fact && "big" in fact ? (
             <AmountStepper testID="fact-big" subTestID="fact-sub" value={fact.big} sub={fact.sub} step={stepper.step} onStep={(d) => change({ amountG: Math.max(stepper.least, amount + d * stepper.by) })} atMin={amount - stepper.by < stepper.least} atMax={false} />
           ) : fact && "big" in fact ? (
-            <FactView fact={fact} />
+            <FactView fact={fact} graded={entry.type === "training"} />
           ) : null}
         </>
       }
@@ -214,7 +215,7 @@ export function EntryDetail({ id }: { id: number }) {
 
 type Names = Pick<Gassi, "dogs" | "exercises" | "treatKinds">;
 
-// A training's repetitions per exercise (and dog, when several train) as counts of "klappt" and "klappt nicht", more
+// A training's repetitions per exercise (and dog, when several train) as counts of "klappt", "geht so" and "klappt nicht", more
 // exercises from the household's list ("Übungen"), and the treats per kind ("Leckerli"), each a section of its own.
 function TrainingFields({ form, change, names }: { form: Form; change: (c: Partial<Form>) => void; names: Names }) {
   const theme = useTheme();
@@ -223,9 +224,9 @@ function TrainingFields({ form, change, names }: { form: Form; change: (c: Parti
   const exerciseName = (eid: number) => names.exercises.find((x) => x.id === eid)?.name ?? "Übung";
   const dogName = (did: number) => names.dogs.find((d) => d.id === did)?.name ?? "Hund";
   const several = form.dogIds.length > 1;
-  const count = (eid: number, did: number, field: "ok" | "fail") => reps.find((r) => r.exerciseId === eid && r.dogId === did)?.[field] ?? 0;
+  const count = (eid: number, did: number, grade: Grade) => reps.find((r) => r.exerciseId === eid && r.dogId === did)?.[grade] ?? 0;
   const addable = names.exercises.filter((x) => !exerciseIds.includes(x.id));
-  const add = (eid: number) => change({ reps: [...form.reps, ...form.dogIds.map((dogId) => ({ exerciseId: eid, dogId, ok: 0, fail: 0 }))] });
+  const add = (eid: number) => change({ reps: [...form.reps, ...form.dogIds.map((dogId) => ({ exerciseId: eid, dogId, ok: 0, meh: 0, fail: 0 }))] });
   const kinds = [...names.treatKinds.map((k) => ({ id: k.id, name: k.name })), ...form.treats.filter((t) => !names.treatKinds.some((k) => k.id === t.treatKindId)).map((t) => ({ id: t.treatKindId, name: "Leckerli" }))];
   const treatCount = (kid: number) => form.treats.find((t) => t.treatKindId === kid)?.count ?? 0;
 
@@ -238,12 +239,17 @@ function TrainingFields({ form, change, names }: { form: Form; change: (c: Parti
           form.dogIds.map((did) => {
             const label = several ? `${exerciseName(eid)} ${dogName(did)}` : exerciseName(eid);
             return (
-              <View key={`${eid}/${did}`} style={styles.repRow}>
-                <Text style={[styles.repName, { color: theme.ink }]} numberOfLines={2}>
+              <View key={`${eid}/${did}`} style={styles.repGroup}>
+                <Text style={[styles.repName, { color: theme.ink }]} numberOfLines={1}>
                   {label}
                 </Text>
-                <Counter sign="check" value={count(eid, did, "ok")} what={`${label} klappt`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "ok", d) })} />
-                <Counter sign="cross" value={count(eid, did, "fail")} what={`${label} klappt nicht`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, "fail", d) })} />
+                <View style={styles.repCounts}>
+                  {GRADES.map((g) => (
+                    <View key={g} style={styles.cell}>
+                      <Counter grade={g} value={count(eid, did, g)} what={`${label} ${GRADE_LABEL[g]}`} onStep={(d) => change({ reps: bumpRep(form.reps, eid, did, g, d) })} />
+                    </View>
+                  ))}
+                </View>
               </View>
             );
           }),
@@ -272,16 +278,14 @@ function TrainingFields({ form, change, names }: { form: Form; change: (c: Parti
 }
 
 /** What the entry is about, large, with a line under it. */
-function FactView({ fact }: { fact: { big: string; sub: string } }) {
+function FactView({ fact, graded }: { fact: { big: string; sub: string }; graded: boolean }) {
   const theme = useTheme();
   return (
     <View style={styles.fact}>
       <Text testID="fact-big" style={[styles.big, { color: theme.ink }]}>
         {fact.big}
       </Text>
-      <Text testID="fact-sub" style={[styles.factSub, { color: theme.muted }]}>
-        {fact.sub}
-      </Text>
+      <Graded testID="fact-sub" style={[styles.factSub, { color: theme.muted }]} text={fact.sub} plain={!graded} />
     </View>
   );
 }
@@ -296,14 +300,15 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Counter({ sign, value, what, onStep }: { sign?: IconName; value: number; what: string; onStep: (d: 1 | -1) => void }) {
+/** A count with − and +; `grade`: a repetition's count, with its sign in its color (#100). */
+function Counter({ grade, value, what, onStep }: { grade?: Grade; value: number; what: string; onStep: (d: 1 | -1) => void }) {
   const theme = useTheme();
   return (
-    <View style={styles.counter}>
+    <View style={[styles.counter, grade && styles.spread]}>
       <StepButton small label={`${what}: eins weniger`} sign="−" disabled={value === 0} onPress={() => onStep(-1)} />
-      <View style={styles.countBox}>
-        {sign ? <Icon name={sign} size={15} color={theme.muted} /> : null}
-        <Text style={[styles.count, { color: theme.ink }]}>{value}</Text>
+      <View style={[styles.countBox, grade && styles.narrowBox]}>
+        {grade ? <Text style={[styles.sign, { color: theme.grade[value ? grade : "zero"] }]}>{GRADE_SIGN[grade]}</Text> : null}
+        <Text style={[styles.count, grade && styles.tightCount, { color: theme.ink }]}>{value}</Text>
       </View>
       <StepButton small label={`${what}: eins mehr`} sign="+" disabled={false} onPress={() => onStep(1)} />
     </View>
@@ -328,6 +333,13 @@ const styles = StyleSheet.create({
   card: { borderRadius: radius.tile, padding: 12, gap: 8 },
   section: { fontSize: 13, fontWeight: "700" },
   repRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  repGroup: { gap: 6 },
+  repCounts: { flexDirection: "row", alignItems: "center", gap: 4 },
+  cell: { flex: 1 },
+  spread: { justifyContent: "space-between", gap: 0 },
+  narrowBox: { minWidth: 0, gap: 1 },
+  sign: { fontSize: 13, fontWeight: "700" },
+  tightCount: { minWidth: 0 },
   repName: { flex: 1, fontSize: 15 },
   counter: { flexDirection: "row", alignItems: "center", gap: 4 },
   countBox: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, minWidth: 44 },

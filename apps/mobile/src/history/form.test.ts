@@ -46,11 +46,11 @@ test("repetitions and treats count up and down, never below 0; a training edit k
   let reps = bumpRep([], 3, 1, "ok", 1);
   reps = bumpRep(reps, 3, 1, "ok", 1);
   reps = bumpRep(reps, 3, 1, "fail", -1);
-  expect(reps).toEqual([{ exerciseId: 3, dogId: 1, ok: 2, fail: 0 }]);
+  expect(reps).toEqual([{ exerciseId: 3, dogId: 1, ok: 2, meh: 0, fail: 0 }]);
   expect(bumpTreat(bumpTreat([], 5, -1), 5, 1)).toEqual([{ treatKindId: 5, count: 1 }]);
   const training = entry({ type: "training", dogIds: [1, 2] });
-  const form = { ...formOf(training), dogIds: [2], reps: [...reps, { exerciseId: 3, dogId: 2, ok: 0, fail: 1 }], treats: [{ treatKindId: 5, count: 1 }] };
-  expect(trainingInput(training, form)).toEqual({ id: 7, reps: [{ exerciseId: 3, dogId: 2, ok: 0, fail: 1 }], treats: [{ treatKindId: 5, count: 1 }] });
+  const form = { ...formOf(training), dogIds: [2], reps: [...reps, { exerciseId: 3, dogId: 2, ok: 0, meh: 0, fail: 1 }], treats: [{ treatKindId: 5, count: 1 }] };
+  expect(trainingInput(training, form)).toEqual({ id: 7, reps: [{ exerciseId: 3, dogId: 2, ok: 0, meh: 0, fail: 1 }], treats: [{ treatKindId: 5, count: 1 }] });
 });
 
 test("picking a dog: one for pee, at least one for a walk", () => {

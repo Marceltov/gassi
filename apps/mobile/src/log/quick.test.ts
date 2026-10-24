@@ -7,8 +7,8 @@ const kinds = [{ id: 7, name: "Käse" }, { id: 8, name: "Huhn" }];
 test("on a walk a tap logs the usual: the Leckerli on you, the last exercise as klappt with one of them", () => {
   const usual = { exerciseId: 2, treatKindId: 8 };
   expect(quickOf("treat", usual, exercises, kinds, true)).toEqual({ kind: "quick.treat", treatKindId: 8 });
-  expect(quickOf("command", usual, exercises, kinds, true)).toEqual({ kind: "quick.command", exerciseId: 2, ok: true, treatKindId: 8 });
-  expect(quickOf("command", { ...usual, commandTreat: false }, exercises, kinds, true)).toEqual({ kind: "quick.command", exerciseId: 2, ok: true, treatKindId: undefined });
+  expect(quickOf("command", usual, exercises, kinds, true)).toEqual({ kind: "quick.command", exerciseId: 2, grade: "ok", treatKindId: 8 });
+  expect(quickOf("command", { ...usual, commandTreat: false }, exercises, kinds, true)).toEqual({ kind: "quick.command", exerciseId: 2, grade: "ok", treatKindId: undefined });
   expect(quickLines(usual, exercises, kinds)).toEqual({ command: "Platz · Huhn", treat: "Huhn" });
   expect(quickLines({ ...usual, commandTreat: false }, exercises, kinds).command).toBe("Platz");
 });

@@ -48,25 +48,28 @@ test("✓ ✓ ✗ and a treat count per exercise; a long press undoes the last, 
     await page.getByRole("button", { name: "Sitz klappt", exact: true }).click();
     await page.getByRole("button", { name: "Sitz klappt", exact: true }).click();
     await page.getByRole("button", { name: "Sitz klappt nicht" }).click();
-    await expect(line).toHaveText("Sitz 2/3");
+    await expect(line).toHaveText("Sitz ✓2 ~0 ✗1");
 
     // a second ✗ by mistake, undone by a long press, without reception
     await context.setOffline(true);
     await page.getByRole("button", { name: "Sitz klappt nicht" }).click();
-    await expect(line).toHaveText("Sitz 2/4");
-    await longPress(page, page.getByRole("button", { name: "Sitz klappt nicht" }), () => expect(line).toHaveText("Sitz 2/3"));
-    await expect(line).toHaveText("Sitz 2/3"); // letting go is no tap
+    await expect(line).toHaveText("Sitz ✓2 ~0 ✗2");
+    await longPress(page, page.getByRole("button", { name: "Sitz klappt nicht" }), () => expect(line).toHaveText("Sitz ✓2 ~0 ✗1"));
+    await expect(line).toHaveText("Sitz ✓2 ~0 ✗1"); // letting go is no tap
     await page.getByRole("button", { name: `${treat.name} +1` }).click();
-    await expect(line).toHaveText("Sitz 2/3 · 1 Leckerli");
+    await expect(line).toHaveText("Sitz ✓2 ~0 ✗1 · 1 Leckerli");
     await context.setOffline(false);
+    // worked, but could be better: its own count (#100)
+    await page.getByRole("button", { name: "Sitz klappt, aber könnte besser sein" }).click();
+    await expect(line).toHaveText("Sitz ✓2 ~1 ✗1 · 1 Leckerli");
 
     const key = (await asHirsch().sessions()).training?.key;
     expect(key).toBeTruthy();
-    await expect.poll(async () => (await asHirsch().sessions()).training?.reps).toEqual([expect.objectContaining({ ok: 2, fail: 1 })]);
+    await expect.poll(async () => (await asHirsch().sessions()).training?.reps).toEqual([expect.objectContaining({ ok: 2, meh: 1, fail: 1 })]);
 
     await page.getByRole("button", { name: "Fertig" }).click();
     await expect(page).toHaveURL(`${BASE_URL}/`);
-    await expect.poll(async () => (await entryOf(client, key!))?.exercises).toEqual([{ name: "Sitz", ok: 2, fail: 1 }]);
+    await expect.poll(async () => (await entryOf(client, key!))?.exercises).toEqual([{ name: "Sitz", ok: 2, meh: 1, fail: 1 }]);
     expect((await entryOf(client, key!))?.treats).toBe(1);
   } finally {
     await restore();
@@ -100,7 +103,7 @@ test("+ Übung offers the exercises not shown yet and a new one; a new one needs
     await page.getByRole("button", { name: "Anlegen" }).click();
     await expect(page.getByTestId("exercise-new")).toBeHidden();
     await page.getByRole("button", { name: `${name} klappt`, exact: true }).click();
-    await expect(page.getByTestId("training-summary")).toHaveText(`${name} 1/1`);
+    await expect(page.getByTestId("training-summary")).toHaveText(`${name} ✓1 ~0 ✗0`);
     expect((await client.exercises()).exercises.some((e) => e.name === name)).toBe(true);
 
     // the name of one the household has already (in other letters) shows that one, without a second
@@ -133,8 +136,8 @@ test("with several dogs ✓ asks for the dog; Fertig on a walk's training leads 
     const choice = page.getByTestId("dog-choice");
     await expect(choice.getByRole("button", { name: "Luna" })).toBeVisible();
     await choice.getByRole("button", { name: "Luna" }).click();
-    await expect(page.getByTestId("training-summary")).toHaveText("Sitz 1/1");
-    await expect.poll(async () => (await asHirsch().sessions()).training?.reps).toEqual([expect.objectContaining({ dogId: luna.id, ok: 1, fail: 0 })]);
+    await expect(page.getByTestId("training-summary")).toHaveText("Sitz ✓1 ~0 ✗0");
+    await expect.poll(async () => (await asHirsch().sessions()).training?.reps).toEqual([expect.objectContaining({ dogId: luna.id, ok: 1, meh: 0, fail: 0 })]);
 
     await page.getByRole("button", { name: "Fertig" }).click();
     await expect(page).toHaveURL(`${BASE_URL}/runde`);
@@ -165,15 +168,15 @@ test("with several dogs a long press after a reload asks which dog to undo, amon
       await page.getByRole("button", { name: "Sitz klappt", exact: true }).click();
       await choice.getByRole("button", { name: dog }).click();
     }
-    await expect(page.getByTestId("training-summary")).toHaveText("Sitz 3/3");
+    await expect(page.getByTestId("training-summary")).toHaveText("Sitz ✓3 ~0 ✗0");
     await expect.poll(async () => (await asHirsch().sessions()).training?.reps.length).toBe(2);
 
     await page.reload(); // the last tap is forgotten: asks, offering the dogs that have a count
-    await expect(page.getByTestId("training-summary")).toHaveText("Sitz 3/3");
+    await expect(page.getByTestId("training-summary")).toHaveText("Sitz ✓3 ~0 ✗0");
     await longPress(page, page.getByRole("button", { name: "Sitz klappt", exact: true }), () => expect(choice.getByRole("button", { name: "Luna" })).toBeVisible());
     await expect(choice.getByRole("button", { name: "Toffee" })).toBeVisible();
     await choice.getByRole("button", { name: "Luna" }).click();
-    await expect(page.getByTestId("training-summary")).toHaveText("Sitz 2/2");
+    await expect(page.getByTestId("training-summary")).toHaveText("Sitz ✓2 ~0 ✗0");
     await expect.poll(async () => (await asHirsch().sessions()).training?.reps.map((r) => [r.dogId === luna.id ? "Luna" : "other", r.ok]).sort()).toEqual([["Luna", 0], ["other", 2]]);
   } finally {
     await client.updateDog({ id: luna.id, archived: true });

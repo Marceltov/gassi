@@ -4,6 +4,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme";
 import { hhmm } from "../time";
+import { Graded } from "../ui/Graded";
 import { Icon } from "../ui/Icon";
 import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
 import type { WalkItem } from "./lines";
@@ -17,9 +18,7 @@ export function ItemRow({ item, text, muted, compact, testID, a11y, onPress }: P
     <>
       <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(item.at)}</Text>
       <Icon name={TYPE_ICON[type]} size={17} color={theme[TYPE_TONE[type]]} />
-      <Text style={[styles.line, styles.text, { color: muted ? theme.muted : theme.ink }]} numberOfLines={1}>
-        {text}
-      </Text>
+      <Graded style={[styles.line, styles.text, { color: muted ? theme.muted : theme.ink }]} numberOfLines={1} text={text} plain={type !== "command" && type !== "training"} />
     </>
   );
   const shape = compact ? styles.compact : styles.box;

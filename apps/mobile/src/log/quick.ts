@@ -5,7 +5,7 @@ type Usual = { exerciseId?: number; treatKindId?: number | null; commandTreat?: 
 type Named = { id: number; name: string };
 
 /** What a tap logs at once, without a sheet, or null when there is something to ask. */
-export type Quick = { kind: "quick.treat"; treatKindId: number } | { kind: "quick.command"; exerciseId: number; ok: true; treatKindId?: number };
+export type Quick = { kind: "quick.treat"; treatKindId: number } | { kind: "quick.command"; exerciseId: number; grade: "ok"; treatKindId?: number };
 
 /** The usual exercise and Leckerli among the household's, and whether a command comes with one. */
 export function usualOf(usual: Usual, exercises: readonly Named[], kinds: readonly Named[]): { exercise?: Named; treatKind?: Named; commandTreat: boolean } {
@@ -22,7 +22,7 @@ export function quickOf(start: "command" | "treat", usual: Usual, exercises: rea
   const { exercise, treatKind, commandTreat } = usualOf(usual, exercises, kinds);
   if (start === "treat") return treatKind && (quick || kinds.length === 1) ? { kind: "quick.treat", treatKindId: treatKind.id } : null;
   if (!quick || !exercise) return null;
-  return { kind: "quick.command", exerciseId: exercise.id, ok: true, treatKindId: commandTreat ? treatKind?.id : undefined };
+  return { kind: "quick.command", exerciseId: exercise.id, grade: "ok", treatKindId: commandTreat ? treatKind?.id : undefined };
 }
 
 /** What the walk's buttons say they give: "Sitz · Käse" and "Käse"; nothing while there is no usual. */

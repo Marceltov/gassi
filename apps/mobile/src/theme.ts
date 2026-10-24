@@ -1,6 +1,6 @@
 // The app's colors, sizes and the hook that picks light or dark.
 import { useColorScheme } from "react-native";
-import { danger, gradients, kinds } from "./colors";
+import { danger, grade, gradients, kinds } from "./colors";
 
 // The icon squares of Mehr's lists and the other lists' rows (like the iPhone's settings): the weight's rose, the
 // household's violet, the devices' slate, the watch's grey, the treats' teal. Vorrat uses food, Hunde walk, Übungen
@@ -27,6 +27,7 @@ export const palettes = {
     ...listTones,
     tint: tints.dark,
     danger: danger.dark,
+    grade: grade.dark,
     neutral: "#2a2f37",
     background: "#111418",
     surface: "#1c2026",
@@ -43,6 +44,7 @@ export const palettes = {
     ...listTones,
     tint: tints.light,
     danger: danger.light,
+    grade: grade.light,
     neutral: "#dfe3e8",
     background: "#f3f4f6",
     surface: "#ffffff",

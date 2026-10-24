@@ -1,10 +1,10 @@
 import { expect, test } from "vitest";
 import { countLine, trainingLine, walkItems } from "./lines";
 
-const training = { id: 9, startedAt: "2026-10-21T18:10:00.000Z", min: 4, exercises: [{ name: "Sitz", ok: 4, fail: 1 }], treats: [{ name: "Käse", count: 2 }, { name: "Wurst", count: 1 }] };
+const training = { id: 9, startedAt: "2026-10-21T18:10:00.000Z", min: 4, exercises: [{ name: "Sitz", ok: 4, meh: 0, fail: 1 }], treats: [{ name: "Käse", count: 2 }, { name: "Wurst", count: 1 }] };
 
 test("a training on a walk reads like the training screen's line, after its duration", () => {
-  expect(trainingLine(training)).toBe("Training · 4 Min. · Sitz 4/5 · 3 Leckerli");
+  expect(trainingLine(training)).toBe("Training · 4 Min. · Sitz ✓4 ~0 ✗1 · 3 Leckerli");
   expect(trainingLine({ ...training, exercises: [], treats: [] })).toBe("Training · 4 Min.");
 });
 

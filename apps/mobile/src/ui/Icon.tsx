@@ -28,6 +28,7 @@ const SYMBOLS = {
   watch: sym("applewatch", "watch"),
   check: sym("checkmark", "check"),
   cross: sym("xmark", "close"),
+  meh: sym("water.waves", "waves"),
   next: sym("chevron.right", "chevron_right"),
   back: sym("chevron.left", "chevron_left"),
   trash: sym("trash", "delete"),

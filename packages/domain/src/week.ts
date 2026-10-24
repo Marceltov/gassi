@@ -5,7 +5,7 @@
 // have no walkers). A walk or training still running counts up to now.
 import type { Entry } from "./entry";
 import { isPractice } from "./entryTypes";
-import type { ExerciseTotal } from "./exerciseTotals";
+import { addCounts, type Counts, type ExerciseTotal, NO_COUNTS, repsOf } from "./exerciseTotals";
 import { dayBounds, dayOf } from "./time";
 
 type Names = ReadonlyMap<string, string>;
@@ -14,7 +14,7 @@ export type Bar = { type: "walk" | "training"; startMin: number; endMin: number 
 export type Tick = { type: "food" | "pee" | "poop"; min: number };
 export type WeekDay = { date: string; bars: Bar[]; ticks: Tick[]; walkMin: number; trainingMin: number };
 export type Route = [lat: number, lon: number][];
-export type PersonWeek = { id: string; name: string; walks: number; walkMin: number; km: number; feedings: number; trainings: number; trainingMin: number; ok: number; fail: number };
+export type PersonWeek = { id: string; name: string; walks: number; walkMin: number; km: number; feedings: number; trainings: number; trainingMin: number } & Counts;
 export type WeekView = {
   monday: string;
   days: WeekDay[];
@@ -60,7 +60,7 @@ const minutes = (ms: number) => Math.round(ms / 60_000);
 export function weekView({ entries, walkers, trainings, tracks, names, monday, timeZone, now }: WeekInput): WeekView {
   const people = new Map<string, PersonWeek>();
   const person = (id: string) => {
-    if (!people.has(id)) people.set(id, { id, name: names.get(id) ?? id, walks: 0, walkMin: 0, km: 0, feedings: 0, trainings: 0, trainingMin: 0, ok: 0, fail: 0 });
+    if (!people.has(id)) people.set(id, { id, name: names.get(id) ?? id, walks: 0, walkMin: 0, km: 0, feedings: 0, trainings: 0, trainingMin: 0, ...NO_COUNTS });
     return people.get(id)!;
   };
   const exercises = new Map<string, ExerciseTotal>();
@@ -120,9 +120,10 @@ export function weekView({ entries, walkers, trainings, tracks, names, monday, t
       }
       const t = trainings[e.id];
       for (const x of t?.exercises ?? []) {
-        const total = exercises.get(x.name) ?? { name: x.name, ok: 0, fail: 0 };
-        exercises.set(x.name, { name: x.name, ok: total.ok + x.ok, fail: total.fail + x.fail });
+        const total = exercises.get(x.name) ?? { name: x.name, ...NO_COUNTS };
+        exercises.set(x.name, { name: x.name, ...addCounts(total, x) });
         p.ok += x.ok;
+        p.meh += x.meh;
         p.fail += x.fail;
       }
       treats += t?.treats ?? 0;
@@ -133,15 +134,10 @@ export function weekView({ entries, walkers, trainings, tracks, names, monday, t
     monday,
     days,
     byPerson: [...people.values()].map((p) => ({ ...p, km: Math.round(p.km * 100) / 100 })).sort((a, b) => a.name.localeCompare(b.name, "de")),
-    exercises: [...exercises.values()].sort((a, b) => b.ok + b.fail - (a.ok + a.fail) || a.name.localeCompare(b.name, "de")),
+    exercises: [...exercises.values()].sort((a, b) => repsOf(b) - repsOf(a) || a.name.localeCompare(b.name, "de")),
     routes,
     treats,
   };
-}
-
-/** The share of exercises that worked, "83 %"; "–" when none were practised. */
-export function successRate(ok: number, fail: number): string {
-  return ok + fail === 0 ? "–" : `${Math.round((100 * ok) / (ok + fail))} %`;
 }
 
 /** The week starting `monday` for a heading: "19.–25. Okt.", "28. Okt.–3. Nov.", across New Year with the year. */

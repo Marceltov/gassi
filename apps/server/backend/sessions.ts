@@ -10,12 +10,13 @@
 //   alias of the running walk, so its later taps land there. A start arriving after the stop joins the walk that was
 //   running at its time. Trainings do the same; a training started on a walk that has since ended ends with it.
 import { sql, type Kysely } from "kysely";
-import { checkDetails, checkDogs, type Command, isPractice, type Consistency, type Entry, type EntryDetails, withDetail, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, keepsOne, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView, withinWalk } from "@gassi/domain";
+import { type Grade, NO_COUNTS, checkDetails, checkDogs, type Command, isPractice, type Consistency, type Entry, type EntryDetails, withDetail, type ExerciseTotal, exerciseTotals, type FoodKind, isOver, joinsEndedSession, keepsOne, minutesBetween, pausedWithin, type Person, resolveDogs, type SessionsView, startedTrainingEndsAt, type TrainingView, type WalkView, withinWalk } from "@gassi/domain";
 import type { DB } from "./db/open";
 import type { Schema } from "./db/schema";
 import { DogRepository } from "./dogs";
 import { EntryRepository } from "./entries/repository";
 import type { Names } from "./people";
+import { COUNT_COLUMN, COUNT_COLUMNS, countRow, countsOf } from "./db/counts";
 
 
 export type { Person, SessionsView, TrainingView, WalkView };
@@ -140,7 +141,7 @@ export class Sessions {
   private async trainingView(t: Entry, walk: Entry | undefined): Promise<TrainingView> {
     const { db } = this.deps;
     const [exercises, treats] = await Promise.all([
-      db.selectFrom("training_exercise").select(["exercise_id", "dog_id", "ok_count", "fail_count"]).where("entry_id", "=", t.id).orderBy(sql`rowid`).execute(),
+      db.selectFrom("training_exercise").select(["exercise_id", "dog_id", ...COUNT_COLUMNS]).where("entry_id", "=", t.id).orderBy(sql`rowid`).execute(),
       db.selectFrom("training_treat").select(["treat_kind_id", "count"]).where("entry_id", "=", t.id).where("count", ">", 0).execute(),
     ]);
     return {
@@ -148,7 +149,7 @@ export class Sessions {
       startedAt: t.at,
       dogIds: t.dogIds,
       walkKey: walk && withinWalk(t.at, walk.at, walk.endedAt) ? walk.clientKey : null,
-      reps: exercises.map((r) => ({ exerciseId: r.exercise_id, dogId: r.dog_id, ok: r.ok_count, fail: r.fail_count })),
+      reps: exercises.map((r) => ({ exerciseId: r.exercise_id, dogId: r.dog_id, ...countsOf(r) })),
       treats: Object.fromEntries(treats.map((r) => [r.treat_kind_id, r.count])),
     };
   }
@@ -156,10 +157,10 @@ export class Sessions {
   private async trainingSummary(t: Entry, walkEnd: string): Promise<TrainingSummary> {
     const { db } = this.deps;
     const [exercises, treats] = await Promise.all([
-      db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["exercise.name", "ok_count", "fail_count"]).where("entry_id", "=", t.id).orderBy(sql`training_exercise.rowid`).execute(),
+      db.selectFrom("training_exercise").innerJoin("exercise", "exercise.id", "training_exercise.exercise_id").select(["exercise.name", ...COUNT_COLUMNS]).where("entry_id", "=", t.id).orderBy(sql`training_exercise.rowid`).execute(),
       db.selectFrom("training_treat").innerJoin("treat_kind", "treat_kind.id", "training_treat.treat_kind_id").select(["treat_kind.name", "count"]).where("entry_id", "=", t.id).where("count", ">", 0).orderBy("treat_kind.name").execute(),
     ]);
-    return { id: t.id, startedAt: t.at, min: minutesBetween(t.at, t.endedAt ?? walkEnd)!, exercises: exerciseTotals(exercises.map((r) => ({ name: r.name, ok: r.ok_count, fail: r.fail_count }))), treats };
+    return { id: t.id, startedAt: t.at, min: minutesBetween(t.at, t.endedAt ?? walkEnd)!, exercises: exerciseTotals(exercises.map((r) => ({ name: r.name, ...countsOf(r) }))), treats };
   }
 }
 
@@ -222,7 +223,7 @@ class Step {
         return "applied";
       }
       case "training.rep":
-        return this.onTraining(c.trainingKey, c.at, (t) => this.rep(t, c.exerciseId, c.dogId, c.ok, c.delta));
+        return this.onTraining(c.trainingKey, c.at, (t) => this.rep(t, c.exerciseId, c.dogId, c.grade, c.delta));
       case "training.treat":
         return this.onTraining(c.trainingKey, c.at, (t) => this.treat(t, c.treatKindId, c.delta));
       case "log": {
@@ -252,7 +253,7 @@ class Step {
         // a repetition and a treat without a training (#36): an entry of their own, with the same rows a training has
         if (!(await this.activeDogs()).includes(c.dogId)) return "dropped";
         const e = await this.create(c.kind === "quick.command" ? "command" : "treat", c.at, null, [c.dogId]);
-        const done = c.kind === "quick.command" ? await this.rep(e, c.exerciseId, c.dogId, c.ok, 1) : "applied";
+        const done = c.kind === "quick.command" ? await this.rep(e, c.exerciseId, c.dogId, c.grade, 1) : "applied";
         if (done === "dropped" || (c.treatKindId !== undefined && (await this.treat(e, c.treatKindId, 1)) === "dropped")) {
           await this.entries.remove(e.id); // an exercise or treat kind that is gone: nothing half
           return "dropped";
@@ -398,13 +399,13 @@ class Step {
     return "applied";
   }
 
-  private async rep(t: Entry, exerciseId: number, dogId: number, ok: boolean, delta: 1 | -1): Promise<Outcome> {
+  private async rep(t: Entry, exerciseId: number, dogId: number, grade: Grade, delta: 1 | -1): Promise<Outcome> {
     if (!t.dogIds.includes(dogId)) return "dropped";
     const exists = await this.tx.selectFrom("exercise").select("id").where("id", "=", exerciseId).executeTakeFirst();
     if (!exists) return "dropped";
-    const row = await this.tx.selectFrom("training_exercise").select(["ok_count", "fail_count"]).where("entry_id", "=", t.id).where("exercise_id", "=", exerciseId).where("dog_id", "=", dogId).executeTakeFirst();
-    const counts = { ok_count: row?.ok_count ?? 0, fail_count: row?.fail_count ?? 0 };
-    const field = ok ? "ok_count" : "fail_count";
+    const row = await this.tx.selectFrom("training_exercise").select(COUNT_COLUMNS).where("entry_id", "=", t.id).where("exercise_id", "=", exerciseId).where("dog_id", "=", dogId).executeTakeFirst();
+    const counts = countRow(row ? countsOf(row) : NO_COUNTS);
+    const field = COUNT_COLUMN[grade];
     counts[field] = Math.max(0, counts[field] + delta);
     await this.tx
       .insertInto("training_exercise")

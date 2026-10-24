@@ -2,7 +2,7 @@
 // empty), walkers only for a walk; a training's repetitions and treats go in their own call and replace what it had; a
 // wet count's other rows (one entry per can size) go as edits of their own, those whose cans changed.
 import type { Input, Output } from "@gassi/api-client";
-import { cansOf, dogRule, type EntryType, keepsOne } from "@gassi/domain";
+import { cansOf, dogRule, type EntryType, type Grade, keepsOne } from "@gassi/domain";
 
 export type Entry = Output<"entry">;
 type Rep = Entry["reps"][number];
@@ -67,9 +67,9 @@ export function countEdits(e: Entry, f: Form): Input<"editEntry">[] {
 /** The training's repetitions for the dogs it is now for, and its treats. */
 export const trainingInput = (e: Entry, f: Form): Input<"editTraining"> => ({ id: e.id, reps: f.reps.filter((r) => f.dogIds.includes(r.dogId)), treats: f.treats });
 
-export function bumpRep(reps: readonly Rep[], exerciseId: number, dogId: number, field: "ok" | "fail", delta: 1 | -1): Rep[] {
+export function bumpRep(reps: readonly Rep[], exerciseId: number, dogId: number, field: Grade, delta: 1 | -1): Rep[] {
   const found = reps.some((r) => r.exerciseId === exerciseId && r.dogId === dogId);
-  const all = found ? [...reps] : [...reps, { exerciseId, dogId, ok: 0, fail: 0 }];
+  const all = found ? [...reps] : [...reps, { exerciseId, dogId, ok: 0, meh: 0, fail: 0 }];
   return all.map((r) => (r.exerciseId === exerciseId && r.dogId === dogId ? { ...r, [field]: Math.max(0, r[field] + delta) } : r));
 }
 

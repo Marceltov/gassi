@@ -50,7 +50,7 @@ test("the Gassi tile says when the last walk was and who went; the Training tile
   const sitz = (await client.exercises()).exercises.find((e) => e.name === "Sitz") ?? (await client.addExercise({ name: "Sitz" }));
   const dog = (await client.dogs()).dogs.find((d) => !d.archived)!;
   const at = new Date().toISOString();
-  const rep = (i: number, ok: boolean) => ({ id: `start-rep-${i}-${n}`, at, kind: "training.rep" as const, trainingKey: `st-${n}`, exerciseId: sitz.id, dogId: dog.id, ok, delta: 1 as const });
+  const rep = (i: number, ok: boolean) => ({ id: `start-rep-${i}-${n}`, at, kind: "training.rep" as const, trainingKey: `st-${n}`, exerciseId: sitz.id, dogId: dog.id, grade: ok ? ("ok" as const) : ("fail" as const), delta: 1 as const });
   await client.commands({
     commands: [
       { id: `start-w1-${n}`, at, kind: "walk.start", walkKey: `sw-${n}` },
@@ -64,7 +64,7 @@ test("the Gassi tile says when the last walk was and who went; the Training tile
   await signIn(page);
   await page.goto("/");
   await expect(page.getByRole("button", { name: /^Gassi gehen, zuletzt gerade eben · \S/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Training starten, Sitz 1/2 zuletzt" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Training starten, Sitz ✓1 ~0 ✗1 zuletzt" })).toBeVisible();
 
   await page.getByRole("button", { name: "Training starten" }).dblclick(); // a double tap starts one training
   await expect(page).toHaveURL(`${BASE_URL}/training`);

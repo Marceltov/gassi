@@ -52,8 +52,8 @@ export const issueSchema = z.object({ number: z.number(), title: z.string(), ope
 // marks: the walk offers "Markiert" for this dog (#38)
 export const dogSchema = z.object({ id: z.number(), name: z.string(), color: z.string(), archived: z.boolean(), marks: z.boolean() });
 
-const exerciseTotalSchema = z.object({ name: z.string(), ok: z.number(), fail: z.number() });
-const repSchema = z.object({ exerciseId: z.number(), dogId: z.number(), ok: z.number(), fail: z.number() });
+const exerciseTotalSchema = z.object({ name: z.string(), ok: z.number(), meh: z.number(), fail: z.number() });
+const repSchema = z.object({ exerciseId: z.number(), dogId: z.number(), ok: z.number(), meh: z.number(), fail: z.number() });
 const routeSchema = z.array(z.tuple([z.number(), z.number()]));
 
 export const entryViewSchema = z.object({
@@ -174,7 +174,7 @@ const weekSchema = z.object({
     }),
   ),
   byPerson: z.array(
-    z.object({ id: z.string(), name: z.string(), walks: z.number(), walkMin: z.number(), km: z.number(), feedings: z.number(), trainings: z.number(), trainingMin: z.number(), ok: z.number(), fail: z.number() }),
+    z.object({ id: z.string(), name: z.string(), walks: z.number(), walkMin: z.number(), km: z.number(), feedings: z.number(), trainings: z.number(), trainingMin: z.number(), ok: z.number(), meh: z.number(), fail: z.number() }),
   ),
   exercises: z.array(exerciseTotalSchema),
   routes: z.array(z.object({ walkId: z.number(), route: routeSchema })),

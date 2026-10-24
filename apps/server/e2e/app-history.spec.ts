@@ -219,13 +219,13 @@ test("from a walk's summary: its pee is deleted, its start moved, then the walk 
   await expect(asHirsch().entry({ id: walk.id })).rejects.toMatchObject({ status: 404 });
 });
 
-test("a training reads Sitz 2/3 in the list; its repetitions are changed in its detail", async ({ page }) => {
+test("a training reads Sitz ✓2 ~0 ✗1 in the list; its repetitions are changed in its detail", async ({ page }) => {
   const client = asHirsch();
   const sitz = (await client.exercises()).exercises.find((e) => e.name === "Sitz") ?? (await client.addExercise({ name: "Sitz" }));
   if (!(await client.treatKinds()).treatKinds.length) await client.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false });
   const dog = await firstDog();
   const key = `history-training-${Date.now()}`;
-  const rep = (n: number, ok: boolean) => ({ id: `${key}-${n}`, at: minutesAgo(10 - n), kind: "training.rep" as const, trainingKey: key, exerciseId: sitz.id, dogId: dog.id, ok, delta: 1 as const });
+  const rep = (n: number, ok: boolean) => ({ id: `${key}-${n}`, at: minutesAgo(10 - n), kind: "training.rep" as const, trainingKey: key, exerciseId: sitz.id, dogId: dog.id, grade: ok ? ("ok" as const) : ("fail" as const), delta: 1 as const });
   await client.commands({
     commands: [
       { id: `${key}-start`, at: minutesAgo(10), kind: "training.start", trainingKey: key, dogIds: [dog.id] },
@@ -241,21 +241,21 @@ test("a training reads Sitz 2/3 in the list; its repetitions are changed in its 
   await signIn(page);
   await page.goto("/verlauf");
   const row = page.getByTestId(`entry-${training.id}`);
-  await expect(row).toContainText("Sitz 2/3");
+  await expect(row).toContainText("Sitz ✓2 ~0 ✗1");
   // a line per exercise under the minutes, not one line cut short
-  await expect(page.getByTestId(`entry-${training.id}-line`)).toHaveText(["Sitz 2/3"]);
+  await expect(page.getByTestId(`entry-${training.id}-line`)).toHaveText(["Sitz ✓2 ~0 ✗1"]);
   await row.click();
   await expect(page).toHaveURL(`${BASE_URL}/verlauf/eintrag/${training.id}`);
   await page.getByRole("button", { name: "Sitz klappt: eins mehr" }).click();
-  await expect(page.getByTestId("fact-sub")).toHaveText("Sitz 3/4");
+  await expect(page.getByTestId("fact-sub")).toHaveText("Sitz ✓3 ~0 ✗1");
   // exercises and treats in sections of their own
   await expect(page.getByTestId("training-exercises").getByText("Übungen", { exact: true })).toBeVisible();
   await expect(page.getByTestId("training-treats").getByText("Leckerli", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Speichern" }).click();
 
   await expect(page).toHaveURL(`${BASE_URL}/verlauf`);
-  await expect(row).toContainText("Sitz 3/4");
-  expect((await client.entry({ id: training.id })).exercises).toEqual([{ name: "Sitz", ok: 3, fail: 1 }]);
+  await expect(row).toContainText("Sitz ✓3 ~0 ✗1");
+  expect((await client.entry({ id: training.id })).exercises).toEqual([{ name: "Sitz", ok: 3, meh: 0, fail: 1 }]);
 });
 
 test("a walk's summary counts what happened, lists it by time, and a training opens its detail", async ({ page }) => {

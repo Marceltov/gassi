@@ -36,7 +36,7 @@ export function factOf(entry: Entry, form: Form, names: Names): Fact | null {
     }
     case "training": {
       const min = minutesBetween(form.at, form.endedAt);
-      const rows = form.reps.filter((r) => form.dogIds.includes(r.dogId)).map((r) => ({ name: names.exerciseName(r.exerciseId), ok: r.ok, fail: r.fail }));
+      const rows = form.reps.filter((r) => form.dogIds.includes(r.dogId)).map((r) => ({ ...r, name: names.exerciseName(r.exerciseId) }));
       return { big: min === null ? "läuft" : formatMinutes(min), sub: trainingSummaryLine(rows, form.treats.reduce((n, t) => n + t.count, 0)) };
     }
     default:

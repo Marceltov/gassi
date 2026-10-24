@@ -1,11 +1,11 @@
 // Logging something from Start or on a walk, one flow for all: a note (#91), an encounter (#37, #90), a command or a
 // treat without a training (#36). "Begegnung" asks Mensch or Hund, then everything for a dog asks which dog (as Pipi and
 // Poopoo do, only when several could be meant), then its sheet: an encounter's details and a note; a note's text; a
-// command's exercise and treat with ✓ klappt / ✗ klappt nicht; a treat's kind (with one kind there is nothing to ask).
+// command's exercise and treat with ✗ klappt nicht / ~ geht so / ✓ klappt (#100); a treat's kind (with one kind there is nothing to ask).
 // Everything is sent as a tap, so it works without reception and lands on a walk by its time (ADR 0002); the last
 // exercise and treat kind are preset next time. On a walk a tap on Kommando or Leckerli logs the usual at once and only a
 // hold opens the sheet (#98, quick.ts).
-import { checkDetails, type Command, type EntryDetails, newId, TYPE_LABEL } from "@gassi/domain";
+import { checkDetails, type Command, type EntryDetails, type Grade, GRADES, newId, TYPE_LABEL } from "@gassi/domain";
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
@@ -18,6 +18,7 @@ import { Sheet } from "../ui/Sheet";
 import { loadKept, saveKept } from "../data/kept";
 import { Chip } from "../ui/Chip";
 import { ChoiceList } from "../ui/ChoiceList";
+import { GradeButton } from "../ui/GradeButton";
 import { DetailFields } from "./DetailFields";
 import { quickLines, quickOf, usualOf } from "./quick";
 
@@ -71,7 +72,7 @@ export function Logging({ start, quick = false, dogIds, place, onDone }: { start
     if (dogId === null || nowKind === undefined) return;
     const at = new Date().toISOString();
     if (nowKind === "quick.treat" && treatKindId !== undefined) send({ id: newId(), at, kind: nowKind, dogId, treatKindId });
-    if (nowKind === "quick.command" && exerciseId !== undefined) send({ id: newId(), at, kind: nowKind, dogId, exerciseId, ok: true, treatKindId });
+    if (nowKind === "quick.command" && exerciseId !== undefined) send({ id: newId(), at, kind: nowKind, dogId, exerciseId, grade: "ok", treatKindId });
     onDone();
   }, [nowKind, exerciseId, treatKindId, dogId, send, onDone]);
   const tap = (c: Command) => {
@@ -91,7 +92,7 @@ export function Logging({ start, quick = false, dogIds, place, onDone }: { start
   );
 }
 
-/** A command: which exercise, a treat with it (or none), then ✓ klappt or ✗ klappt nicht logs it. */
+/** A command: which exercise, a treat with it (or none), then ✗ klappt nicht, ~ geht so or ✓ klappt logs it. */
 function CommandForm({ dogId, onTap }: { dogId: number; onTap: (c: Command) => void }) {
   const theme = useTheme();
   const { exercises, treatKinds } = useGassi();
@@ -99,10 +100,11 @@ function CommandForm({ dogId, onTap }: { dogId: number; onTap: (c: Command) => v
   const usual = usualOf(lastOf(), exercises, kinds);
   const [exerciseId, setExerciseId] = useState<number | null>(usual.exercise?.id ?? exercises[0]?.id ?? null);
   const [treatKindId, setTreatKindId] = useState<number | null>(usual.commandTreat ? (usual.treatKind?.id ?? kinds[0]?.id ?? null) : null);
-  const log = (ok: boolean) => {
+  // a treat goes with klappt and geht so, not with klappt nicht
+  const log = (grade: Grade) => {
     if (exerciseId === null) return;
     remember({ exerciseId, commandTreat: treatKindId !== null, ...(treatKindId !== null ? { treatKindId } : {}) });
-    onTap({ id: newId(), at: new Date().toISOString(), kind: "quick.command", dogId, exerciseId, ok, treatKindId: ok && treatKindId !== null ? treatKindId : undefined });
+    onTap({ id: newId(), at: new Date().toISOString(), kind: "quick.command", dogId, exerciseId, grade, treatKindId: grade !== "fail" && treatKindId !== null ? treatKindId : undefined });
   };
   return (
     <View testID="command-sheet" style={styles.form}>
@@ -123,13 +125,13 @@ function CommandForm({ dogId, onTap }: { dogId: number; onTap: (c: Command) => v
           ))}
         </View>
       ) : null}
+      {/* the main one, klappt, on the right (#80) */}
       <View style={styles.row}>
-        <View style={styles.cell}>
-          <BigButton kind="neutral" size="l" icon="cross" label="klappt nicht" disabled={exerciseId === null} onPress={() => log(false)} />
-        </View>
-        <View style={styles.cell}>
-          <BigButton kind="walk" size="l" icon="check" label="klappt" disabled={exerciseId === null} onPress={() => log(true)} />
-        </View>
+        {[...GRADES].reverse().map((g) => (
+          <View key={g} style={styles.cell}>
+            <GradeButton grade={g} size="l" disabled={exerciseId === null} onPress={() => log(g)} />
+          </View>
+        ))}
       </View>
     </View>
   );

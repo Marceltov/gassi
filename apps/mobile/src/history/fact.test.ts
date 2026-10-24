@@ -33,9 +33,9 @@ test("pee and poop: the time large, the dog and the day under it, as edited", ()
 });
 
 test("a training: its minutes large and what was trained under them; one still running says so", () => {
-  const reps = [{ exerciseId: 7, dogId: 1, ok: 4, fail: 1 }];
-  expect(fact(entry({ type: "training" }), { endedAt: "2026-10-22T05:31:00.000Z", reps, treats: [{ treatKindId: 1, count: 3 }] })).toEqual({ big: "12 Min.", sub: "Sitz 4/5 · 3 Leckerli" });
-  expect(fact(entry({ type: "training" }), { reps })).toEqual({ big: "läuft", sub: "Sitz 4/5" });
+  const reps = [{ exerciseId: 7, dogId: 1, ok: 4, meh: 0, fail: 1 }];
+  expect(fact(entry({ type: "training" }), { endedAt: "2026-10-22T05:31:00.000Z", reps, treats: [{ treatKindId: 1, count: 3 }] })).toEqual({ big: "12 Min.", sub: "Sitz ✓4 ~0 ✗1 · 3 Leckerli" });
+  expect(fact(entry({ type: "training" }), { reps })).toEqual({ big: "läuft", sub: "Sitz ✓4 ~0 ✗1" });
 });
 
 test("food, weight, a walk and a note have their own: no fact on top", () => {
