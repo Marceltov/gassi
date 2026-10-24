@@ -99,7 +99,7 @@ test("with two dogs, Begegnung asks the dog first, like Pipi, and the form is ab
   expect((await newest(token, "dogEncounter")).dogIds).toEqual([dogs[1].id]);
 });
 
-test("Kommando and Leckerli, on a walk and at home: one or two taps, counted like a training's", async ({ page }) => {
+test("Kommando and Leckerli on a walk: a tap logs the usual one the button names, a hold chooses (#36, #98)", async ({ page }) => {
   const restore = await onlyOneDog();
   const api = asHirsch();
   const warten = await api.addExercise({ name: `Warten ${Date.now()}` });
@@ -110,6 +110,8 @@ test("Kommando and Leckerli, on a walk and at home: one or two taps, counted lik
     const token = await signIn(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Gassi gehen" }).click();
+    const taps = page.getByTestId("walk-taps");
+    // nothing usual yet: the tap asks
     await page.getByRole("button", { name: "Kommando", exact: true }).click();
     const command = page.getByTestId("command-sheet");
     await command.getByRole("button", { name: warten.name }).click();
@@ -118,15 +120,33 @@ test("Kommando and Leckerli, on a walk and at home: one or two taps, counted lik
     if ((await withKaese.getAttribute("aria-pressed")) !== "true") await withKaese.click();
     await expect(withKaese).toHaveAttribute("aria-pressed", "true");
     await command.getByRole("button", { name: "klappt", exact: true }).click();
-    await expect(page.getByTestId("walk-taps")).toContainText(`Kommando · ${warten.name} ✓ · 1 Leckerli`);
+    await expect(taps).toContainText(`Kommando · ${warten.name} ✓ · 1 Leckerli`);
     const entry = await newest(token, "command");
     expect(entry).toMatchObject({ exercises: [{ name: warten.name, ok: 1, fail: 0 }], treats: 1 });
 
-    // the next one has the exercise and treat preset: one tap
-    await page.getByRole("button", { name: "Kommando", exact: true }).click();
+    // now a tap logs the usual at once, as the buttons say
+    const kommando = page.getByRole("button", { name: `Kommando, ${warten.name} · ${kaese.name}` });
+    const leckerli = page.getByRole("button", { name: `Leckerli, ${kaese.name}` });
+    await kommando.click();
+    await expect(command).toBeHidden();
+    await expect(taps.getByText(`Kommando · ${warten.name} ✓ · 1 Leckerli`)).toHaveCount(2);
+    await leckerli.click();
+    await expect(taps).toContainText(`Leckerli · ${kaese.name}`);
+    await expect(page.getByTestId("treat-sheet")).toBeHidden();
+    await expect.poll(async () => (await createClient({ baseUrl: BASE_URL, token }).entries({ type: "treat" })).entries[0]?.treatCounts).toEqual([{ treatKindId: kaese.id, count: 1 }]);
+
+    // a hold chooses: a command that didn't work, another Leckerli that is then the one on you, for both buttons
+    await kommando.click({ delay: 800 });
     await command.getByRole("button", { name: "klappt nicht" }).click();
-    await expect(page.getByTestId("walk-taps")).toContainText(`Kommando · ${warten.name} ✗`);
-    made.push((await newest(token, "command")).id);
+    await expect(taps).toContainText(`Kommando · ${warten.name} ✗`);
+    await leckerli.click({ delay: 800 });
+    await page.getByTestId("treat-sheet").getByRole("button", { name: huhn.name }).click();
+    await expect(taps).toContainText(`Leckerli · ${huhn.name}`);
+    await expect(page.getByRole("button", { name: `Leckerli, ${huhn.name}` })).toBeVisible();
+    await expect(page.getByRole("button", { name: `Kommando, ${warten.name} · ${huhn.name}` })).toBeVisible();
+    // every one of them goes again afterwards
+    const client = createClient({ baseUrl: BASE_URL, token });
+    for (const type of ["command", "treat"]) made.push(...(await client.entries({ type })).entries.filter((e) => e.at >= entry.at).map((e) => e.id));
     await page.getByRole("button", { name: "Zuhause" }).click();
 
     // at home: Leckerli asks the kind, the last one marked
