@@ -40,3 +40,9 @@ test("normalizeServer: a typed address becomes the server's origin", () => {
   expect(normalizeServer("http://192.168.178.162:3000/")).toBe("http://192.168.178.162:3000");
   expect(normalizeServer("https://a.b")).toBe("https://a.b");
 });
+
+test("normalizeServer: a pasted link keeps only its server", () => {
+  expect(normalizeServer("gassi.example.org/join?token=abc")).toBe("https://gassi.example.org");
+  expect(normalizeServer("https://gassi.example.org:8443/mehr/haushalt#x")).toBe("https://gassi.example.org:8443");
+  expect(normalizeServer("gassi.example.org?token=abc")).toBe("https://gassi.example.org");
+});

@@ -12,10 +12,12 @@ export type LinkKind = (typeof linkKinds)[number];
 /** Setup and person links make a new person: they ask for a name (setup also for the first dog). */
 export const needsName = (kind: LinkKind): boolean => kind === "setup" || kind === "person";
 
-/** A typed server address as an origin: no spaces or trailing slashes, https:// unless it says http(s). */
+/** A typed server address as an origin: no spaces, path or query (a pasted link), https:// unless it says http(s). */
 export function normalizeServer(typed: string): string {
   const s = typed.trim().replace(/\/+$/, "");
-  return /^https?:\/\//i.test(s) ? s : `https://${s}`;
+  const withScheme = /^https?:\/\//i.test(s) ? s : `https://${s}`;
+  // by hand rather than URL.origin, which React Native's URL takes up to the first slash only
+  return withScheme.match(/^https?:\/\/[^/?#]+/i)?.[0] ?? withScheme;
 }
 
 export async function linkKind(server: string, key: LinkKey, fetchFn?: typeof fetch): Promise<LinkKind> {
