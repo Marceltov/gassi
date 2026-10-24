@@ -1,7 +1,8 @@
-// GPS tracks of walks, as the recording phone or watch sends them: batches of points with a sequence number, so a
-// batch sent twice is stored once and batches sent late (no reception) fall into place. A walk may have several
-// tracks (both walkers recorded); it shows one (chooseTrack: the watch's, else the longest).
-import { chooseTrack, trimTrack, type TrackMetrics, trackMetrics, type TrackPoint, type TrackSource } from "@gassi/domain";
+// GPS tracks of walks, as the recording phone or watch sends them: batches of raw points with a sequence number, so a
+// batch sent twice is stored once and batches sent late (no reception) fall into place. A walk may have tracks from
+// several phones, each recording while it was the walk's recorder (ADR 0014); it shows them joined by those times
+// (joinTracks, a watch's instead when there is one) and filtered (cleanTrack), measured and trimmed for drawing.
+import { cleanTrack, joinTracks, trimTrack, type TrackMetrics, trackMetrics, type TrackPoint, type TrackSource } from "@gassi/domain";
 import type { DB } from "./db/open";
 import { InputError } from "./errors";
 import { findByKey } from "./sessions";
@@ -41,26 +42,34 @@ export class Tracks {
   /** The shown track of each walk in `entryIds` that has one, loaded in one query. */
   async shown(entryIds: readonly number[]): Promise<Map<number, ShownTrack>> {
     if (entryIds.length === 0) return new Map();
-    const rows = await this.db
-      .selectFrom("track")
-      .innerJoin("track_batch", "track_batch.track_id", "track.id")
-      .select(["track.id", "track.entry_id", "track.source", "track_batch.seq", "track_batch.points"])
-      .where("track.entry_id", "in", entryIds)
-      .orderBy("track.id")
-      .orderBy("track_batch.seq")
-      .execute();
-    const byTrack = new Map<string, { entryId: number; source: TrackSource; points: TrackPoint[] }>();
+    const [rows, walks, recorders] = await Promise.all([
+      this.db
+        .selectFrom("track")
+        .innerJoin("track_batch", "track_batch.track_id", "track.id")
+        .select(["track.id", "track.entry_id", "track.source", "track.device_id", "track_batch.seq", "track_batch.points"])
+        .where("track.entry_id", "in", entryIds)
+        .orderBy("track.id")
+        .orderBy("track_batch.seq")
+        .execute(),
+      this.db.selectFrom("entry").select(["id", "at", "ended_at"]).where("id", "in", entryIds).execute(),
+      this.db.selectFrom("walk_recorder").select(["entry_id", "device_id", "from_at"]).where("entry_id", "in", entryIds).execute(),
+    ]);
+    const byTrack = new Map<string, { entryId: number; deviceId: number | null; source: TrackSource; points: TrackPoint[] }>();
     for (const r of rows) {
-      const t = byTrack.get(r.id) ?? { entryId: r.entry_id, source: r.source === "watch" ? "watch" : "phone", points: [] };
+      const t = byTrack.get(r.id) ?? { entryId: r.entry_id, deviceId: r.device_id, source: r.source === "watch" ? "watch" : "phone", points: [] };
       t.points.push(...(JSON.parse(r.points) as TrackPoint[]));
       byTrack.set(r.id, t);
     }
-    const byWalk = new Map<number, { source: TrackSource; points: TrackPoint[]; metrics: TrackMetrics }[]>();
-    for (const t of byTrack.values()) byWalk.set(t.entryId, [...(byWalk.get(t.entryId) ?? []), { ...t, metrics: trackMetrics(t.points) }]);
     const out = new Map<number, ShownTrack>();
-    for (const [id, all] of byWalk) {
-      const i = chooseTrack(all.map((t) => ({ source: t.source, distanceM: t.metrics.distanceM })));
-      if (i !== null) out.set(id, { source: all[i].source, points: trimTrack(all[i].points), metrics: all[i].metrics });
+    for (const w of walks) {
+      const tracks = [...byTrack.values()].filter((t) => t.entryId === w.id);
+      if (!tracks.length) continue;
+      const turns = recorders.filter((r) => r.entry_id === w.id).map((r) => ({ deviceId: r.device_id, from: r.from_at }));
+      const source: TrackSource = tracks.some((t) => t.source === "watch") ? "watch" : "phone";
+      const joined = joinTracks(tracks, turns, { at: w.at, endedAt: w.ended_at });
+      // a watch's GPS needs no filter (and may send no accuracy, which the filter's gate would drop)
+      const points = source === "watch" ? joined : cleanTrack(joined);
+      if (points.length) out.set(w.id, { source, points: trimTrack(points), metrics: trackMetrics(points) });
     }
     return out;
   }

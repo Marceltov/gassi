@@ -106,7 +106,7 @@ describe("tracks over the API", () => {
 });
 
 describe("today, people and routes over the API", () => {
-  const point = (s: number, north: number) => ({ t: new Date(Date.parse("2026-10-20T09:00:00Z") + s * 1000).toISOString(), lat: 48.137 + north / 111_195, lon: 11.575, ele: null, acc: null });
+  const point = (s: number, north: number) => ({ t: new Date(Date.parse("2026-10-20T09:00:00Z") + s * 1000).toISOString(), lat: 48.137 + north / 111_195, lon: 11.575, ele: null, acc: 5 });
 
   test("today is the newest entry of each type, null where there is none; people lists the household", async () => {
     const token = await tokenFor(HIRSCH.id);
@@ -148,7 +148,8 @@ describe("today, people and routes over the API", () => {
     const { body: today } = await json("/api/today", { token });
     expect(Math.round(today.walk.distanceM)).toBeGreaterThan(900);
     expect(today.walk.route.length).toBeLessThanOrEqual(64);
-    expect(today.walk.route[0]).toEqual([points[0].lat, points[0].lon]);
+    // the route is the filtered one (ADR 0014): it starts within metres of the first point
+    expect(Math.abs(today.walk.route[0][0] - points[0].lat) * 111_195).toBeLessThan(10);
     const { body: week } = await json("/api/week?w=2026-10-20", { token });
     expect(week.routes).toEqual([{ walkId: today.walk.id, route: today.walk.route }]);
     expect(week.byPerson[0].km).toBeCloseTo(today.walk.distanceM / 1000, 1);

@@ -162,6 +162,18 @@ const migrations: Record<string, Migration> = {
       await db.schema.alterTable("dog").addColumn("marks", "integer", (c) => c.notNull().defaultTo(0)).execute();
     },
   },
+  // Who records a walk's route from when (#104, ADR 0014): a new table, so every row stays as it was.
+  "0.5_walk_recorder": {
+    async up(db: Kysely<any>) {
+      await db.schema
+        .createTable("walk_recorder")
+        .addColumn("entry_id", "integer", (c) => c.notNull().references("entry.id").onDelete("cascade"))
+        .addColumn("device_id", "integer", (c) => c.notNull())
+        .addColumn("from_at", "text", (c) => c.notNull())
+        .addPrimaryKeyConstraint("walk_recorder_pk", ["entry_id", "from_at"])
+        .execute();
+    },
+  },
 };
 
 const provider: MigrationProvider = { getMigrations: async () => migrations };

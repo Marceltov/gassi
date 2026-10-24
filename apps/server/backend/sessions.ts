@@ -56,13 +56,13 @@ export class Sessions {
   constructor(private readonly deps: SessionsDeps) {}
 
   /** Applies `commands` by `user` in time order. An id seen before is not applied again and counts as applied. */
-  async apply(user: Person, commands: readonly Command[]): Promise<{ applied: string[]; dropped: string[] }> {
+  async apply(user: Person, commands: readonly Command[], device: { id: number } | null = null): Promise<{ applied: string[]; dropped: string[] }> {
     const result = { applied: [] as string[], dropped: [] as string[] };
     for (const c of [...commands].sort(byTime)) {
       const outcome = await this.deps.db.transaction().execute(async (tx) => {
         const seen = await tx.selectFrom("applied_command").select("id").where("id", "=", c.id).executeTakeFirst();
         if (seen) return "applied";
-        const o = await new Step(tx, this.deps, user).run(c);
+        const o = await new Step(tx, this.deps, user, device).run(c);
         await tx.insertInto("applied_command").values({ id: c.id, applied_at: this.deps.now().toISOString() }).execute();
         return o;
       });
@@ -80,7 +80,7 @@ export class Sessions {
     const repo = new EntryRepository(db);
     const [walk, training] = await Promise.all([repo.running("walk"), repo.running("training")]);
     return {
-      walk: walk ? { key: walk.clientKey!, startedAt: walk.at, dogIds: walk.dogIds, walkers: await this.walkers(walk.id), ...(await this.pauses(walk.id)) } : null,
+      walk: walk ? { key: walk.clientKey!, startedAt: walk.at, dogIds: walk.dogIds, walkers: await this.walkers(walk.id), ...(await this.pauses(walk.id)), recorder: await this.recorder(walk.id) } : null,
       training: training ? await this.trainingView(training, walk) : null,
     };
   }
@@ -129,6 +129,18 @@ export class Sessions {
   private async walkers(entryId: number): Promise<Person[]> {
     const rows = await this.deps.db.selectFrom("walk_walker").select("person_id").where("entry_id", "=", entryId).orderBy(sql`rowid`).execute();
     return rows.map((r) => ({ id: r.person_id, name: this.deps.names.get(r.person_id) ?? r.person_id }));
+  }
+
+  // the device that took the route last (a device signed out since keeps a plain name)
+  private async recorder(entryId: number): Promise<WalkView["recorder"]> {
+    const r = await this.deps.db
+      .selectFrom("walk_recorder")
+      .leftJoin("device", "device.id", "walk_recorder.device_id")
+      .select(["walk_recorder.device_id", "device.name"])
+      .where("entry_id", "=", entryId)
+      .orderBy("from_at", "desc")
+      .executeTakeFirst();
+    return r ? { deviceId: r.device_id, name: r.name ?? "ein Gerät" } : null;
   }
 
   private async pauses(entryId: number): Promise<Pick<WalkView, "pauses" | "paused">> {
@@ -189,6 +201,7 @@ class Step {
     private readonly tx: Tx,
     private readonly deps: SessionsDeps,
     private readonly user: Person,
+    private readonly device: { id: number } | null,
   ) {
     this.entries = new EntryRepository(tx, deps.now);
   }
@@ -209,6 +222,8 @@ class Step {
         return this.onWalk(c.walkKey, c.at, (w) => this.resume(w, c.at));
       case "walk.stop":
         return this.stopWalk(c.walkKey, c.at);
+      case "walk.record":
+        return this.onWalk(c.walkKey, c.at, (w) => this.record(w.id, c.at));
       case "training.start": {
         const walk = c.walkKey ? await this.find(c.walkKey, "walk") : undefined;
         if (c.walkKey && (!walk || isOver(walk.endedAt, c.at))) return "dropped";
@@ -304,6 +319,7 @@ class Step {
       else {
         e = await this.create(type, at, key, await this.dogsFor(dogIds));
         if (endedAt) await this.end(e, endedAt);
+        if (type === "walk") await this.record(e.id, at); // the starting phone records the route
       }
     }
     if (type === "walk") await this.addWalker(e.id);
@@ -328,6 +344,12 @@ class Step {
     const t = await this.find(key, "training");
     if (!t || isOver(t.endedAt, at)) return "dropped";
     return act(t);
+  }
+
+  // this device records the walk's route from `at` (#104)
+  private async record(entryId: number, at: string): Promise<void> {
+    if (!this.device) return; // a script without a device records nothing
+    await this.tx.insertInto("walk_recorder").values({ entry_id: entryId, device_id: this.device.id, from_at: at }).onConflict((oc) => oc.doNothing()).execute();
   }
 
   private async addWalker(entryId: number): Promise<void> {

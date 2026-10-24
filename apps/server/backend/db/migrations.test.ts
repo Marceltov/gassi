@@ -37,3 +37,18 @@ test("0.4 keeps a 0.3 database's entries and dogs: no details, no dog marks", as
   expect(await db.selectFrom("dog").select(["name", "marks"]).execute()).toEqual([{ name: "Toffee", marks: 0 }]);
   await db.destroy();
 });
+
+test("0.5 adds walk_recorder and keeps the data", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = new Kysely<any>({ dialect: new SqliteDialect({ database: new Database(":memory:") }) });
+  await migrateTo(db, "0.4_details_marks");
+  await db.insertInto("person").values({ id: "marcel", name: "Hirsch", created_at: "2026-10-20T08:00:00Z" }).execute();
+  await db.insertInto("entry").values({ type: "walk", at: "2026-10-20T09:00:00Z", client_key: "w", logged_by: "marcel", created_at: "2026-10-20T09:00:00Z", updated_at: "2026-10-20T09:00:00Z" }).execute();
+  await db.insertInto("track").values({ id: "t", entry_id: 1, source: "phone", device_id: null, created_at: "2026-10-20T09:00:00Z" }).execute();
+  await migrate(db);
+  expect(await db.selectFrom("entry").select(["type", "client_key"]).execute()).toEqual([{ type: "walk", client_key: "w" }]);
+  expect(await db.selectFrom("track").select("id").execute()).toEqual([{ id: "t" }]);
+  await db.insertInto("walk_recorder").values({ entry_id: 1, device_id: 3, from_at: "2026-10-20T09:00:00Z" }).execute();
+  expect(await db.selectFrom("walk_recorder").selectAll().execute()).toEqual([{ entry_id: 1, device_id: 3, from_at: "2026-10-20T09:00:00Z" }]);
+  await db.destroy();
+});

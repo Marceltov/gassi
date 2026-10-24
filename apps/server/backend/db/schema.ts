@@ -82,6 +82,13 @@ export interface TrackBatchTable {
   received_at: string;
 }
 
+// who records the walk's route from when (#104): the starting device, then each that took over
+export interface WalkRecorderTable {
+  entry_id: number;
+  device_id: number;
+  from_at: string;
+}
+
 export interface WalkPauseTable {
   id: Generated<number>;
   entry_id: number;
@@ -140,6 +147,7 @@ export interface Schema {
   track_batch: TrackBatchTable;
   walk_walker: WalkWalkerTable;
   walk_pause: WalkPauseTable;
+  walk_recorder: WalkRecorderTable;
   exercise: ExerciseTable;
   training_exercise: TrainingExerciseTable;
   treat_kind: TreatKindTable;

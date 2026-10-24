@@ -80,7 +80,7 @@ const implementations: Implementations<ApiDeps> = {
   sessions: async ({ deps }) => (await sessions(deps)).current(),
   commands: async ({ input, auth, deps }) => {
     const s = await sessions(deps);
-    return { ...(await s.apply(auth.person, input.commands)), view: await s.current() };
+    return { ...(await s.apply(auth.person, input.commands, auth.device)), view: await s.current() };
   },
   entries: async ({ input, deps }) => {
     const d = await diary(deps);

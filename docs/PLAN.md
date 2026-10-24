@@ -7,8 +7,8 @@ everything, and something other households can run themselves (agreed with Marce
 on 2026-10-21, ADR 0005).
 
 - **Web app** (installable PWA, phone-first): logging, including walks (start/stop, pauses, several walkers,
-  pee/poop during the walk, and the route while the app is open, ADR 0014), food and stock, training, weight; today, history, week, statistics and maps;
-  also the dashboard on a big screen. Taps queue on the device without reception.
+  pee/poop during the walk, and the route while the app is open, ADR 0014), food and stock, training, weight; today,
+  history, week, statistics and maps; also the dashboard on a big screen. Taps queue on the device without reception.
 - **Android app** (the same Expo app, ADR 0006) with native look and feel: everything for daily use, plus the walk's GPS
   track recorded in the background. Built with EAS during development. An iOS app is left to the community.
 - **Garmin app** (Connect IQ, Forerunner 165 first): start/stop, pee, poop, training and treats from the wrist; the
