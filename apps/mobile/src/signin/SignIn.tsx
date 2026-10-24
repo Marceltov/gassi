@@ -1,19 +1,19 @@
-// Signing this browser in, with the code from an invitation (/anmelden) or a link's token (/join). Asks the server
+// Signing this device in, with the code from an invitation (/anmelden) or a link's token (/join). Asks the server
 // what the link is for first: a setup or person link needs a name (setup also the first dog), a device link signs in
 // at once. The code is sent as typed; the server reads it loosely (case, spaces, dashes).
 import { router } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Platform, StyleSheet, Text, TextInput } from "react-native";
+import { StyleSheet, Text, TextInput } from "react-native";
 import { errorMessage } from "@/src/data/api";
 import { type LinkKey, type LinkKind, linkKind, needsName, signIn } from "@/src/data/signin";
 import { radius, space, useTheme } from "@/src/theme";
 import { BigButton } from "@/src/ui/BigButton";
 import { Screen } from "@/src/ui/Screen";
 
-const userAgent = () => (Platform.OS === "web" && typeof navigator !== "undefined" ? navigator.userAgent : Platform.OS);
-
-/** `token` (from /join): sign in with that link; else a field for the code. `extra`: more ways to sign in. */
-export function SignIn({ token, extra, hint }: { token?: string; extra?: ReactNode; hint?: ReactNode }) {
+/** `server`: the server to sign in to ("" on the web: the one serving the page), null while none is typed. `token`
+ * (from /join): sign in with that link; else a field for the code. `extra`: more ways to sign in. `above`: what goes
+ * above the code (the server's address on Android). */
+export function SignIn({ server, token, extra, hint, above }: { server: string | null; token?: string; extra?: ReactNode; hint?: ReactNode; above?: ReactNode }) {
   const theme = useTheme();
   const [code, setCode] = useState("");
   const [kind, setKind] = useState<LinkKind | null>(null);
@@ -23,17 +23,17 @@ export function SignIn({ token, extra, hint }: { token?: string; extra?: ReactNo
   const [busy, setBusy] = useState(false);
   const started = useRef(false);
 
-  const key: LinkKey | null = token ? { token } : code.trim() ? { code } : null;
+  const key: LinkKey | null = token ? { token } : code.trim() && server !== null ? { code } : null;
   const asking = kind !== null && needsName(kind);
 
   async function submit(k: LinkKey | null = key) {
-    if (!k || busy) return;
+    if (!k || server === null || busy) return;
     setBusy(true);
     setError(null);
     try {
       let known = kind;
       if (known === null) {
-        known = await linkKind(k);
+        known = await linkKind(server, k);
         setKind(known);
       }
       // a new person: first ask for the name, then sign in
@@ -41,7 +41,7 @@ export function SignIn({ token, extra, hint }: { token?: string; extra?: ReactNo
         if (kind !== null) setError("Wie heißt du?");
         return;
       }
-      await signIn(k, { personName, dogName: known === "setup" ? dogName : undefined }, userAgent());
+      await signIn(server, k, { personName, dogName: known === "setup" ? dogName : undefined });
       router.replace("/");
     } catch (e) {
       setError(errorMessage(e));
@@ -77,6 +77,7 @@ export function SignIn({ token, extra, hint }: { token?: string; extra?: ReactNo
       }
       bottom={
         <>
+          {above}
           {token ? null : (
             <TextInput
               accessibilityLabel="Code"
@@ -100,7 +101,7 @@ export function SignIn({ token, extra, hint }: { token?: string; extra?: ReactNo
             <TextInput accessibilityLabel="Name deines Hundes" placeholder="Name deines Hundes" placeholderTextColor={theme.muted} value={dogName} onChangeText={setDogName} onSubmitEditing={() => void submit()} style={input} />
           ) : null}
           {!token || asking ? (
-            <BigButton kind="ink" size="l" icon="signIn" label={busy ? "Einen Moment …" : "Anmelden"} onPress={() => void submit()} />
+            <BigButton kind="ink" size="l" icon="signIn" label={busy ? "Einen Moment …" : "Anmelden"} disabled={server === null} onPress={() => void submit()} />
           ) : error ? (
             <BigButton kind="ink" size="l" label="Zur Anmeldung" onPress={() => router.replace("/anmelden")} />
           ) : null}

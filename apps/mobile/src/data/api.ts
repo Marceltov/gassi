@@ -67,9 +67,9 @@ export function forgetDevice(): void {
   clearDevice();
 }
 
-/** The client before sign-in (links and codes). */
-export function publicApi(fetchFn: typeof fetch = (...a) => fetch(...a)): Client {
-  return createClient({ baseUrl: API_URL, fetch: wrap(fetchFn, () => {}, () => {}) });
+/** The client before sign-in (links and codes), against the server the link or the typed address names. */
+export function publicApi(server: string, fetchFn: typeof fetch = (...a) => fetch(...a)): Client {
+  return createClient({ baseUrl: server, fetch: wrap(fetchFn, () => {}, () => {}) });
 }
 
 /** What to show for a failed call: the server's message, OFFLINE when it wasn't reachable, NO_ANSWER when it got no
