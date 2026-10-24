@@ -35,6 +35,9 @@ export const formatKg = (grams: number) => `${(grams / 1000).toLocaleString("de-
 /** A walk's distance: "850 m" under a kilometre, else "3,1 km". */
 export const formatDistance = (m: number) => (m < 999.5 ? `${Math.round(m)} m` : `${(m / 1000).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`);
 
+/** A walk's speed from metres per second: "3,7 km/h". */
+export const formatSpeed = (mps: number) => `${(mps * 3.6).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km/h`;
+
 const grams = (g: number) => (g >= 1000 && g % 100 === 0 ? formatKg(g).replace(",0 kg", " kg") : `${g} g`);
 
 /** How an entry reads in a list: "Gassi" + "52 Min. (8 Pause) · 3,1 km" + "Hirsch + Herzii", "Futter" +

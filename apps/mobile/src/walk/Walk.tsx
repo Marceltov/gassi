@@ -1,5 +1,6 @@
 // The running walk ("Runde"): one hand holds the leash, the thumb taps. On top the clock, who walks with which dogs
-// (a chip taps them off, "+" adds), and what happened so far; at the bottom Pipi, Markiert (for dogs that mark, #38) and
+// (a chip taps them off, "+" adds), the route in one line (the distance on the phone that records it, a tap shows it,
+// #104), and what happened so far; at the bottom Pipi, Markiert (for dogs that mark, #38) and
 // Poopoo, Kommando, Leckerli and Begegnung (#36, #90, #37), Pause/Weiter and Training, Zuhause; with several dogs on the walk
 // each asks which one. Only what happened scrolls, newest first; a tap on one opens it to change or delete (#99). A tap on Kommando or Leckerli logs the usual one they name, a hold chooses (#98). A poop is logged at the tap and then asks how it was (#86), in a sheet like the dog's; closed,
 // it has none; one still in the queue asks again from the list. Every tap goes through the queue and shows at once. When the walk is over
@@ -27,6 +28,8 @@ import { tapLine, trainingLine, walkItems } from "./lines";
 import type { Tap } from "./taps";
 import { useWalkTaps } from "./useWalkTaps";
 import { ItemRow } from "./ItemRow";
+import { RoutePill } from "./RoutePill";
+import { RouteSheet } from "./RouteSheet";
 import { useTabPath } from "../ui/tabPath";
 
 type Kind = "pee" | "mark" | "poop";
@@ -40,6 +43,7 @@ export function Walk() {
   const tabPath = useTabPath();
   const { taps, trainings } = useWalkTaps(walk);
   const [adding, setAdding] = useState(false);
+  const [route, setRoute] = useState(false);
   const [choosing, setChoosing] = useState<Kind | null>(null);
   const [hint, setHint] = useState<string | null>(null); // why the last person or dog can't be tapped off
   const [asking, setAsking] = useState<Tap | null>(null); // the poop whose consistency is asked
@@ -179,6 +183,7 @@ export function Walk() {
             ))}
             <Chip label="+" a11y="Hinzufügen" on={false} onPress={() => setAdding(true)} />
           </View>
+          <RoutePill onPress={() => setRoute(true)} />
           {hint ? <Text style={[styles.since, { color: theme.muted }]}>{hint}</Text> : null}
           {walkDogs.length === 0 ? <Text style={[styles.since, { color: theme.muted }]}>Kein Hund dabei – „+“ nimmt einen mit.</Text> : null}
         </>
@@ -269,6 +274,7 @@ export function Walk() {
             })}
             onClose={() => setAsking(null)}
           />
+          <RouteSheet walk={walk} open={route} onClose={() => setRoute(false)} />
           <Sheet open={adding} onClose={() => setAdding(false)} label="Wer kommt mit?">
             <View style={styles.sheet}>
               <Text style={[styles.title, { color: theme.ink }]}>Wer kommt mit?</Text>

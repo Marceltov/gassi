@@ -59,9 +59,14 @@ async function flush(walkKey: string, upload: (b: Batch) => Promise<unknown>): P
   }
 }
 
-/** Sends what recordings of ended walks still hold (one that couldn't go out at Zuhause), and goes on with any other. */
-export async function sendLeftovers(upload: (b: Batch) => Promise<unknown>): Promise<void> {
-  for (const walkKey of Object.keys(all())) await flush(walkKey, upload);
+/** Sends what recordings still hold: one that couldn't go out at Zuhause, one handed over to another phone, one an
+ * earlier page left. A recording of a walk other than `running` (the walk running now, if any) is over: once sent, it
+ * is forgotten. */
+export async function sendLeftovers(upload: (b: Batch) => Promise<unknown>, running: string | null): Promise<void> {
+  for (const [walkKey, r] of Object.entries(all())) {
+    if (walkKey !== running && !r.ended) save(walkKey, { ...r, ended: true });
+    await flush(walkKey, upload);
+  }
 }
 
 const browserLocks = (): Locks | null => (typeof navigator !== "undefined" && "locks" in navigator ? (navigator.locks as unknown as Locks) : null);
@@ -70,7 +75,8 @@ const browserLocks = (): Locks | null => (typeof navigator !== "undefined" && "l
  * recording without the walk ending (another phone took over, the screen goes away). */
 export function createRecorder({ walkKey, upload, geo = { watch: watchPosition }, locks = browserLocks() }: { walkKey: string; upload: (b: Batch) => Promise<unknown>; geo?: Geo; locks?: Locks | null }) {
   const kept = all()[walkKey];
-  if (!kept) save(walkKey, { trackId: newId(), points: [], sent: 0, nextSeq: 0, inflight: null, ended: false });
+  // a recording taken for over while this walk wasn't known yet (sendLeftovers) goes on
+  save(walkKey, kept ? { ...kept, ended: false } : { trackId: newId(), points: [], sent: 0, nextSeq: 0, inflight: null, ended: false });
   const live = createLiveFilter();
   for (const p of kept?.points ?? []) live.add(p);
   let lastFix = Date.now();

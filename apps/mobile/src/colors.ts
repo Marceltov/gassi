@@ -24,6 +24,10 @@ export const gradients = {
 // page and on a card, in each theme (colors.test.ts).
 export const danger = { dark: "#ff7b72", light: "#b42318" };
 
+// Something that doesn't work right now but needs nothing from you to save (the walk's "kein GPS-Signal", "GPS aus"):
+// amber, as text in each theme (colors.test.ts).
+export const warn = { dark: "#f0b35a", light: "#9a5b00" };
+
 function luminance(hex: string): number {
   const n = parseInt(hex.slice(1), 16);
   const [r, g, b] = [n >> 16, (n >> 8) & 255, (n >> 0) & 255].map((v) => {

@@ -1,6 +1,7 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { useColorScheme } from "react-native";
 import { GassiProvider, useGassi } from "@/src/data/GassiProvider";
+import { RecordingProvider } from "@/src/track/Recording";
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -13,9 +14,11 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   return (
     <GassiProvider>
-      <ThemeProvider value={colorScheme === "light" ? DefaultTheme : DarkTheme}>
-        <Screens />
-      </ThemeProvider>
+      <RecordingProvider>
+        <ThemeProvider value={colorScheme === "light" ? DefaultTheme : DarkTheme}>
+          <Screens />
+        </ThemeProvider>
+      </RecordingProvider>
     </GassiProvider>
   );
 }

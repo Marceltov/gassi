@@ -62,11 +62,13 @@ test("Pipi with one dog logs at once; without reception Poopoo and Zuhause show 
 
     // with a track, the summary shows it on the map and its distance
     const t = (s: number) => new Date(Date.parse(walk.summary.startedAt) + s * 1000).toISOString();
-    const points = [0, 600, 1200].map((north, i) => ({ t: t(i), lat: 48.137 + north / 111_195, lon: 11.575, ele: null, acc: 5 }));
+    // 5 m a second (faster would be a GPS jump to the filter, ADR 0014); only what lies within the walk's few seconds
+    // counts, so the distance is small: app-route.spec.ts checks real distances
+    const points = [0, 5, 10].map((north, i) => ({ t: t(i), lat: 48.137 + north / 111_195, lon: 11.575, ele: null, acc: 5 }));
     await client.uploadTrack({ trackId: `walk-${key}`, walkKey: key, source: "phone", seq: 0, points });
     await page.reload();
     await expect(page.getByTestId("track-map")).toContainText("OpenStreetMap");
-    await expect(page.getByText("1,2 km")).toBeVisible();
+    await expect(page.getByText(/^\d+ m$/)).toBeVisible();
 
     // after the reload the summary is a cold link, which resolves to Verlauf's copy and goes on to Start's: Start stays
     // highlighted and Fertig goes back to Start

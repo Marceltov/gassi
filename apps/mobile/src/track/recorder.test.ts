@@ -1,5 +1,6 @@
 import type { TrackPoint } from "@gassi/domain";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { loadKept } from "../data/kept";
 import { createRecorder, type Batch, type Geo, type Locks, sendLeftovers } from "./recorder";
 
 const T0 = Date.parse("2026-10-24T09:00:00Z");
@@ -96,10 +97,25 @@ test("a recording that couldn't go out at the end goes with the next chance", as
   await walkFor(geo, 0, 10);
   await r.stop();
   up.failing = 0;
-  await sendLeftovers(up.send);
+  await sendLeftovers(up.send, null);
   expect(up.batches.flatMap((b) => b.points)).toHaveLength(2);
-  await sendLeftovers(up.send);
+  await sendLeftovers(up.send, null);
   expect(up.batches.flatMap((b) => b.points)).toHaveLength(2);
+});
+
+test("a recording handed over is sent and forgotten once its walk no longer runs", async () => {
+  const geo = fakeGeo();
+  const up = fakeUpload();
+  up.failing = 99;
+  const r = createRecorder({ walkKey: "w", geo, upload: up.send, locks: null });
+  await walkFor(geo, 0, 10);
+  r.close(); // another phone took over
+  up.failing = 0;
+  await sendLeftovers(up.send, "w"); // the walk still runs: sent, kept
+  expect(up.batches.flatMap((b) => b.points)).toHaveLength(2);
+  expect(Object.keys(loadKept("recordings") as object)).toEqual(["w"]);
+  await sendLeftovers(up.send, null); // it ended
+  expect(loadKept("recordings")).toEqual({});
 });
 
 test("no fix for 30 s means noSignal", async () => {
@@ -152,4 +168,19 @@ test("only one tab records", async () => {
   await vi.advanceTimersByTimeAsync(0);
   expect(b.watching()).toBe(true);
   second.close();
+});
+
+test("a recorder takes back a recording that was taken for over (the app opened before it knew the walk)", async () => {
+  const geo = fakeGeo();
+  const up = fakeUpload();
+  up.failing = 99;
+  const first = createRecorder({ walkKey: "w", geo, upload: up.send, locks: null });
+  await walkFor(geo, 0, 10);
+  first.close();
+  await sendLeftovers(up.send, null); // no walk known yet, and no reception: kept as over
+  up.failing = 0;
+  const again = createRecorder({ walkKey: "w", geo, upload: up.send, locks: null });
+  await walkFor(geo, 10, 40); // a batch goes out on the way; the recording must not be forgotten after it
+  await again.stop();
+  expect(up.batches.flatMap((b) => b.points)).toHaveLength(10);
 });
