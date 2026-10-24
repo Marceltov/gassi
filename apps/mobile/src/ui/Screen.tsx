@@ -3,13 +3,15 @@
 // corners, a notch in landscape). The bottom keeps clear of the home indicator, except on a tab (every screen of the
 // signed-in app): the tab bar below does that. With `fill` the top doesn't scroll but takes the height that is there,
 // for a screen that scales to it (Gewicht). In the scrolling top a part with `flex: 1` takes the height that is left
-// (Woche's map), and the top scrolls once it is at its least.
+// (Woche's map), and the top scrolls once it is at its least. Above everything the sync error, when there is one
+// (SyncBanner).
 import { BottomTabBarHeightContext } from "expo-router/tabs";
 import { type ReactNode, useContext } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { space, useTheme } from "../theme";
 import { useEdges } from "./edges";
+import { SyncBanner } from "./SyncBanner";
 
 /** `topMin`: how much of the top stays readable when a tall bottom has to give way (the clock, a summary line). */
 /** `low`: the top's content sits at its bottom, right above the controls, while it is shorter than the space (rows
@@ -22,6 +24,7 @@ export function Screen({ head, top, bottom, topMin, fill, low }: { head?: ReactN
   const sides = { paddingLeft: edges.left(space.gutter), paddingRight: edges.right(space.gutter) };
   return (
     <View style={[styles.screen, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+      <SyncBanner style={sides} />
       {head ? (
         <View testID="screen-head" style={[styles.head, sides]}>
           {head}

@@ -38,6 +38,11 @@ describe("createClient", () => {
     const r = recorder({ body: { person: "nobody" } });
     await expect(createClient({ baseUrl: "https://gassi.example", token: "t", fetch: r.fetch }).me()).rejects.toBeInstanceOf(ApiError);
   });
+
+  test("an answer that doesn't fit says where (the error banner shows it)", async () => {
+    const r = recorder({ body: { ...ME, person: { id: 7, name: "Hirsch" } } });
+    await expect(createClient({ baseUrl: "https://gassi.example", token: "t", fetch: r.fetch }).me()).rejects.toThrow(/passt nicht zu dieser App-Version \(person\.id: /);
+  });
 });
 
 describe("paths", () => {
