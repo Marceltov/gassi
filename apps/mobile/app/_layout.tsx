@@ -1,3 +1,4 @@
+import "@/src/polyfill";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { useColorScheme } from "react-native";
 import { GassiProvider, useGassi } from "@/src/data/GassiProvider";

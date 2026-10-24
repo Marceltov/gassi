@@ -25,6 +25,9 @@ the same app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay
 - The app in dev: `npm run web -w @gassi/mobile` (port 8081) against that server, with `CORS_ORIGIN=http://localhost:8081`
   in the server's `.env.local` and `EXPO_PUBLIC_API_URL=http://localhost:3000` in `apps/mobile/.env.local` (see
   `apps/mobile/.env.example`). Development needs no export.
+- Android: `npx eas-cli build -p android --profile preview` in `apps/mobile` (an APK on EAS, free queue; the account
+  is `marceltov-gassi`). No Android SDK here: `npx expo export --platform android --output-dir <scratch>` checks that
+  native files resolve and bundle; native checks run on Bille's phone, one at a time.
 - `scripts/quiet.sh <command>` prints only failures and the summary of a long run
 - Installs run without scripts (`.npmrc`): better-sqlite3 loads its prebuilt binary.
 
@@ -39,13 +42,15 @@ the same app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay
   `backend/index.ts`. `backend/http/router.ts` serves the contract from one catch-all route (`app/api/[...path]`);
   `backend/http/api.ts` maps each endpoint to a use case (`diary.ts`, `sessions.ts`, `tracks.ts`, `catalog.ts`,
   `dogs.ts`, `auth/*`). Devices sign in with Bearer tokens from one-time links (ADR 0004).
-- `apps/mobile` (`@gassi/mobile`): the Expo Router app for the web now and Android in step 3 (ADR 0006). Screens in
+- `apps/mobile` (`@gassi/mobile`): the Expo Router app for the web and Android (ADR 0006). Screens in
   `app/` stay thin and render from `src/` (start, walk, food, training, history, week, more). `src/data` holds the
-  device, the command queue and the household snapshot behind modules with a `.web.ts` file (localStorage); other
-  platform parts the same way (`.web.tsx`: maps, pickers, sheet). `src/track` records the walk's route on the phone
+  device, the command queue and the household snapshot over one `storage` module (`storage.ts` SQLite on Android,
+  `storage.web.ts` localStorage); other platform parts the same way (`.web.tsx`: maps, pickers, sheet). `src/track` records the walk's route on the phone
   that records it (ADR 0014): positions (`geo.web.ts`), batches kept and sent (`recorder.ts`), the wake lock. No domain rules here; writes other than taps need the
   server and say `OFFLINE`. `public/` holds the web page template, manifest and service worker. Its e2e tests run
-  against the server's build in `apps/server/e2e` (`app-*.spec.ts`).
+  against the server's build in `apps/server/e2e` (`app-*.spec.ts`). During development a sync error shows as a
+  banner on every screen (`ui/SyncBanner.tsx`), and sync errors and crashes go to the server's log
+  (`data/reports.ts`, `POST /api/client-errors`; read them with `docker compose logs gassi | grep client-error`).
 - Tests sit next to the code. Outside calls are injected (`fetch`, `now`, the database), not mocked:
   `backend/db/testing.ts` is a fresh database per test (seeded with Toffee, Hirsch, Herzii unless `{ empty: true }`),
   `backend/http/testing.ts` calls the API with device tokens, `backend/oidc/testing.ts` is a stub issuer.

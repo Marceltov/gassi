@@ -1,10 +1,12 @@
-// Where a link's "Hier im Browser anmelden" and the OIDC sign-in end: /join?token=… signs this browser in with the
-// link, /join?error=signin says the sign-in didn't work.
+// Where a link's "Hier im Browser anmelden" / "In App öffnen" and the OIDC sign-in end: /join?token=… (in the app
+// gassi://join?server=…&token=…) signs this device in with the link, ?error=signin says the sign-in didn't work.
 import { useLocalSearchParams } from "expo-router";
+import { linkedServer } from "@/src/data/thisDevice";
 import { SignIn, SignInFailed } from "@/src/signin/SignIn";
 
 export default function JoinScreen() {
-  const { token, error } = useLocalSearchParams<{ token?: string; error?: string }>();
-  if (error || !token) return <SignInFailed message={error ? "Anmeldung hat nicht geklappt." : "Dieser Link ist unvollständig."} />;
-  return <SignIn token={token} />;
+  const { token, server, error } = useLocalSearchParams<{ token?: string; server?: string; error?: string }>();
+  const target = linkedServer(server);
+  if (error || !token || target === null) return <SignInFailed message={error ? "Anmeldung hat nicht geklappt." : "Dieser Link ist unvollständig."} />;
+  return <SignIn token={token} server={target} />;
 }

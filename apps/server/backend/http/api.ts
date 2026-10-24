@@ -8,6 +8,7 @@ import type { Issues } from "../issues";
 import { Catalog } from "../catalog";
 import { Diary } from "../diary";
 import { DogRepository } from "../dogs";
+import { logger } from "../log";
 import { PeopleRepository } from "../people";
 import { Sessions } from "../sessions";
 import { Tracks } from "../tracks";
@@ -138,6 +139,12 @@ const implementations: Implementations<ApiDeps> = {
     return { removed: true as const };
   },
   issues: async ({ deps }) => ({ issues: await issues(deps).list(deps.now().getTime()) }),
+  reportErrors: async ({ input, auth }) => {
+    const log = logger("client-error");
+    const who = { person: auth.person.name, device: auth.device.name, kind: auth.device.kind, version: input.version };
+    for (const e of input.errors) log.warn({ ...who, ...e }, "client error");
+    return { received: input.errors.length };
+  },
   reportIssue: async ({ input, auth, deps }) => {
     const filed = issues(deps);
     const now = deps.now().getTime();

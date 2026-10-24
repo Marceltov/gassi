@@ -7,9 +7,8 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Pressable, StyleSheet } from "react-native";
 import { useTheme } from "../theme";
-import { Icon } from "../ui/Icon";
+import { Corner } from "./Corner";
 
 export type TrackMapProps = { routes: [number, number][][]; height: number | { min: number }; still?: boolean };
 
@@ -72,17 +71,3 @@ function MapBox({ routes, still }: { routes: [number, number][][]; still: boolea
   }, [routes, still, theme.walk]);
   return <div ref={box} data-testid="track-map" style={{ position: "absolute", inset: 0, borderRadius: 12, overflow: "hidden", background: theme.surface }} />;
 }
-
-function Corner({ icon, label, onPress }: { icon: "expand" | "shrink"; label: string; onPress: () => void }) {
-  const theme = useTheme();
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.corner, { backgroundColor: theme.surface, opacity: pressed ? 0.7 : 1 }]}>
-      <Icon name={icon} size={20} />
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  // above Leaflet's own controls (z-index 1000), in the corner they leave free
-  corner: { position: "absolute", top: 8, right: 8, zIndex: 1001, width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-});

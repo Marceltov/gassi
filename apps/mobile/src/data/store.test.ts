@@ -158,3 +158,44 @@ test("knows its device, and a walk it starts shows it as recording the route (#1
   await settle();
   expect(offline.get().view.walk?.recorder).toEqual({ deviceId: 1, name: "iPhone (Web)" });
 });
+
+test("an answer that doesn't fit shows as the sync error, until one fits", async () => {
+  const server = household();
+  const fits = server.handlers["GET /api/sessions"]!;
+  server.handlers["GET /api/sessions"] = () => ({ walk: "kaputt", training: null });
+  const store = createGassiStore({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: server.fetch });
+  await store.refresh();
+  expect(store.get().syncError).toMatch(/^Runde und Training: Die Antwort des Servers passt nicht/);
+  server.handlers["GET /api/sessions"] = fits;
+  await store.refresh();
+  expect(store.get().syncError).toBeNull();
+});
+
+test("taps the server can't take show as the sync error", async () => {
+  const server = household();
+  server.handlers["POST /api/commands"] = () => status(500, { error: "Da ging etwas schief." });
+  const store = createGassiStore({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: server.fetch });
+  store.send(start("s1"));
+  await settle();
+  expect(store.get()).toMatchObject({ unsent: 1, syncError: "Senden: Da ging etwas schief." });
+});
+
+test("no reception is no sync error", async () => {
+  const server = household();
+  server.reachable = false;
+  const store = createGassiStore({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: server.fetch });
+  store.send(start("s1"));
+  await store.refresh();
+  expect(store.get()).toMatchObject({ online: false, syncError: null });
+});
+
+test("a sync error goes to the server's log too", async () => {
+  const server = household();
+  server.handlers["GET /api/sessions"] = () => ({ walk: "kaputt", training: null });
+  server.handlers["POST /api/client-errors"] = (body) => ({ received: (body as { errors: unknown[] }).errors.length });
+  const store = createGassiStore({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: server.fetch, version: "0.3.0" });
+  await store.refresh();
+  await settle();
+  const sent = server.calls.filter((c) => c.route === "POST /api/client-errors");
+  expect(sent).toEqual([expect.objectContaining({ body: { version: "0.3.0", errors: [expect.objectContaining({ part: "Runde und Training", message: expect.stringMatching(/^Die Antwort des Servers passt nicht/) })] } })]);
+});

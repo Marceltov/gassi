@@ -62,6 +62,11 @@ here in the same PR that follows it.
 - **Text fields are at least 16 px**: an iPhone zooms into a smaller one when it gets the focus. `e2e/fit.ts` checks it
   on every page it opens.
 
+## Formatting
+
+- No formatter: the code is wrapped by hand, in long lines, matching the file around it. Never run Prettier (its
+  defaults rewrap whole files); `.prettierignore` makes an accidental run a no-op. ESLint (`npm run lint`) is the check.
+
 ## Tests
 
 - Tests sit next to the code. Outside calls (`fetch`, `now`, the database) are injected, not mocked.

@@ -1,11 +1,14 @@
-// Copying text for the user (an invite's link or code). On Android this comes with expo-clipboard in step 3; until
-// then there is nothing to copy with and the buttons stay away. copy.web.ts is the web's.
+// Copying text for the user (an invite's link or code), on Android with expo-clipboard. copy.web.ts is the web's.
+import { setStringAsync } from "expo-clipboard";
 
 /** Whether this platform can copy. */
-export const canCopy = (): boolean => false;
+export const canCopy = (): boolean => true;
 
 /** Copies `text`; false when it didn't work. */
 export async function copyText(text: string): Promise<boolean> {
-  void text;
-  return false;
+  try {
+    return await setStringAsync(text);
+  } catch {
+    return false;
+  }
 }

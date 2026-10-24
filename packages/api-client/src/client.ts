@@ -36,7 +36,12 @@ export function createClient({ baseUrl, token, fetch: fetchFn = (...a) => fetch(
     const body: unknown = await res.json().catch(() => null);
     if (!res.ok) throw new ApiError(res.status, (body as { error?: string } | null)?.error ?? `HTTP ${res.status}`);
     const parsed = e.output.safeParse(body);
-    if (!parsed.success) throw new ApiError(502, "Die Antwort des Servers passt nicht zu dieser App-Version.");
+    if (!parsed.success) {
+      // where it doesn't fit, for the error banner (the app's GassiState.syncError)
+      const first = parsed.error.issues[0];
+      const where = first ? ` (${first.path.join(".") || "Antwort"}: ${first.message})` : "";
+      throw new ApiError(502, `Die Antwort des Servers passt nicht zu dieser App-Version${where}.`);
+    }
     return parsed.data;
   };
   return Object.fromEntries(Object.keys(contract).map((name) => [name, (input?: unknown) => call(name as EndpointName, input)])) as Client;

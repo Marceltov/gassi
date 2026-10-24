@@ -1,8 +1,10 @@
-// Signing this browser in with a link's token or its code: ask what the link is for (a setup or person link needs a
-// name, setup also the first dog), then redeem it as a "web" device and keep the device token.
+// Signing this device in with a link's token or its code: ask what the link is for (a setup or person link needs a
+// name, setup also the first dog), then redeem it as this device (thisDevice.ts) and keep the device token with the
+// server it came from.
 import type { linkKinds } from "@gassi/api-client";
-import { API_URL, publicApi } from "./api";
+import { publicApi } from "./api";
 import { saveDevice } from "./device";
+import { DEVICE_KIND, thisDeviceName } from "./thisDevice";
 
 export type LinkKey = { code: string } | { token: string };
 export type LinkKind = (typeof linkKinds)[number];
@@ -10,38 +12,28 @@ export type LinkKind = (typeof linkKinds)[number];
 /** Setup and person links make a new person: they ask for a name (setup also for the first dog). */
 export const needsName = (kind: LinkKind): boolean => kind === "setup" || kind === "person";
 
-export async function linkKind(key: LinkKey, fetchFn?: typeof fetch): Promise<LinkKind> {
-  return (await publicApi(fetchFn).linkInfo(key)).kind;
+/** A typed server address as an origin: no spaces or trailing slashes, https:// unless it says http(s). */
+export function normalizeServer(typed: string): string {
+  const s = typed.trim().replace(/\/+$/, "");
+  return /^https?:\/\//i.test(s) ? s : `https://${s}`;
 }
 
-/** Redeems the link and signs this browser in; throws ApiError with the server's German message. */
-export async function signIn(key: LinkKey, names: { personName?: string; dogName?: string }, userAgent: string, fetchFn?: typeof fetch): Promise<void> {
+export async function linkKind(server: string, key: LinkKey, fetchFn?: typeof fetch): Promise<LinkKind> {
+  return (await publicApi(server, fetchFn).linkInfo(key)).kind;
+}
+
+/** Redeems the link and signs this device in; throws ApiError with the server's German message. */
+export async function signIn(server: string, key: LinkKey, names: { personName?: string; dogName?: string }, fetchFn?: typeof fetch): Promise<void> {
   const blank = (s?: string) => (s?.trim() ? s.trim() : undefined);
-  const { deviceToken, person } = await publicApi(fetchFn).redeem({ ...key, deviceKind: "web", deviceName: deviceName(userAgent), personName: blank(names.personName), dogName: blank(names.dogName) });
-  saveDevice({ token: deviceToken, serverUrl: API_URL, person });
-}
-
-/** "iPhone (Web)" and the like, for the household's list of devices. */
-export function deviceName(userAgent: string): string {
-  const kinds: [RegExp, string][] = [
-    [/iPhone/, "iPhone"],
-    [/iPad/, "iPad"],
-    [/Android/, "Android"],
-    [/Macintosh|Mac OS X/, "Mac"],
-    [/Windows/, "Windows"],
-    [/Linux|X11/, "Linux"],
-  ];
-  return `${kinds.find(([re]) => re.test(userAgent))?.[1] ?? "Browser"} (Web)`;
+  const { deviceToken, person } = await publicApi(server, fetchFn).redeem({ ...key, deviceKind: DEVICE_KIND, deviceName: thisDeviceName(), personName: blank(names.personName), dogName: blank(names.dogName) });
+  saveDevice({ token: deviceToken, serverUrl: server, person });
 }
 
 /** What else the sign-in can offer (OIDC, mail); nothing when the server isn't reachable. */
-export async function signInOptions(fetchFn?: typeof fetch): Promise<{ oidc: boolean; mail: boolean }> {
+export async function signInOptions(server: string, fetchFn?: typeof fetch): Promise<{ oidc: boolean; mail: boolean }> {
   try {
-    return await publicApi(fetchFn).options();
+    return await publicApi(server, fetchFn).options();
   } catch {
     return { oidc: false, mail: false };
   }
 }
-
-/** Where "Mit authentik anmelden" goes; the sign-in ends at /join?token=… (or /join?error=signin). */
-export const OIDC_START = `${API_URL}/api/oidc/start?web=1`;

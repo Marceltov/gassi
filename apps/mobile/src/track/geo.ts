@@ -1,5 +1,5 @@
 // The phone's position as it changes, for recording a walk's route (recorder.ts). The web asks the browser
-// (geo.web.ts); the Android app (step 3) brings background recording next to this file. Until then a native build
+// (geo.web.ts); the Android app brings background recording (#108) next to this file. Until then a native build
 // gets no positions, and the walk says "kein GPS-Signal".
 import type { TrackPoint } from "@gassi/domain";
 

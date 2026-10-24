@@ -6,20 +6,22 @@ import type { Client } from "@gassi/api-client";
 import type { Command } from "@gassi/domain";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import { AppState } from "react-native";
+import { APP_VERSION } from "../version";
+import { onCrash } from "./crashes";
 import { loadDevice, subscribeDevice } from "./device";
 import { createGassiStore, type GassiState, type GassiStore } from "./store";
 
 export type Gassi = GassiState & { signedIn: boolean; api: Client | null; writeApi: Client | null; send(cmd: Command): void; refresh(): Promise<void> };
 
 const REFRESH_MS = 30_000;
-const signedOut: GassiState = { me: null, device: null, household: null, people: [], dogs: [], exercises: [], treatKinds: [], view: { walk: null, training: null }, pending: [], unsent: 0, online: true };
+const signedOut: GassiState = { me: null, device: null, household: null, people: [], dogs: [], exercises: [], treatKinds: [], view: { walk: null, training: null }, pending: [], unsent: 0, online: true, syncError: null };
 const noStore = { subscribe: () => () => {}, get: () => signedOut };
 
 const GassiContext = createContext<Gassi | null>(null);
 
 export function GassiProvider({ children }: { children: ReactNode }) {
   const device = useSyncExternalStore(subscribeDevice, loadDevice, loadDevice);
-  const store: GassiStore | null = useMemo(() => (device ? createGassiStore(device) : null), [device]);
+  const store: GassiStore | null = useMemo(() => (device ? createGassiStore(device, { version: APP_VERSION }) : null), [device]);
   const source = store ?? noStore;
   const state = useSyncExternalStore(source.subscribe, source.get, source.get);
 
@@ -28,8 +30,10 @@ export function GassiProvider({ children }: { children: ReactNode }) {
     const stop = store.start();
     void store.refresh();
     const onFront = AppState.addEventListener("change", (s) => s === "active" && void store.refresh());
+    const stopCrashes = onCrash((message) => store.reportError("Absturz", message));
     return () => {
       stop();
+      stopCrashes();
       onFront.remove();
     };
   }, [store]);
