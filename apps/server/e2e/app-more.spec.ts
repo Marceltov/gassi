@@ -516,7 +516,7 @@ test("Mehr and its screens fit a small and a big phone: the title and the button
   await signIn(page);
   await expectFits(page, "/mehr", "Abmelden");
   await expectFits(page, "/mehr/gewicht", "Gewicht heute in kg");
-  for (const [path, title] of [["hunde", "Hunde"], ["uebungen", "Übungen"], ["leckerli", "Leckerli"], ["haushalt", "Haushalt"], ["geraete", "Meine Geräte"]]) {
+  for (const [path, title] of [["hunde", "Hunde"], ["uebungen", "Übungen"], ["leckerli", "Leckerli"], ["haushalt", "Haushalt"], ["geraete", "Meine Geräte"], ["akku", "Akku"], ["standort", "Standort im Hintergrund"]]) {
     await expectFits(page, `/mehr/${path}`, title);
   }
 });
