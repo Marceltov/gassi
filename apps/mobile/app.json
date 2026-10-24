@@ -11,6 +11,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "io.github.marceltov.gassi",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#2f6b45",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -45,6 +47,12 @@
     "experiments": {
       "typedRoutes": true
     },
-    "backgroundColor": "#111418"
+    "backgroundColor": "#111418",
+    "owner": "marceltov-gassi",
+    "extra": {
+      "eas": {
+        "projectId": "64643fb1-a3e3-408f-9b6a-d3eba04ebfac"
+      }
+    }
   }
 }
