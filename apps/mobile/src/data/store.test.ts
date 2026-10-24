@@ -31,7 +31,7 @@ test("a tap without reception stays queued, shows at once, and goes out once the
   expect(JSON.parse(localStorage.getItem("gassi.commands.p-hirsch")!)).toMatchObject([{ id: "s1" }]);
 
   server.reachable = true;
-  server.handlers["POST /api/commands"] = () => ({ applied: ["s1"], dropped: [], view: { walk: { key: "w1", startedAt: "2026-10-21T10:00:00.000Z", dogIds: [1], walkers: [{ id: "p-hirsch", name: "Hirsch" }], pauses: [], paused: false }, training: null } });
+  server.handlers["POST /api/commands"] = () => ({ applied: ["s1"], dropped: [], view: { walk: { key: "w1", startedAt: "2026-10-21T10:00:00.000Z", dogIds: [1], walkers: [{ id: "p-hirsch", name: "Hirsch" }], pauses: [], paused: false, recorder: null }, training: null } });
   server.handlers["GET /api/sessions"] = server.handlers["POST /api/commands"] as never;
   await store.refresh();
   expect(store.get()).toMatchObject({ online: true, unsent: 0, view: { walk: { key: "w1", startedAt: "2026-10-21T10:00:00.000Z" } } });
@@ -80,7 +80,7 @@ test("a refresh that goes wrong in an unexpected way keeps the state and rejects
 
 test("a sessions answer asked for before a tap's answer came back does not undo the tap", async () => {
   const server = household();
-  const walk = { key: "w1", startedAt: "2026-10-21T10:00:00.000Z", dogIds: [1], walkers: [HIRSCH], pauses: [], paused: false };
+  const walk = { key: "w1", startedAt: "2026-10-21T10:00:00.000Z", dogIds: [1], walkers: [HIRSCH], pauses: [], paused: false, recorder: null };
   server.handlers["POST /api/commands"] = () => ({ applied: ["s1"], dropped: [], view: { walk, training: null } });
   // the sessions answer is held back until the tap's answer is in: it shows the server before the tap
   let release = () => {};
@@ -144,4 +144,17 @@ test("an answer that comes after this device was signed out keeps nothing", asyn
   release();
   await refreshing;
   expect(loadKept("snapshot")).toBeNull();
+});
+
+test("knows its device, and a walk it starts shows it as recording the route (#104)", async () => {
+  const device = { token: "t", serverUrl: "", person: HIRSCH };
+  saveDevice(device);
+  const store = createGassiStore(device, { fetch: household().fetch });
+  await store.refresh();
+  expect(store.get().device).toEqual({ id: 1, name: "iPhone (Web)" });
+  const offline = createGassiStore(device, { fetch: (() => Promise.reject(new TypeError("offline"))) as typeof fetch });
+  expect(offline.get().device).toEqual({ id: 1, name: "iPhone (Web)" }); // kept from the last answer
+  offline.send(start("s1"));
+  await settle();
+  expect(offline.get().view.walk?.recorder).toEqual({ deviceId: 1, name: "iPhone (Web)" });
 });

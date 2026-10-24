@@ -4,7 +4,7 @@ import type { SessionsView } from "@gassi/domain";
 import { dropKept, loadKept, saveKept } from "./kept";
 import type { GassiState } from "./store";
 
-export type Snapshot = Pick<GassiState, "household" | "people" | "dogs" | "exercises" | "treatKinds"> & { me: NonNullable<GassiState["me"]>; view: SessionsView };
+export type Snapshot = Pick<GassiState, "household" | "device" | "people" | "dogs" | "exercises" | "treatKinds"> & { me: NonNullable<GassiState["me"]>; view: SessionsView };
 
 const KEY = "snapshot";
 
