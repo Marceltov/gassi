@@ -46,6 +46,12 @@ export function keepPoint(walkKey: string, p: TrackPoint): boolean {
   return true;
 }
 
+/** Whether a recording of `walkKey` is kept and not over. */
+export const hasRecording = (walkKey: string): boolean => all()[walkKey]?.ended === false;
+
+/** The kept points of `walkKey`'s recording. */
+export const keptPoints = (walkKey: string): TrackPoint[] => all()[walkKey]?.points ?? [];
+
 /** Marks `walkKey`'s recording as over: once the rest is sent, it is forgotten. */
 export function endRecording(walkKey: string): void {
   const r = all()[walkKey];
