@@ -177,7 +177,7 @@ function LogForm({ kind, dogId, place, onClose }: { kind: Exclude<LogKind, "comm
   return (
     <View testID="log-sheet" style={styles.form}>
       <Text style={[styles.title, { color: theme.ink }]}>{TYPE_LABEL[kind]}</Text>
-      <ScrollView style={{ maxHeight: height * 0.62 }} contentContainerStyle={styles.fields} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ maxHeight: height * 0.62, flexShrink: 1 }} contentContainerStyle={styles.fields} keyboardShouldPersistTaps="handled">
         <DetailFields type={kind} details={details} change={setDetails} suggestions={{ who: names }} />
         <TextInput
           accessibilityLabel={kind === "note" ? "Notiz" : "Notiz zur Begegnung"}
@@ -199,7 +199,7 @@ function LogForm({ kind, dogId, place, onClose }: { kind: Exclude<LogKind, "comm
 }
 
 const styles = StyleSheet.create({
-  form: { gap: 10 },
+  form: { gap: 10, flexShrink: 1 },
   fields: { gap: 10 },
   title: { fontSize: 17, fontWeight: "700" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
