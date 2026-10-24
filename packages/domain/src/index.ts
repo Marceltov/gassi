@@ -19,5 +19,6 @@ export * from "./stock";
 export * from "./todayProjection";
 export * from "./time";
 export * from "./track";
+export * from "./trackFilter";
 export * from "./week";
 export * from "./weight";
