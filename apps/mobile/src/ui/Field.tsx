@@ -1,5 +1,6 @@
 // A labelled text field: the label above, the input in a surface box, FIELD_HEIGHT tall (a small button fits beside it);
-// `multiline` for a longer text, a few lines tall.
+// `multiline` for a longer text, a few lines tall. It takes the width left in a row and its own height in a column
+// (not `flex: 1`: Android lays that out zero tall in a sheet's column, and the box overlaps what follows).
 import { StyleSheet, Text, TextInput, type TextInputProps, View } from "react-native";
 import { FIELD_HEIGHT, radius, useTheme } from "../theme";
 
@@ -16,7 +17,7 @@ export function Field({ label, ...input }: Props) {
 }
 
 const styles = StyleSheet.create({
-  field: { flex: 1, gap: 4, minWidth: 0 },
+  field: { flexGrow: 1, flexShrink: 1, gap: 4, minWidth: 0 },
   label: { fontSize: 13 },
   input: { height: FIELD_HEIGHT, borderRadius: radius.tile, borderWidth: 1, paddingHorizontal: 12, fontSize: 16, minWidth: 0 },
   lines: { height: FIELD_HEIGHT * 2.5, paddingVertical: 10, textAlignVertical: "top" },
