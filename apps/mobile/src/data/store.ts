@@ -8,7 +8,7 @@ import { type Command, createCommandQueue, type Person, project, RejectedCommand
 import { apiFor, WRITE_TIMEOUT_MS } from "./api";
 import { type Device, loadDevice } from "./device";
 import { onReconnect } from "./network";
-import { onQueueChanged, queueStorage } from "./queue";
+import { onStoredElsewhere, storage } from "./storage";
 import { loadSnapshot, saveSnapshot } from "./snapshot";
 
 export type Household = Output<"me">["household"];
@@ -98,7 +98,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
 
   // the queue of the person signed in, there from the start: taps without reception are kept from the first one
   const queueKey = `gassi.commands.${device.person.id}`;
-  const queue = createCommandQueue({ storage: queueStorage(), send: sendCommands, key: queueKey });
+  const queue = createCommandQueue({ storage, send: sendCommands, key: queueKey });
   queue.subscribe((_, view) => {
     if (view) {
       answers++;
@@ -153,7 +153,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn }: { fetch?: t
     refresh,
     start() {
       // another tab's taps (the queue re-reads storage) show here too; reception back sends the queued ones at once
-      const stopWatching = onQueueChanged(queueKey, () => queue.refresh());
+      const stopWatching = onStoredElsewhere(queueKey, () => queue.refresh());
       const stopReconnect = onReconnect(() => void refresh());
       return () => {
         stopWatching();

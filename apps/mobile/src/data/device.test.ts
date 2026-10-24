@@ -32,3 +32,9 @@ test("subscribers hear about sign-in and sign-out", () => {
   saveDevice({ token: "t2", serverUrl: "", person: HIRSCH });
   expect(seen).toEqual(["t1", null]);
 });
+
+test("a device saved under gassi.device before the fold still loads", () => {
+  const device = { token: "t", serverUrl: "", person: { id: "p", name: "Herzii" } };
+  localStorage.setItem("gassi.device", JSON.stringify(device));
+  expect(loadDevice()).toEqual(device);
+});
