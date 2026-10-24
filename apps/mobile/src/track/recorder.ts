@@ -2,7 +2,8 @@
 // (kept.ts, so a reload, a closed app or no reception loses nothing) and sent in batches with a sequence number. A
 // batch, once made, is sent again as it is until the server has it: the server stores each (track, seq) once, so a
 // batch that grew between tries would lose its new points. One track id per phone and walk; a reload goes on with it.
-// Only one tab records (a Web Lock where the browser has one); the others wait for it to let go. A batch the server
+// Only one tab records (a Web Lock where the browser has one); the others wait for it to let go, and meanwhile show its
+// route from what it keeps. A batch the server
 // refuses for good (its walk's start never reached it) is tried again while the walk runs, and given up once it is over.
 import { trackPointSchema } from "@gassi/api-client";
 import { createLiveFilter, newId, type TrackPoint } from "@gassi/domain";
@@ -86,8 +87,16 @@ export function createRecorder({ walkKey, upload, geo = { watch: watchPosition }
   // a recording taken for over while this walk wasn't known yet (sendLeftovers) goes on
   save(walkKey, kept ? { ...kept, ended: false } : { trackId: newId(), points: [], sent: 0, nextSeq: 0, inflight: null, ended: false });
   const live = createLiveFilter();
-  for (const p of kept?.points ?? []) live.add(p);
+  let fed = 0; // how many of the kept points the live filter has had
   let lastFix = Date.now();
+  // the kept points the live filter hasn't had yet: on start, and while another tab records
+  const catchUp = () => {
+    const points = all()[walkKey]?.points ?? [];
+    for (const p of points.slice(fed)) live.add(p);
+    if (points.length > fed) lastFix = Math.max(lastFix, Date.parse(points.at(-1)!.t));
+    fed = points.length;
+  };
+  catchUp();
   let denied = false;
   const listeners = new Set<() => void>();
   const changed = () => listeners.forEach((fn) => fn());
@@ -103,6 +112,7 @@ export function createRecorder({ walkKey, upload, geo = { watch: watchPosition }
         if (!r || r.points.at(-1)?.t === p.t || !trackPointSchema.safeParse(p).success) return;
         save(walkKey, { ...r, points: [...r.points, p] });
         live.add(p);
+        fed++;
         [lastFix, denied] = [Date.now(), false];
         changed();
       },
@@ -121,7 +131,10 @@ export function createRecorder({ walkKey, upload, geo = { watch: watchPosition }
   else begin();
 
   const batches = setInterval(() => void flush(walkKey, upload), BATCH_MS);
-  const ticks = setInterval(changed, TICK_MS);
+  const ticks = setInterval(() => {
+    if (!unwatch) catchUp(); // another tab records
+    changed();
+  }, TICK_MS);
   const close = () => {
     closed = true;
     clearInterval(batches);

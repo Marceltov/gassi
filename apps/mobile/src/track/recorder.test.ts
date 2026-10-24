@@ -215,3 +215,25 @@ test("a batch the server refuses for good is tried again while its walk runs, an
   await sendLeftovers(refuse, null);
   expect(tries.length).toBe(before);
 });
+
+test("a tab waiting for the lock shows the recording tab's distance", async () => {
+  let held = false;
+  const locks: Locks = {
+    request: async (_name, fn) => {
+      if (held) return new Promise<void>(() => {}); // waits for good in this test
+      held = true;
+      await fn();
+    },
+  };
+  const [a, b] = [fakeGeo(), fakeGeo()];
+  const recording = createRecorder({ walkKey: "w", geo: a, upload: fakeUpload().send, locks });
+  const waiting = createRecorder({ walkKey: "w", geo: b, upload: fakeUpload().send, locks });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(b.watching()).toBe(false);
+  await walkFor(a, 0, 300);
+  expect(recording.distanceM()).toBeGreaterThan(350);
+  expect(waiting.distanceM()).toBe(recording.distanceM());
+  expect(waiting.status()).toBe("on");
+  recording.close();
+  waiting.close();
+});
