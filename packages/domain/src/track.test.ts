@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { chooseTrack, simplify, trimTrack, type TrackPoint, trackMetrics } from "./track";
+import { joinTracks, simplify, trimTrack, type TrackPoint, trackMetrics } from "./track";
 
 const T0 = Date.parse("2026-10-20T09:00:00Z");
 // a point `north` metres north and `east` metres east of Munich's Marienplatz, `s` seconds after T0
@@ -55,11 +55,50 @@ describe("trimTrack", () => {
   });
 });
 
-describe("chooseTrack", () => {
-  test("the watch track is chosen over a longer phone track; else the longest", () => {
-    expect(chooseTrack([{ source: "phone", distanceM: 3000 }, { source: "watch", distanceM: 2500 }])).toBe(1);
-    expect(chooseTrack([{ source: "phone", distanceM: 1000 }, { source: "phone", distanceM: 3000 }])).toBe(1);
-    expect(chooseTrack([])).toBeNull();
+describe("joinTracks", () => {
+  const min = (m: number) => new Date(T0 + m * 60_000).toISOString();
+  // a point every minute from `from` to `to` (minutes after T0), `east` metres east to tell the devices apart
+  const run = (from: number, to: number, east: number) => Array.from({ length: to - from + 1 }, (_, i) => p((from + i) * 60, (from + i) * 80, east));
+  const walk = { at: min(0), endedAt: min(40) };
+
+  test("takes each recorder's points for its own time", () => {
+    const out = joinTracks(
+      [
+        { deviceId: 1, source: "phone", points: run(0, 40, 0) },
+        { deviceId: 2, source: "phone", points: run(0, 40, 50) },
+      ],
+      [{ deviceId: 1, from: min(0) }, { deviceId: 2, from: min(20) }],
+      walk,
+    );
+    const east = (q: TrackPoint) => Math.round((q.lon - 11.575) * 111_195 * Math.cos((48.137 * Math.PI) / 180));
+    expect(out.filter((q) => q.t < min(20)).every((q) => east(q) === 0)).toBe(true);
+    expect(out.filter((q) => q.t >= min(20)).every((q) => east(q) === 50)).toBe(true);
+    expect(out).toHaveLength(41);
+  });
+
+  test("cuts points outside the walk", () => {
+    const out = joinTracks([{ deviceId: 1, source: "phone", points: run(-5, 45, 0) }], [{ deviceId: 1, from: min(0) }], walk);
+    expect(out[0].t).toBe(min(0));
+    expect(out.at(-1)!.t).toBe(min(40));
+  });
+
+  test("a running walk keeps its newest points", () => {
+    expect(joinTracks([{ deviceId: 1, source: "phone", points: run(0, 45, 0) }], [{ deviceId: 1, from: min(0) }], { at: min(0), endedAt: null })).toHaveLength(46);
+  });
+
+  test("a watch track wins", () => {
+    const watch = run(0, 40, 50);
+    expect(joinTracks([{ deviceId: 1, source: "phone", points: run(0, 40, 0) }, { deviceId: null, source: "watch", points: watch }], [{ deviceId: 1, from: min(0) }], walk)).toEqual(watch);
+  });
+
+  test("drops duplicate times", () => {
+    const pts = run(0, 3, 0);
+    expect(joinTracks([{ deviceId: 1, source: "phone", points: [...pts, ...pts] }], [{ deviceId: 1, from: min(0) }], walk)).toHaveLength(4);
+  });
+
+  test("no recorders: the track with the most points", () => {
+    expect(joinTracks([{ deviceId: 1, source: "phone", points: run(0, 3, 0) }, { deviceId: 2, source: "phone", points: run(0, 10, 50) }], [], walk)).toHaveLength(11);
+    expect(joinTracks([], [], walk)).toEqual([]);
   });
 });
 
