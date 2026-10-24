@@ -16,8 +16,10 @@ export class Tracks {
     private readonly now: () => Date = () => new Date(),
   ) {}
 
-  /** Stores a batch from `deviceId`; `stored: false` when that batch (track and seq) is already there. */
-  async addBatch(deviceId: number, b: Batch): Promise<{ stored: boolean }> {
+  /** Stores a batch from `deviceId`; `stored: false` when that batch (track and seq) is already there. `recording`: the
+   * walk still runs and `deviceId` is its recorder (the last to take the route), so a phone recording without a screen
+   * learns when to stop (#108). */
+  async addBatch(deviceId: number, b: Batch): Promise<{ stored: boolean; recording: boolean }> {
     return this.db.transaction().execute(async (tx) => {
       const walk = await findByKey(tx, b.walkKey, "walk");
       if (!walk) throw new InputError("Diese Runde gibt es nicht.");
@@ -30,7 +32,8 @@ export class Tracks {
         .values({ track_id: b.trackId, seq: b.seq, points: JSON.stringify(b.points), received_at: at })
         .onConflict((oc) => oc.columns(["track_id", "seq"]).doNothing())
         .executeTakeFirst();
-      return { stored: Number(r.numInsertedOrUpdatedRows ?? 0n) > 0 };
+      const last = await tx.selectFrom("walk_recorder").select("device_id").where("entry_id", "=", walk.id).orderBy("from_at", "desc").executeTakeFirst();
+      return { stored: Number(r.numInsertedOrUpdatedRows ?? 0n) > 0, recording: !walk.endedAt && last?.device_id === deviceId };
     });
   }
 

@@ -72,8 +72,8 @@ describe("tracks over the API", () => {
     const token = await tokenFor(HIRSCH.id);
     await json("/api/commands", { method: "POST", token, body: { commands: [{ id: "s", at: "2026-10-20T09:00:00.000Z", kind: "walk.start", walkKey: "w" }, { id: "e", at: "2026-10-20T09:10:00.000Z", kind: "walk.stop", walkKey: "w" }] } });
     const batch = { trackId: "t1", walkKey: "w", source: "phone", seq: 0, points: [point(0, 0), point(300, 500), point(600, 1000)] };
-    expect((await json("/api/tracks", { method: "POST", token, body: batch })).body).toEqual({ stored: true });
-    expect((await json("/api/tracks", { method: "POST", token, body: batch })).body).toEqual({ stored: false });
+    expect((await json("/api/tracks", { method: "POST", token, body: batch })).body).toEqual({ stored: true, recording: false }); // the walk is over
+    expect((await json("/api/tracks", { method: "POST", token, body: batch })).body).toEqual({ stored: false, recording: false });
     const { body: entries } = await json("/api/entries?type=walk", { token });
     const { status, body } = await json(`/api/walks/${entries.entries[0].id}`, { token });
     expect(status).toBe(200);

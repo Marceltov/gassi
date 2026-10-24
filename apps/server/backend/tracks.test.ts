@@ -31,9 +31,9 @@ describe("Tracks", () => {
     const entryId = await walk();
     const phone = await device(HIRSCH.id, "phone");
     const t = tracks();
-    expect(await t.addBatch(phone, { trackId: "tr1", walkKey: "w", source: "phone", seq: 2, points: [pt(600, 1000)] })).toEqual({ stored: true });
-    expect(await t.addBatch(phone, { trackId: "tr1", walkKey: "w", source: "phone", seq: 1, points: [pt(0, 0), pt(300, 500)] })).toEqual({ stored: true });
-    expect(await t.addBatch(phone, { trackId: "tr1", walkKey: "w", source: "phone", seq: 1, points: [pt(0, 0), pt(300, 500)] })).toEqual({ stored: false });
+    expect(await t.addBatch(phone, { trackId: "tr1", walkKey: "w", source: "phone", seq: 2, points: [pt(600, 1000)] })).toMatchObject({ stored: true });
+    expect(await t.addBatch(phone, { trackId: "tr1", walkKey: "w", source: "phone", seq: 1, points: [pt(0, 0), pt(300, 500)] })).toMatchObject({ stored: true });
+    expect(await t.addBatch(phone, { trackId: "tr1", walkKey: "w", source: "phone", seq: 1, points: [pt(0, 0), pt(300, 500)] })).toMatchObject({ stored: false });
     const shown = await t.forWalk(entryId);
     expect(shown?.source).toBe("phone");
     expect(Math.round(shown!.metrics.distanceM)).toBe(1000);
@@ -74,7 +74,7 @@ describe("Tracks", () => {
   test("a batch for an ended walk is still stored", async () => {
     const entryId = await walk();
     await sessions().apply(HIRSCH, [{ id: "stop", at: at(1200), kind: "walk.stop", walkKey: "w" }]);
-    expect(await tracks().addBatch(await device(HIRSCH.id, "phone"), { trackId: "late", walkKey: "w", source: "phone", seq: 0, points: line(0, 600, 0) })).toEqual({ stored: true });
+    expect(await tracks().addBatch(await device(HIRSCH.id, "phone"), { trackId: "late", walkKey: "w", source: "phone", seq: 0, points: line(0, 600, 0) })).toMatchObject({ stored: true });
     expect(await tracks().forWalk(entryId)).not.toBeNull();
   });
 
@@ -102,6 +102,30 @@ describe("Tracks", () => {
     await tracks().addBatch(phone, { trackId: "track-1", walkKey: "w1", source: "phone", seq: 0, points: [pt(0, 0)] });
     await sessions().apply(HIRSCH, [{ id: "stop-w1", at: "2026-10-20T09:30:00.000Z", kind: "walk.stop", walkKey: "w1" }, { id: "start-w2", at: "2026-10-20T10:00:00.000Z", kind: "walk.start", walkKey: "w2" }]);
     await expect(tracks().addBatch(phone, { trackId: "track-1", walkKey: "w2", source: "phone", seq: 0, points: [pt(3600, 0)] })).rejects.toThrow(new InputError("Diese Strecke gehört zu einer anderen Runde."));
+  });
+
+  test("answers recording while this device records the running walk", async () => {
+    const entryId = await walk();
+    const phone = await device(HIRSCH.id, "phone");
+    await recorder(entryId, phone, 0);
+    expect(await tracks().addBatch(phone, { trackId: "tr1", walkKey: "w", source: "phone", seq: 0, points: [pt(0, 0)] })).toEqual({ stored: true, recording: true });
+  });
+
+  test("answers not recording once the walk ended", async () => {
+    const entryId = await walk();
+    const phone = await device(HIRSCH.id, "phone");
+    await recorder(entryId, phone, 0);
+    await db().updateTable("entry").set({ ended_at: at(600) }).where("id", "=", entryId).execute();
+    expect(await tracks().addBatch(phone, { trackId: "tr1", walkKey: "w", source: "phone", seq: 0, points: [pt(0, 0)] })).toEqual({ stored: true, recording: false });
+  });
+
+  test("answers not recording once another device took over", async () => {
+    const entryId = await walk();
+    const [mine, hers] = [await device(HIRSCH.id, "phone"), await device(HERZII.id, "phone")];
+    await recorder(entryId, mine, 0);
+    await recorder(entryId, hers, 600);
+    expect(await tracks().addBatch(mine, { trackId: "tr1", walkKey: "w", source: "phone", seq: 0, points: [pt(0, 0)] })).toEqual({ stored: true, recording: false });
+    expect(await tracks().addBatch(hers, { trackId: "tr2", walkKey: "w", source: "phone", seq: 0, points: [pt(700, 0)] })).toEqual({ stored: true, recording: true });
   });
 
   test("a walk without a track has none", async () => {

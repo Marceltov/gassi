@@ -265,7 +265,8 @@ export const contract = {
     method: "POST",
     path: "/api/tracks",
     input: z.object({ trackId: z.string().min(1).max(64), walkKey: z.string().min(1).max(64), source: z.enum(["phone", "watch"]), seq: z.number().int().min(0), points: z.array(trackPointSchema).min(1).max(2000) }),
-    output: z.object({ stored: z.boolean() }),
+    // recording: this device still records the walk (it runs, and no other device took the route since)
+    output: z.object({ stored: z.boolean(), recording: z.boolean() }),
   }),
   walk: endpoint({ method: "GET", path: "/api/walks/:id", input: z.object({ id }), output: walkOutput }),
   // the same for the walk a phone started (or joined) with `key`, before it knows the walk's id; 404 while the server
