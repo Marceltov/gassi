@@ -1,13 +1,13 @@
 // The running walk ("Runde"): one hand holds the leash, the thumb taps. On top the clock, who walks with which dogs
 // (a chip taps them off, "+" adds), and what happened so far; at the bottom Pipi, Markiert (for dogs that mark, #38) and
 // Poopoo, Kommando, Leckerli and Begegnung (#36, #90, #37), Pause/Weiter and Training, Zuhause; with several dogs on the walk
-// each asks which one. A tap on Kommando or Leckerli logs the usual one they name, a hold chooses (#98). A poop is logged at the tap and then asks how it was (#86), in a sheet like the dog's; closed,
-// it has none. A poop in the list asks again. Every tap goes through the queue and shows at once. When the walk is over
+// each asks which one. Only what happened scrolls, newest first; a tap on one opens it to change or delete (#99). A tap on Kommando or Leckerli logs the usual one they name, a hold chooses (#98). A poop is logged at the tap and then asks how it was (#86), in a sheet like the dog's; closed,
+// it has none; one still in the queue asks again from the list. Every tap goes through the queue and shows at once. When the walk is over
 // (ended here or on another phone), the screen leaves: to the summary after Zuhause, else to Start.
 import { CONSISTENCIES, CONSISTENCY_LABEL, type Consistency, keepsOne, newId, TYPE_LABEL } from "@gassi/domain";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { walkClock } from "../start/elapsed";
 import { useNow } from "../start/useNow";
@@ -18,7 +18,6 @@ import { Chip } from "../ui/Chip";
 import { type LogStart, Logging, useQuickLines } from "../log/LogSheet";
 import { ChoiceSheet, dogChoices } from "../ui/ChoiceSheet";
 import { Icon } from "../ui/Icon";
-import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
 import { Screen } from "../ui/Screen";
 import { Sheet } from "../ui/Sheet";
 import { useLeaving } from "../ui/useLeaving";
@@ -27,6 +26,8 @@ import { LAST_DOG, LAST_WALKER } from "./lastOne";
 import { tapLine, trainingLine, walkItems } from "./lines";
 import type { Tap } from "./taps";
 import { useWalkTaps } from "./useWalkTaps";
+import { ItemRow } from "./ItemRow";
+import { useTabPath } from "../ui/tabPath";
 
 type Kind = "pee" | "mark" | "poop";
 
@@ -36,6 +37,7 @@ export function Walk() {
   const { view, send, people, dogs, online, unsent } = useGassi();
   const walk = view.walk;
   const now = useNow(1000);
+  const tabPath = useTabPath();
   const { taps, trainings } = useWalkTaps(walk);
   const [adding, setAdding] = useState(false);
   const [choosing, setChoosing] = useState<Kind | null>(null);
@@ -158,7 +160,7 @@ export function Walk() {
 
   return (
     <Screen
-      top={
+      head={
         <>
           <Text style={[styles.state, { color: theme.muted }]}>
             {walk.paused ? "Pause" : "Runde läuft"}
@@ -179,40 +181,32 @@ export function Walk() {
           </View>
           {hint ? <Text style={[styles.since, { color: theme.muted }]}>{hint}</Text> : null}
           {walkDogs.length === 0 ? <Text style={[styles.since, { color: theme.muted }]}>Kein Hund dabei – „+“ nimmt einen mit.</Text> : null}
-          <View testID="walk-taps" style={[styles.log, { backgroundColor: theme.surface }]}>
-            {taps.length === 0 && trainings.length === 0 && !runningTraining ? <Text style={[styles.line, { color: theme.muted }]}>Noch nichts</Text> : null}
-            {walkItems(taps, trainings).map((item, i) =>
-              item.kind === "tap" ? (
-                <Pressable
-                  key={`${item.tap.type}${item.at}${item.tap.dogId}`}
-                  disabled={item.tap.type !== "poop"}
-                  accessibilityRole={item.tap.type === "poop" ? "button" : undefined}
-                  accessibilityLabel={`${tapLine(item.tap, tapDog(item.tap))}, ${hhmm(item.at)}${item.tap.type === "poop" ? ", Konsistenz wählen" : ""}`}
-                  onPress={() => setAsking(item.tap)}
-                  style={styles.item}
-                >
-                  <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(item.at)}</Text>
-                  <Icon name={TYPE_ICON[item.tap.type]} size={17} color={theme[TYPE_TONE[item.tap.type]]} />
-                  <Text style={[styles.line, styles.shrink, { color: theme.ink }]} numberOfLines={1}>
-                    {tapLine(item.tap, tapDog(item.tap))}
-                  </Text>
-                </Pressable>
-              ) : (
-                <View key={`t${i}`} style={styles.item}>
-                  <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(item.at)}</Text>
-                  <Icon name="training" size={17} color={theme.training} />
-                  <Text style={[styles.line, styles.shrink, { color: theme.ink }]}>{trainingLine(item.training)}</Text>
-                </View>
-              ),
-            )}
-            {runningTraining && trainings.length === 0 ? (
-              <View style={styles.item}>
-                <Icon name="training" size={17} color={theme.training} />
-                <Text style={[styles.line, { color: theme.ink }]}>Training läuft</Text>
-              </View>
-            ) : null}
-          </View>
         </>
+      }
+      top={
+        <View testID="walk-taps" style={[styles.log, { backgroundColor: theme.surface }]}>
+          {taps.length === 0 && trainings.length === 0 && !runningTraining ? <Text style={[styles.line, { color: theme.muted }]}>Noch nichts</Text> : null}
+          {runningTraining && trainings.length === 0 ? (
+            <View style={styles.item}>
+              <Icon name="training" size={17} color={theme.training} />
+              <Text style={[styles.line, { color: theme.ink }]}>Training läuft</Text>
+            </View>
+          ) : null}
+          {walkItems(taps, trainings)
+            .reverse()
+            .map((item) => {
+              const text = item.kind === "tap" ? tapLine(item.tap, tapDog(item.tap)) : trainingLine(item.training);
+              const key = `${item.kind}${item.at}${item.kind === "tap" ? item.tap.dogId : ""}`;
+              const id = item.kind === "tap" ? item.tap.id : item.training.id;
+              // one the server has opens its entry; a poop still in the queue asks how it was
+              if (id !== undefined) return <ItemRow key={key} item={item} text={text} compact onPress={() => router.push(tabPath(`/eintrag/${id}`))} />;
+              if (item.kind === "tap" && item.tap.type === "poop") {
+                const poop = item.tap;
+                return <ItemRow key={key} item={item} text={text} compact a11y={`${text}, ${hhmm(item.at)}, Konsistenz wählen`} onPress={() => setAsking(poop)} />;
+              }
+              return <ItemRow key={key} item={item} text={text} compact />;
+            })}
+        </View>
       }
       bottom={
         <>
@@ -317,8 +311,6 @@ const styles = StyleSheet.create({
   log: { borderRadius: 12, padding: 12, gap: 4 },
   line: { fontSize: 15 },
   item: { flexDirection: "row", alignItems: "center", gap: 8 },
-  time: { fontVariant: ["tabular-nums"], minWidth: 40 },
-  shrink: { flexShrink: 1 },
   row: { flexDirection: "row", gap: 8 },
   cell: { flex: 1 },
   sheet: { gap: 8 },

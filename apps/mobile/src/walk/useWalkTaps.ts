@@ -1,8 +1,10 @@
 // The running walk's pee/markings/poop and trainings: the server's summary of the walk (asked for by its key whenever the
 // walk's view changes: a tap, an answer, a refresh), with this phone's unsent taps laid over. A tap that has just left
-// the queue stays shown until a summary from the server holds it, so nothing blinks out in between.
+// the queue stays shown until a summary from the server holds it, so nothing blinks out in between. Coming back to the
+// walk (from an entry changed or deleted there, #99) asks again.
 import type { WalkView } from "@gassi/domain";
-import { useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useGassi } from "../data/GassiProvider";
 import { holds, mergeTaps, type Names, summaryTaps, type Tap, tapsOf, type WalkSummary, withConsistencies } from "./taps";
 
@@ -20,6 +22,8 @@ export function useWalkTaps(walk: WalkView | null): { taps: Tap[]; trainings: Wa
   const [known, setKnown] = useState<Known | null>(null);
   const [carried, setCarried] = useState<Tap[]>([]);
   const [lastPending, setLastPending] = useState(pending);
+  const [focused, setFocused] = useState(0);
+  useFocusEffect(useCallback(() => setFocused((n) => n + 1), []));
   if (pending !== lastPending) {
     setLastPending(pending);
     setCarried((c) => [...c, ...tapsOf(lastPending, names).filter((t) => !holds(c, t))]);
@@ -41,7 +45,7 @@ export function useWalkTaps(walk: WalkView | null): { taps: Tap[]; trainings: Wa
       },
       () => {}, // no reception, or the server doesn't know the walk yet: the unsent taps show meanwhile
     );
-  }, [api, walk]);
+  }, [api, walk, focused]);
 
   if (!walk) return { taps: [], trainings: [] };
   const mine = known?.key === walk.key ? known : null;

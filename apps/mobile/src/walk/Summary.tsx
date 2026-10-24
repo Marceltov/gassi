@@ -8,7 +8,7 @@
 import { formatDistance, formatMinutes, keepsOne, simplify } from "@gassi/domain";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { errorMessage, OFFLINE } from "../data/api";
 import { useGassi } from "../data/GassiProvider";
 import { TrackMap } from "../map/TrackMap";
@@ -17,14 +17,13 @@ import { hhmm } from "../time";
 import { BigButton } from "../ui/BigButton";
 import { ButtonRow } from "../ui/ButtonRow";
 import { Chip } from "../ui/Chip";
-import { Icon } from "../ui/Icon";
 import { Screen } from "../ui/Screen";
 import { useTabPath } from "../ui/tabPath";
 import { LAST_WALKER } from "./lastOne";
-import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
 import { countLine, tapLine, trainingLine, type WalkItem, walkItems } from "./lines";
 import type { Shown } from "./taps";
 import { useWalkSummary } from "./useWalkSummary";
+import { ItemRow } from "./ItemRow";
 
 export function Summary({ idOrKey }: { idOrKey: string }) {
   const router = useRouter();
@@ -140,35 +139,10 @@ export function Summary({ idOrKey }: { idOrKey: string }) {
   // exercises), one only this phone has waits for reception
   function row(i: WalkItem) {
     const id = i.kind === "tap" ? i.tap.id : i.training.id;
-    const type = i.kind === "tap" ? i.tap.type : "training";
     const text = itemText(i);
-    const content = (
-      <>
-        <Text style={[styles.line, styles.time, { color: theme.muted }]}>{hhmm(i.at)}</Text>
-        <Icon name={TYPE_ICON[type]} size={17} color={theme[TYPE_TONE[type]]} />
-        <Text style={[styles.line, styles.text, { color: id !== undefined && !local ? theme.ink : theme.muted }]}>{id !== undefined && !local ? text : `${text} · wartet auf Empfang`}</Text>
-      </>
-    );
     const key = `${i.kind}${i.at}${i.kind === "tap" ? i.tap.dogId : ""}`;
-    if (id === undefined || local)
-      return (
-        <View key={key} style={styles.mark}>
-          {content}
-        </View>
-      );
-    return (
-      <Pressable
-        key={key}
-        testID={i.kind === "tap" ? `summary-mark-${id}` : `summary-training-${id}`}
-        accessibilityRole="button"
-        accessibilityLabel={`${hhmm(i.at)} ${text} ändern`}
-        onPress={() => router.push(tabPath(`/eintrag/${id}`))}
-        style={({ pressed }) => [styles.mark, { backgroundColor: theme.neutral, opacity: pressed ? 0.7 : 1 }]}
-      >
-        {content}
-        <Icon name="next" size={18} color={theme.muted} />
-      </Pressable>
-    );
+    if (id === undefined || local) return <ItemRow key={key} item={i} text={`${text} · wartet auf Empfang`} muted />;
+    return <ItemRow key={key} item={i} text={text} testID={i.kind === "tap" ? `summary-mark-${id}` : `summary-training-${id}`} onPress={() => router.push(tabPath(`/eintrag/${id}`))} />;
   }
 }
 
@@ -180,9 +154,6 @@ const styles = StyleSheet.create({
   value: { fontSize: 17, fontWeight: "700" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   card: { borderRadius: 12, padding: 12, gap: 6 },
-  mark: { flexDirection: "row", gap: 8, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, minHeight: 40, alignItems: "center" },
-  time: { fontVariant: ["tabular-nums"] },
-  text: { flex: 1 },
   line: { fontSize: 15 },
   note: { borderRadius: 12, padding: 12, minHeight: 60, fontSize: 16 },
 });
