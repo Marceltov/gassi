@@ -1,7 +1,7 @@
 // The running walk ("Runde"): one hand holds the leash, the thumb taps. On top the clock, who walks with which dogs
 // (a chip taps them off, "+" adds), and what happened so far; at the bottom Pipi, Markiert (for dogs that mark, #38) and
 // Poopoo, Kommando, Leckerli and Begegnung (#36, #90, #37), Pause/Weiter and Training, Zuhause; with several dogs on the walk
-// each asks which one. A poop is logged at the tap and then asks how it was (#86), in a sheet like the dog's; closed,
+// each asks which one. A tap on Kommando or Leckerli logs the usual one they name, a hold chooses (#98). A poop is logged at the tap and then asks how it was (#86), in a sheet like the dog's; closed,
 // it has none. A poop in the list asks again. Every tap goes through the queue and shows at once. When the walk is over
 // (ended here or on another phone), the screen leaves: to the summary after Zuhause, else to Start.
 import { CONSISTENCIES, CONSISTENCY_LABEL, type Consistency, keepsOne, newId, TYPE_LABEL } from "@gassi/domain";
@@ -15,7 +15,7 @@ import { useTheme } from "../theme";
 import { hhmm } from "../time";
 import { BigButton } from "../ui/BigButton";
 import { Chip } from "../ui/Chip";
-import { type LogStart, Logging } from "../log/LogSheet";
+import { type LogStart, Logging, useQuickLines } from "../log/LogSheet";
 import { ChoiceSheet, dogChoices } from "../ui/ChoiceSheet";
 import { Icon } from "../ui/Icon";
 import { TYPE_ICON, TYPE_TONE } from "../ui/icons";
@@ -42,6 +42,8 @@ export function Walk() {
   const [hint, setHint] = useState<string | null>(null); // why the last person or dog can't be tapped off
   const [asking, setAsking] = useState<Tap | null>(null); // the poop whose consistency is asked
   const [logging, setLogging] = useState<LogStart | null>(null);
+  const [quick, setQuick] = useState(false);
+  const usual = useQuickLines();
 
   // Leaving (Zuhause, Training) happens once, also on a double tap. Without a walk (ended on another phone, or none
   // after a reload) the focused screen goes back to Start, down its tab's stack.
@@ -54,6 +56,11 @@ export function Walk() {
   if (!walk) return null;
 
   const at = () => new Date().toISOString();
+  // a tap logs the usual (without one yet it asks), a hold asks
+  const start = (s: LogStart, fast: boolean) => {
+    setQuick(fast);
+    setLogging(s);
+  };
   const dogName = (id: number) => dogs.find((d) => d.id === id)?.name ?? "Hund";
   const walkDogs = walk.dogIds;
   const several = walkDogs.length > 1;
@@ -224,13 +231,13 @@ export function Walk() {
           </View>
           <View style={styles.row}>
             <View style={styles.cell}>
-              <BigButton kind="training" size="m" icon="training" label="Kommando" stacked disabled={walkDogs.length === 0} onPress={() => setLogging("command")} />
+              <BigButton kind="training" size="l" icon="training" label="Kommando" sub={usual.command} stacked disabled={walkDogs.length === 0} onPress={() => start("command", true)} onLongPress={() => start("command", false)} />
             </View>
             <View style={styles.cell}>
-              <BigButton kind="training" size="m" icon="treat" label="Leckerli" stacked disabled={walkDogs.length === 0} onPress={() => setLogging("treat")} />
+              <BigButton kind="training" size="l" icon="treat" label="Leckerli" sub={usual.treat} stacked disabled={walkDogs.length === 0} onPress={() => start("treat", true)} onLongPress={() => start("treat", false)} />
             </View>
             <View style={styles.cell}>
-              <BigButton kind="encounter" size="m" icon="people" label="Begegnung" stacked disabled={walkDogs.length === 0} onPress={() => setLogging("encounter")} />
+              <BigButton kind="encounter" size="l" icon="people" label="Begegnung" stacked disabled={walkDogs.length === 0} onPress={() => start("encounter", false)} />
             </View>
           </View>
           <View style={styles.row}>
@@ -243,7 +250,7 @@ export function Walk() {
           </View>
           <BigButton kind="walk" size="l" icon="home" label="Zuhause" onPress={home} />
 
-          <Logging start={logging} dogIds={walkDogs} place="outside" onDone={() => setLogging(null)} />
+          <Logging start={logging} quick={quick} dogIds={walkDogs} place="outside" onDone={() => setLogging(null)} />
           <ChoiceSheet
             testID="dog-choice"
             open={choosing !== null}

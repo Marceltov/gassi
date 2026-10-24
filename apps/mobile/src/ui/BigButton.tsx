@@ -17,7 +17,7 @@ type Props = {
   sub?: string;
   onPress?: () => void;
   size?: keyof typeof sizes;
-  /** Held down: for the "undo" of a counting tap. */
+  /** Held down: the "undo" of a counting tap, or choosing what a tap gives (the walk's Leckerli). */
   onLongPress?: () => void;
   /** What a screen reader says, when the label alone is not enough ("klappt" per exercise); else the label. */
   a11y?: string;
@@ -44,7 +44,11 @@ export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, 
         {icon ? <Icon name={icon} size={iconSize} color={look.ink} /> : null}
         {label ? <Text style={[styles.label, { fontSize: font, color: look.ink }]}>{label}</Text> : null}
       </View>
-      {sub ? <Text style={[styles.sub, { color: look.sub }]}>{sub}</Text> : null}
+      {sub ? (
+        <Text style={[styles.sub, { color: look.sub }]} numberOfLines={1}>
+          {sub}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
