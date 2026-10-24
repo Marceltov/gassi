@@ -77,6 +77,10 @@ here in the same PR that follows it.
 ## Decisions and shipping
 
 - Decisions go into ADRs in `docs/adr/`, not into `docs/BUILD.md`. Small rulings go into the PR description or here.
+- **The server goes first.** An APK is built only from a commit the live server already runs (or an older one): merge,
+  let the image reach the homelab (Watchtower pulls once a day at 11:54; `docker compose pull && docker compose up -d`
+  in `/root/services/gassi` does it at once), then build. An app whose contract is newer than its server rejects the
+  server's answers (#106: Bille's phone and the walk's `recorder`). No tolerance for an older server in the client.
 - Every change has a GitHub issue. Branch `gassi-<issue>-<slug>`, commit and PR title `GASSI #<issue>: …`, and the
   PR body says `Closes #<issue>`.
 - Screen changes are shaped with mockups before they are built.
