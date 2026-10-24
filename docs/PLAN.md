@@ -26,16 +26,18 @@ households per server, reminders, training plans, vet records, an iOS app built 
 
 ### Step 3 checklist (Android, from the step 2 reviews)
 
-- `data/signin.ts` redeems as `deviceKind: "web"`: the Android app is a `phone`.
-- `app/anmelden.tsx`'s "Mit authentik anmelden" uses `window.location.assign`: native needs the browser and the
-  `gassi://join` return (`/api/oidc/start?app=1`).
-- `newId` needs `crypto.getRandomValues` (Hermes: a polyfill such as expo-crypto).
+Struck through: done in #106 (Android 3a-1).
+
+- ~~`data/signin.ts` redeems as `deviceKind: "web"`: the Android app is a `phone`.~~
+- ~~`app/anmelden.tsx`'s "Mit authentik anmelden" uses `window.location.assign`: native needs the browser and the
+  `gassi://join` return (`/api/oidc/start?app=1`).~~
+- ~~`newId` needs `crypto.getRandomValues` (Hermes: a polyfill such as expo-crypto).~~
 - `weekLabel` and the other `de-DE` date texts need ICU with German on Hermes.
-- The native `TimeField` commits only on end editing.
-- `data/kept.ts`, the queue and the device keep only in memory on native: real storage (the food facts, the
-  snapshot and the ended walk included).
+- ~~The native `TimeField` commits only on end editing.~~
+- ~~`data/kept.ts`, the queue and the device keep only in memory on native: real storage (the food facts, the
+  snapshot and the ended walk included).~~
 - Android icons and the adaptive icon.
-- Native stand-ins to replace: `ui/Sheet.tsx`, `more/Curve.tsx`, `map/TrackMap.tsx`, `ui/copy.ts`.
+- Native stand-ins to replace: `ui/Sheet.tsx`, ~~`more/Curve.tsx`, `map/TrackMap.tsx`, `ui/copy.ts`~~.
 
 ## Before the rebuild (0.1 and 0.2, replaced)
 
