@@ -3,12 +3,13 @@
 // when another phone takes over; with "Bildschirm auf der Runde anlassen" on, it keeps the screen on meanwhile.
 // useRecording() gives the walk screen what it shows: whether this phone records, how recording goes, the distance and
 // route so far, who records, and `takeOver`. `sent` counts the batches that reached the server, so the summary asks
-// again once the last one is there.
-import { ApiError } from "@gassi/api-client";
+// again once the last one is there. `stoppedEarly`: Android ended this phone's recording behind the app's back (#108);
+// it starts again here, and the walk says so.
 import { newId, type TrackPoint } from "@gassi/domain";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useGassi } from "../data/GassiProvider";
-import { type Batch, createRecorder, type Recorder, type RecordingStatus, RejectedBatch, sendLeftovers } from "./recorder";
+import { backgroundStopped, recordingGeo } from "./geo";
+import { type Batch, createRecorder, type Recorder, type RecordingStatus, sendLeftovers, uploadWith } from "./recorder";
 import { useScreenOn } from "./screenOn";
 import { holdScreen } from "./wakeLock";
 
@@ -19,6 +20,7 @@ export type Recording = {
   points: TrackPoint[];
   recorderName: string | null;
   sent: number;
+  stoppedEarly: boolean;
   takeOver(): void;
 };
 
@@ -54,10 +56,12 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   const { view, device, api, send } = useGassi();
   const walk = view.walk;
   const key = walk?.key ?? null;
+  const startedAt = walk?.startedAt ?? null;
   const mine = !!walk && !!device && walk.recorder?.deviceId === device.id;
   const store = useMemo(() => liveStore(), []);
   const live = useSyncExternalStore(store.subscribe, store.get, store.get);
   const [sent, setSent] = useState(0);
+  const [stoppedEarly, setStoppedEarly] = useState(false);
   // the walk running after this render, for the recorder's cleanup to tell an ended walk from a handover (layout
   // effects run before the cleanups of the effects below)
   const running = useRef(key);
@@ -68,12 +72,9 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   const upload = useCallback(
     async (b: Batch) => {
       if (!api) throw new Error("signed out");
-      try {
-        await api.uploadTrack(b);
-      } catch (e) {
-        throw e instanceof ApiError && e.status === 400 ? new RejectedBatch() : e;
-      }
+      const answer = await uploadWith(api)(b);
       setSent((n) => n + 1);
+      return answer;
     },
     [api],
   );
@@ -84,8 +85,9 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   }, [api, upload, key, mine]);
 
   useEffect(() => {
-    if (!key || !mine || !api) return;
-    const r = createRecorder({ walkKey: key, upload });
+    if (!key || !startedAt || !mine || !api) return;
+    void backgroundStopped(key).then(setStoppedEarly, () => {});
+    const r = createRecorder({ walkKey: key, upload, geo: recordingGeo(startedAt) });
     const unsubscribe = store.set(r);
     return () => {
       unsubscribe();
@@ -94,7 +96,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
       if (running.current !== key) void r.stop();
       else r.close();
     };
-  }, [key, mine, api, upload, store]);
+  }, [key, startedAt, mine, api, upload, store]);
 
   // "Bildschirm auf der Runde anlassen": the screen stays on while this phone records
   const screenOn = useScreenOn();
@@ -109,6 +111,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     ...(mine ? live : NOTHING),
     recorderName: walk?.recorder?.name ?? null,
     sent,
+    stoppedEarly: mine && stoppedEarly,
     takeOver,
   };
   return <RecordingContext.Provider value={value}>{children}</RecordingContext.Provider>;

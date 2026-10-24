@@ -7,10 +7,9 @@
 // refuses for good (its walk's start never reached it) is tried again while the walk runs, and given up once it is over.
 // On Android the points come from a task that also runs without a screen (headless.ts, #108): it keeps and sends them
 // through `keepPoint` and `sendRecording`, and an open screen reads what it kept.
-import { trackPointSchema } from "@gassi/api-client";
+import { ApiError, type Client, trackPointSchema } from "@gassi/api-client";
 import { createLiveFilter, newId, type TrackPoint } from "@gassi/domain";
 import { loadKept, saveKept } from "../data/kept";
-import { watchPosition } from "./geo";
 
 export type Batch = { trackId: string; walkKey: string; source: "phone"; seq: number; points: TrackPoint[] };
 /** `watch` returns the stop of this page's watching; `end` ends recording on this device at the walk's end (Android's
@@ -21,6 +20,17 @@ export type RecordingStatus = "on" | "noSignal" | "denied";
 
 /** What `upload` throws when the server refuses a batch for good (400: "Diese Runde gibt es nicht."). */
 export class RejectedBatch extends Error {}
+
+/** The upload through `api`, a refusal for good as RejectedBatch; answers whether this device still records. */
+export const uploadWith =
+  (api: Client) =>
+  async (b: Batch): Promise<{ recording: boolean }> => {
+    try {
+      return await api.uploadTrack(b);
+    } catch (e) {
+      throw e instanceof ApiError && e.status === 400 ? new RejectedBatch() : e;
+    }
+  };
 
 const BATCH_MS = 30_000;
 const NO_FIX_MS = 30_000;
@@ -109,7 +119,8 @@ const browserLocks = (): Locks | null => (typeof navigator !== "undefined" && "l
 
 /** Records `walkKey`'s route from now: `stop` at the walk's end (sends the rest), `close` when this page stops
  * recording without the walk ending (another phone took over, the screen goes away). */
-export function createRecorder({ walkKey, upload, geo = { watch: watchPosition }, locks = browserLocks() }: { walkKey: string; upload: (b: Batch) => Promise<unknown>; geo?: Geo; locks?: Locks | null }) {
+/** `geo`: where positions come from (geo.ts's `recordingGeo`). */
+export function createRecorder({ walkKey, upload, geo, locks = browserLocks() }: { walkKey: string; upload: (b: Batch) => Promise<unknown>; geo: Geo; locks?: Locks | null }) {
   const kept = all()[walkKey];
   // a recording taken for over while this walk wasn't known yet (sendLeftovers) goes on
   save(walkKey, kept ? { ...kept, ended: false } : { trackId: newId(), points: [], sent: 0, nextSeq: 0, inflight: null, ended: false });

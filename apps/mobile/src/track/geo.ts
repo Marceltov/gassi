@@ -1,9 +1,20 @@
-// The phone's position as it changes, for recording a walk's route (recorder.ts). The web asks the browser
-// (geo.web.ts); the Android app brings background recording (#108) next to this file. Until then a native build
-// gets no positions, and the walk says "kein GPS-Signal".
-import type { TrackPoint } from "@gassi/domain";
+// The phone's position for recording a walk's route (recorder.ts). On Android a foreground service records, also with
+// the screen off (background.ts, #108): it keeps the points itself, and an open screen hears of each; the web asks
+// the browser (geo.web.ts).
+import type { Geo } from "./recorder";
+import { backgroundStopped, startBackground, stopBackground } from "./background";
+import { pointEvents } from "./headless";
 
-type OnPoint = (p: TrackPoint) => void;
+/** Positions for the walk that started at `startedAt` (the notification says since when). */
+export function recordingGeo(startedAt: string): Geo {
+  return {
+    watch(walkKey, onPoint, onDenied) {
+      // a start Android refuses (the app went to the background meanwhile) counts as no GPS; the next open tries again
+      void startBackground(walkKey, startedAt).then((s) => (s === "denied" ? onDenied() : undefined), onDenied);
+      return pointEvents.subscribe(onPoint);
+    },
+    end: stopBackground,
+  };
+}
 
-/** Calls `onPoint` with each new position and `onDenied` when location is refused; returns the stop. */
-export const watchPosition: (walkKey: string, onPoint: OnPoint, onDenied: () => void) => () => void = () => () => {};
+export { backgroundStopped };

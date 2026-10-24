@@ -3,10 +3,11 @@
 // this file on the web, so that one is named with its extension).
 import type { TrackPoint } from "@gassi/domain";
 import type * as Native from "./geo.ts";
+import type { Geo } from "./recorder";
 
 const DENIED = 1; // GeolocationPositionError.PERMISSION_DENIED
 
-export function watchPosition(_walkKey: string, onPoint: (p: TrackPoint) => void, onDenied: () => void): () => void {
+function watchPosition(_walkKey: string, onPoint: (p: TrackPoint) => void, onDenied: () => void): () => void {
   if (typeof navigator === "undefined" || !navigator.geolocation) return () => {};
   const id = navigator.geolocation.watchPosition(
     ({ coords, timestamp }) => onPoint({ t: new Date(timestamp).toISOString(), lat: coords.latitude, lon: coords.longitude, ele: coords.altitude ?? null, acc: coords.accuracy ?? null }),
@@ -18,5 +19,11 @@ export function watchPosition(_walkKey: string, onPoint: (p: TrackPoint) => void
   return () => navigator.geolocation.clearWatch(id);
 }
 
-const sameAsNative: Pick<typeof Native, "watchPosition"> = { watchPosition };
+/** The browser records only while the page is open, so there is nothing to end beyond the watching. */
+export const recordingGeo = (): Geo => ({ watch: watchPosition });
+
+/** The browser's recording can't be ended behind the app's back. */
+export const backgroundStopped = async (): Promise<boolean> => false;
+
+const sameAsNative: typeof Native = { recordingGeo, backgroundStopped };
 void sameAsNative;
