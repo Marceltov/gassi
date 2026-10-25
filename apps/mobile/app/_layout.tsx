@@ -41,7 +41,7 @@ function Screens() {
   const { signedIn } = useGassi();
   // which screen is open, as a usage event each time it changes: the address, never what is on it
   const path = usePathname();
-  useEffect(() => events.record("screen", path), [path]);
+  useEffect(() => events.screen(path), [path]);
   useEffect(() => {
     if (startTold) return;
     startTold = true;

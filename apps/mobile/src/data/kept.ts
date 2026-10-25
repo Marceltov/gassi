@@ -19,6 +19,11 @@ export function saveKept(key: string, value: unknown): void {
   storage.setItem(PREFIX + key, JSON.stringify(value));
 }
 
+/** As saveKept, for a value already turned into JSON (events.ts measures its length). */
+export function saveKeptText(key: string, json: string): void {
+  storage.setItem(PREFIX + key, json);
+}
+
 export function dropKept(key: string): void {
   storage.removeItem(PREFIX + key);
 }

@@ -1,5 +1,6 @@
 // A fresh localStorage for every test (Node has none of its own without a flag).
 import { beforeEach } from "vitest";
+import { events } from "./src/data/events";
 
 class MemoryStorage implements Storage {
   private data = new Map<string, string>();
@@ -25,4 +26,5 @@ class MemoryStorage implements Storage {
 
 beforeEach(() => {
   Object.defineProperty(globalThis, "localStorage", { value: new MemoryStorage(), configurable: true, writable: true });
+  events.forget(); // a fresh storage is a fresh device: no error went out yet
 });

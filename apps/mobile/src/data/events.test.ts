@@ -131,3 +131,36 @@ test("errorText: a crash's first stack lines, or what it says", () => {
   expect(errorText("kaputt")).toBe("kaputt");
   expect(errorText(new Error("x"))).toMatch(/^Error: x/);
 });
+
+test("what is kept stays small enough for the browser's storage, however long the stacks", () => {
+  const { events, later } = setup();
+  for (let i = 0; i < 300; i++) {
+    later(61_000); // each a new minute: none is held back as a repeat
+    events.error("Aufnahme", Object.assign(new Error(`x${i}`), { stack: "s".repeat(4000) }));
+  }
+  expect((storage.getItem("gassi.kept.events") ?? "").length).toBeLessThanOrEqual(500_000);
+  expect(events.waiting().at(-1)!.data!.message).toBe("Error: x299"); // the newest stay
+});
+
+test("a repeated error within the minute doesn't read storage", () => {
+  const { events } = setup();
+  events.error("Absturz", new Error("x"));
+  const spy = vi.spyOn(storage, "getItem");
+  for (let i = 0; i < 100; i++) events.error("Absturz", new Error("x"));
+  expect(spy).not.toHaveBeenCalled();
+  spy.mockRestore();
+});
+
+test("an error names the screen that was open", () => {
+  const { events } = setup();
+  events.screen("/runde");
+  events.error("Anzeige", new Error("x"));
+  expect(events.waiting().at(-1)!.data).toMatchObject({ screen: "/runde" });
+  expect(events.waiting().at(-2)).toMatchObject({ kind: "screen", name: "/runde" });
+});
+
+test("an error that can't even be turned into text doesn't throw", () => {
+  const { events } = setup();
+  expect(() => events.error("Absturz", Object.create(null))).not.toThrow();
+  expect(events.waiting().at(-1)).toMatchObject({ kind: "error", name: "Absturz" });
+});
