@@ -8,7 +8,7 @@
 // On Android the points come from a task that also runs without a screen (headless.ts, #108): it keeps and sends them
 // through `keepPoint` and `sendRecording`, and an open screen reads what it kept.
 import { ApiError, type Client, trackPointSchema } from "@gassi/api-client";
-import { createLiveFilter, newId, type TrackPoint } from "@gassi/domain";
+import { createLiveFilter, newId, precise, type TrackPoint } from "@gassi/domain";
 import { loadKept, saveKept } from "../data/kept";
 import { type Events, events } from "../data/events";
 import { batchEvent } from "../data/usage";
@@ -18,7 +18,8 @@ export type Batch = { trackId: string; walkKey: string; source: "phone"; seq: nu
  * background service, which outlives the page). */
 export type Geo = { watch(walkKey: string, onPoint: (p: TrackPoint) => void, onDenied: () => void): () => void; end?(): Promise<void> };
 export type Locks = { request(name: string, fn: () => Promise<void>): Promise<void> };
-export type RecordingStatus = "on" | "noSignal" | "denied";
+/** `rough`: positions come, but none precise enough for the route for a minute (network fixes, #127). */
+export type RecordingStatus = "on" | "rough" | "noSignal" | "denied";
 
 /** What `upload` throws when the server refuses a batch for good (400: "Diese Runde gibt es nicht."). */
 export class RejectedBatch extends Error {}
@@ -29,11 +30,11 @@ export const uploadWith =
   async (b: Batch): Promise<{ recording: boolean }> => {
     try {
       const answer = await api.uploadTrack(b);
-      const { name, data } = batchEvent(b.points.length, answer);
+      const { name, data } = batchEvent(b.points, answer);
       stream.record("track", name, data);
       return answer;
     } catch (e) {
-      const { name, data } = batchEvent(b.points.length, null);
+      const { name, data } = batchEvent(b.points, null);
       stream.record("track", name, data);
       throw e instanceof ApiError && e.status === 400 ? new RejectedBatch() : e;
     }
@@ -41,6 +42,7 @@ export const uploadWith =
 
 const BATCH_MS = 30_000;
 const NO_FIX_MS = 30_000;
+const ROUGH_MS = 60_000;
 const TICK_MS = 5_000; // how often the screen hears of the time passing (for "kein GPS-Signal")
 const MAX_POINTS = 2000; // per batch, as the contract allows
 
@@ -138,10 +140,14 @@ export function createRecorder({ walkKey, upload, geo, locks = browserLocks() }:
   const live = createLiveFilter();
   let fed = 0; // how many of the kept points the live filter has had
   let lastFix = Date.now();
+  let lastPrecise = lastFix;
   // the kept points the live filter hasn't had yet: on start, and while another tab records
   const catchUp = () => {
     const points = all()[walkKey]?.points ?? [];
-    for (const p of points.slice(fed)) live.add(p);
+    for (const p of points.slice(fed)) {
+      live.add(p);
+      if (precise(p)) lastPrecise = Math.max(lastPrecise, Date.parse(p.t));
+    }
     if (points.length > fed) lastFix = Math.max(lastFix, Date.parse(points.at(-1)!.t));
     fed = points.length;
   };
@@ -200,7 +206,7 @@ export function createRecorder({ walkKey, upload, geo, locks = browserLocks() }:
       endRecording(walkKey);
       await sendRecording(walkKey, upload);
     },
-    status: (): RecordingStatus => (denied ? "denied" : Date.now() - lastFix > NO_FIX_MS ? "noSignal" : "on"),
+    status: (): RecordingStatus => (denied ? "denied" : Date.now() - lastFix > NO_FIX_MS ? "noSignal" : Date.now() - lastPrecise > ROUGH_MS ? "rough" : "on"),
     distanceM: () => live.distanceM(),
     points: () => live.points(),
     subscribe(fn: () => void) {

@@ -9,6 +9,7 @@ import { TrackMap } from "../map/TrackMap";
 import { walkClock } from "../start/elapsed";
 import { useNow } from "../start/useNow";
 import { useTheme } from "../theme";
+import { hintsSupported } from "../track/hints";
 import { useRecording } from "../track/Recording";
 import { BigButton } from "../ui/BigButton";
 import { Sheet } from "../ui/Sheet";
@@ -60,6 +61,7 @@ export function RouteSheet({ walk, open, onClose }: { walk: WalkView; open: bool
         </View>
         <Text style={[styles.line, { color: theme.muted }]}>{`Strecke: ${who}`}</Text>
         {recording.mine && recording.status === "denied" ? <Text style={[styles.line, { color: theme.warn }]}>Standort für diese Seite in den Browser-Einstellungen erlauben.</Text> : null}
+        {recording.mine && recording.status === "rough" ? <Text style={[styles.line, { color: theme.warn }]}>{hintsSupported() ? "Nur ungefährer Standort – Standort auf „Immer zulassen“ stellen" : "Nur ungefährer Standort – genauen Standort erlauben"}</Text> : null}
         {recording.mine ? null : <BigButton kind="walk" size="m" icon="walk" label="Strecke hier aufnehmen" onPress={recording.takeOver} />}
       </View>
     </Sheet>

@@ -107,6 +107,19 @@ test.describe("with location allowed", () => {
     await page.clock.fastForward(40_000);
     await expect(pill(page)).toContainText("kein GPS-Signal");
   });
+
+  test("only network fixes for a minute say ungefährer Standort (#127)", async ({ page, context }) => {
+    await page.clock.install();
+    await signIn(page);
+    await startWalk(page);
+    for (let step = 1; step <= 14; step++) {
+      await context.setGeolocation({ ...START, latitude: START.latitude + (step * 7) / 111_195, accuracy: 250 });
+      await page.clock.fastForward(5_000);
+    }
+    await expect(pill(page)).toContainText("ungefährer Standort");
+    await pill(page).click();
+    await expect(page.getByText("Nur ungefährer Standort – genauen Standort erlauben")).toBeVisible();
+  });
 });
 
 test("no permission says GPS aus", async ({ page, context }) => {
