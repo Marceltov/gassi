@@ -12,6 +12,7 @@ import { logged } from "./http/requestlog";
 import { Issues } from "./issues";
 import { oidcCallbackRoute, oidcStartRoute } from "./oidc/routes";
 import { linkCodeKey } from "./secret";
+import { loadUpdate, updateResponse } from "./updates";
 
 export { startup } from "./startup";
 
@@ -37,6 +38,12 @@ export const api = logged(async (req) => {
   return cors(corsOrigin, async (req) => apiRouter({ db: await database(), now: () => new Date(), publicUrl, codeKey: linkCodeKey(secret, dataDir), codeThrottle, client: clientOf(req), oidc: oidc !== null, mailer: smtp && mailer(smtp), timeZone, defaultDogName, issues: github && issuesOf(github), reportThrottle, eventThrottle, clientEvents })(req))(req);
 });
 export const health = logged(() => healthRoute());
+/** The Android app's update for its runtime (#107): the signed manifest, or 204. */
+export const appUpdate = logged(async (req) => {
+  const h = req.headers;
+  const answer = updateResponse({ platform: h.get("expo-platform"), runtimeVersion: h.get("expo-runtime-version"), expectSignature: h.has("expo-expect-signature") }, loadUpdate());
+  return new Response(answer.body, { status: answer.status, headers: answer.headers });
+});
 export const oidcStart = logged((req) => oidcStartRoute(req));
 export const oidcCallback = logged((req) => oidcCallbackRoute(req));
 

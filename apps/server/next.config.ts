@@ -16,6 +16,9 @@ const nextConfig: NextConfig = {
   // answers gets its index.html. The fallback phase comes after public files, app routes and dynamic routes, so /api,
   // /l/<token>, /health and the OIDC routes win. A missing build file (under _next/, _expo/ or assets/, or with a dot
   // in its last segment, e.g. an old hashed chunk a stale tab asks for) stays a 404 rather than HTML.
+  // Hashed build files (the web app's and the Android update's bundles and assets) change their name with their
+  // content: kept for good (#107).
+  headers: async () => ["/_expo/static/:path*", "/assets/:path*"].map((source) => ({ source, headers: [{ key: "cache-control", value: "public, max-age=31536000, immutable" }] })),
   rewrites: async () => ({ beforeFiles: [], afterFiles: [], fallback: [{ source: "/:path((?!_next/|_expo/|assets/)(?!.*\\.[^/]*$).*)", destination: "/index.html" }] }),
 };
 
