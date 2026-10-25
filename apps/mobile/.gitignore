@@ -29,6 +29,8 @@ yarn-error.*
 # macOS
 .DS_Store
 *.pem
+# the update certificate is public by design (the private key is a CI secret, #107)
+!certs/certificate.pem
 
 # local env files
 .env*.local
