@@ -98,6 +98,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # the key as a file: build-push-action's `secrets:` splits into key=value lines and keeps only a PEM's first line
+      - env:
+          UPDATES_SIGNING_KEY: ${{ secrets.UPDATES_SIGNING_KEY }}
+        run: printf '%s\n' "$UPDATES_SIGNING_KEY" > "$RUNNER_TEMP/updates_key.pem"
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -109,8 +113,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           # signs the Android app's update (#107, ADR 0015); a BuildKit secret, so it stays out of the image
-          secrets: |
-            updates_key=${{ secrets.UPDATES_SIGNING_KEY }}
+          secret-files: |
+            updates_key=${{ runner.temp }}/updates_key.pem
 
   # The Android APK for a new runtime version (#107, ADR 0015), guarded so it never spends EAS builds by itself: only
   # on main, only when no release apk-<runtime> exists yet (a JS change ships as an update, not an APK), only after
