@@ -5,12 +5,11 @@
 // each asks which one. Only what happened scrolls, newest first; a tap on one opens it to change or delete (#99). A tap on Kommando or Leckerli logs the usual one they name, a hold chooses (#98). A poop is logged at the tap and then asks how it was (#86), in a sheet like the dog's; closed,
 // it has none; one still in the queue asks again from the list. Every tap goes through the queue and shows at once. When the walk is over
 // (ended here or on another phone), the screen leaves: to the summary after Zuhause, else to Start. On Android, the first
-// walk this phone records opens Akku once (#108), and a recording Android ended behind the app's back is said under
-// the route, with the way to Akku.
+// walk this phone records opens Akku once (#108).
 import { CONSISTENCIES, CONSISTENCY_LABEL, type Consistency, keepsOne, newId, TYPE_LABEL } from "@gassi/domain";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { walkClock } from "../start/elapsed";
 import { useNow } from "../start/useNow";
@@ -64,7 +63,7 @@ export function Walk() {
       if (!walk && !isLeaving()) router.dismissTo("/");
     }, [walk, router, isLeaving]),
   );
-  const { mine, stoppedEarly } = useRecording();
+  const { mine } = useRecording();
   useEffect(() => {
     if (mine && hintsSupported() && takeFirstRecording()) router.push("/mehr/akku");
   }, [mine, router]);
@@ -193,11 +192,6 @@ export function Walk() {
             <Chip label="+" a11y="Hinzufügen" on={false} onPress={() => setAdding(true)} />
           </View>
           <RoutePill onPress={() => setRoute(true)} />
-          {stoppedEarly ? (
-            <Pressable testID="recording-stopped" accessibilityRole="button" onPress={() => router.push("/mehr/akku")}>
-              <Text style={[styles.since, { color: theme.warn }]}>Android hat die Aufnahme beendet · Akku ›</Text>
-            </Pressable>
-          ) : null}
           {hint ? <Text style={[styles.since, { color: theme.muted }]}>{hint}</Text> : null}
           {walkDogs.length === 0 ? <Text style={[styles.since, { color: theme.muted }]}>Kein Hund dabei – „+“ nimmt einen mit.</Text> : null}
         </>

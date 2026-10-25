@@ -12,13 +12,12 @@ import { hhmm } from "../time";
 import { type Batch, endRecording, hasRecording, keepPoint, keptPoints, sendRecording } from "./recorder";
 
 const BATCH_MS = 30_000;
-const ENDED_EARLY_MS = 120_000; // no position for this long while recording: Android ended the service
 const KEY = "background";
 
 /** A position as expo-location delivers it. */
 export type Location = { timestamp: number; coords: { latitude: number; longitude: number; altitude: number | null; accuracy: number | null } };
-/** The walk this device records in the background, since when, when it last sent and last had a position. */
-export type Background = { walkKey: string; startedAt: string; lastSentAt: number; lastDeliveredAt: number };
+/** The walk this device records in the background, since when, and when it last sent. */
+export type Background = { walkKey: string; startedAt: string; lastSentAt: number };
 export type HeadlessDeps = {
   now(): number;
   upload(b: Batch): Promise<{ recording: boolean }>;
@@ -31,14 +30,14 @@ export type HeadlessDeps = {
 
 export function backgroundWalk(): Background | null {
   const b = loadKept(KEY) as Background | null;
-  return b && typeof b.walkKey === "string" && typeof b.startedAt === "string" && typeof b.lastSentAt === "number" && typeof b.lastDeliveredAt === "number" ? b : null;
+  return b && typeof b.walkKey === "string" && typeof b.startedAt === "string" && typeof b.lastSentAt === "number" ? b : null;
 }
 
 /** Records `walkKey` in the background from now (the walk started at `startedAt`); the same walk again goes on. */
 export function beginBackground(walkKey: string, startedAt: string): void {
   const b = backgroundWalk();
   const same = b?.walkKey === walkKey;
-  saveKept(KEY, { walkKey, startedAt, lastSentAt: same ? b.lastSentAt : Date.now(), lastDeliveredAt: same ? b.lastDeliveredAt : Date.now() });
+  saveKept(KEY, { walkKey, startedAt, lastSentAt: same ? b.lastSentAt : Date.now() });
 }
 
 /** Whether a kept background recording is no longer this phone's (`running`: the walk running now, `mine`: this phone
@@ -46,13 +45,6 @@ export function beginBackground(walkKey: string, startedAt: string): void {
 export function staleBackground(running: string | null, mine: boolean): boolean {
   const b = backgroundWalk();
   return !!b && (b.walkKey !== running || !mine);
-}
-
-/** Whether Android ended the recording of `walkKey` behind the app's back: no position for 2 minutes (they come every
- * 5 s while the service runs, also standing still). */
-export function endedEarly(walkKey: string, now: number): boolean {
-  const b = backgroundWalk();
-  return b?.walkKey === walkKey && now - b.lastDeliveredAt > ENDED_EARLY_MS;
 }
 
 /** The service's options (without the accuracy, background.ts adds expo-location's High): a position every 5 s, also
@@ -90,8 +82,8 @@ export async function onLocations(locations: Location[], deps: HeadlessDeps): Pr
     if (keepPoint(b.walkKey, p)) deps.onPoint(p);
   }
   const now = deps.now();
-  if (now - b.lastSentAt < BATCH_MS) return void saveKept(KEY, { ...b, lastDeliveredAt: now });
-  saveKept(KEY, { ...b, lastSentAt: now, lastDeliveredAt: now });
+  if (now - b.lastSentAt < BATCH_MS) return;
+  saveKept(KEY, { ...b, lastSentAt: now });
   const answer = (await sendRecording(b.walkKey, deps.upload)) as { recording: boolean } | undefined;
   if (answer?.recording !== false || deps.queued(b.walkKey)) return;
   endRecording(b.walkKey);

@@ -3,12 +3,12 @@
 // when another phone takes over; with "Bildschirm auf der Runde anlassen" on, it keeps the screen on meanwhile.
 // useRecording() gives the walk screen what it shows: whether this phone records, how recording goes, the distance and
 // route so far, who records, and `takeOver`. `sent` counts the batches that reached the server, so the summary asks
-// again once the last one is there. `stoppedEarly`: Android ended this phone's recording behind the app's back (#108);
-// it starts again here, and the walk says so.
+// again once the last one is there. A gap without positions (a tunnel, or Android ended the service) doesn't end the
+// recording: it goes on when positions come again, and an opened app starts the service again (#108).
 import { newId, type TrackPoint } from "@gassi/domain";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useGassi } from "../data/GassiProvider";
-import { backgroundStopped, recordingGeo, stopStaleBackground } from "./geo";
+import { recordingGeo, stopStaleBackground } from "./geo";
 import { type Batch, createRecorder, type Recorder, type RecordingStatus, sendLeftovers, uploadWith } from "./recorder";
 import { useScreenOn } from "./screenOn";
 import { holdScreen } from "./wakeLock";
@@ -20,7 +20,6 @@ export type Recording = {
   points: TrackPoint[];
   recorderName: string | null;
   sent: number;
-  stoppedEarly: boolean;
   takeOver(): void;
 };
 
@@ -61,7 +60,6 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   const store = useMemo(() => liveStore(), []);
   const live = useSyncExternalStore(store.subscribe, store.get, store.get);
   const [sent, setSent] = useState(0);
-  const [stoppedEarly, setStoppedEarly] = useState(false);
   // the walk running after this render, for the recorder's cleanup to tell an ended walk from a handover (layout
   // effects run before the cleanups of the effects below)
   const running = useRef(key);
@@ -91,7 +89,6 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!key || !startedAt || !mine || !api) return;
-    void backgroundStopped(key).then(setStoppedEarly, () => {});
     const r = createRecorder({ walkKey: key, upload, geo: recordingGeo(startedAt) });
     const unsubscribe = store.set(r);
     return () => {
@@ -116,7 +113,6 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     ...(mine ? live : NOTHING),
     recorderName: walk?.recorder?.name ?? null,
     sent,
-    stoppedEarly: mine && stoppedEarly,
     takeOver,
   };
   return <RecordingContext.Provider value={value}>{children}</RecordingContext.Provider>;

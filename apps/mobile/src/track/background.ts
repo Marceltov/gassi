@@ -8,7 +8,7 @@ import * as TaskManager from "expo-task-manager";
 import { AppState, PermissionsAndroid, Platform } from "react-native";
 import { apiFor } from "../data/api";
 import { loadDevice } from "../data/device";
-import { backgroundWalk, beginBackground, clearBackground, distanceOf, endedEarly, type Location as Delivered, locationOptions, notificationBody, onLocations, pointEvents, queuedFor, stopWhenSignedOut } from "./headless";
+import { backgroundWalk, beginBackground, clearBackground, distanceOf, type Location as Delivered, locationOptions, notificationBody, onLocations, pointEvents, queuedFor, stopWhenSignedOut } from "./headless";
 import { uploadWith } from "./recorder";
 
 const TASK = "gassi-recording";
@@ -49,10 +49,6 @@ export async function stopBackground(): Promise<void> {
   clearBackground();
   if (await Location.hasStartedLocationUpdatesAsync(TASK)) if (!backgroundWalk()) await Location.stopLocationUpdatesAsync(TASK);
 }
-
-/** Whether Android ended the recording of `walkKey` on its own (the task's registration outlives a killed process,
- * so this goes by the last position). */
-export const backgroundStopped = async (walkKey: string): Promise<boolean> => endedEarly(walkKey, Date.now());
 
 // back in the foreground: the notification's line catches up
 AppState.addEventListener("change", (state) => {

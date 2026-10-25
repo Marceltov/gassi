@@ -22,11 +22,8 @@ function watchPosition(_walkKey: string, onPoint: (p: TrackPoint) => void, onDen
 /** The browser records only while the page is open, so there is nothing to end beyond the watching. */
 export const recordingGeo = (): Geo => ({ watch: watchPosition });
 
-/** The browser's recording can't be ended behind the app's back. */
-export const backgroundStopped = async (): Promise<boolean> => false;
-
 /** Nothing records in the background here. */
 export const stopStaleBackground = async (): Promise<void> => {};
 
-const sameAsNative: typeof Native = { recordingGeo, backgroundStopped, stopStaleBackground };
+const sameAsNative: typeof Native = { recordingGeo, stopStaleBackground };
 void sameAsNative;
