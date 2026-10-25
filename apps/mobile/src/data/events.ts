@@ -15,6 +15,7 @@ export type EventData = NonNullable<ClientEvent["data"]>;
 type Kept = { wants: ClientEventWants; events: ClientEvent[]; recent: Record<string, number> }; // recent: an error → when
 
 const KEY = "events";
+const TRIES = 3; // a server error this often in a row for the same batch drops it
 const KEEP = 2000;
 const KEEP_CHARS = 500_000;
 const BATCH = 100;
@@ -44,8 +45,8 @@ function serialized(kept: Kept): string {
   }
 }
 
-function load(): Kept {
-  const k = loadKept(KEY) as Partial<Kept> | null;
+function loadFrom(key: string): Kept {
+  const k = loadKept(key) as Partial<Kept> | null;
   const wants = k?.wants === "off" || k?.wants === "errors" ? k.wants : "all";
   const recent = k?.recent && typeof k.recent === "object" ? k.recent : {};
   return { wants, events: Array.isArray(k?.events) ? k.events : [], recent };
@@ -64,9 +65,15 @@ export function errorText(e: unknown): string {
   return e.stack?.split("\n").slice(0, 6).join("\n") ?? `${e.name}: ${e.message}`;
 }
 
-export function createEvents({ now = () => new Date(), newId = domainId }: { now?: () => Date; newId?: () => string } = {}): Events {
+// a refusal that sending the same batch again won't change; 401 (signed out), 408 and 429 (later) aren't
+const forGood = (e: unknown) => e instanceof ApiError && e.status >= 400 && e.status < 500 && ![401, 408, 429].includes(e.status);
+
+/** `key`: where in the kept storage; the background task keeps its own, so it never writes over the open app's. */
+export function createEvents({ now = () => new Date(), newId = domainId, key = KEY }: { now?: () => Date; newId?: () => string; key?: string } = {}): Events {
+  const load = () => loadFrom(key);
   let sending: Promise<void> | null = null;
   let asked = -Infinity;
+  let failures = { id: "", count: 0 }; // server errors in a row for the batch starting at `id`
   let open: string | null = null; // the screen now open
   const recentHere = new Map<string, number>(); // the same as `recent`, without reading storage for a repeat
 
@@ -82,7 +89,7 @@ export function createEvents({ now = () => new Date(), newId = domainId }: { now
         recent[again] = at;
       }
       const event: ClientEvent = { id: newId(), at: new Date(at).toISOString(), kind, name: name.slice(0, NAME), ...(data ? { data: fit(data) } : {}) };
-      saveKeptText(KEY, serialized({ ...kept, recent, events: [...kept.events, event] }));
+      saveKeptText(key, serialized({ ...kept, recent, events: [...kept.events, event] }));
     } catch {
       // storage full or gone: this one is lost, the app goes on
     }
@@ -97,12 +104,16 @@ export function createEvents({ now = () => new Date(), newId = domainId }: { now
         asked = now().getTime();
         wants = (await post(batch)).wants;
       } catch (e) {
-        // refused for good (400): dropped, so the stream goes on; else (no reception) it waits for the next flush
-        if (!(e instanceof ApiError && e.status === 400)) return;
+        // refused for good: dropped, so the stream goes on; a server error a few times in a row too; else (no
+        // reception, signed out, too often) it waits for the next flush
+        const head = batch[0]?.id ?? "";
+        const serverError = e instanceof ApiError && e.status >= 500;
+        failures = serverError ? { id: head, count: failures.id === head ? failures.count + 1 : 1 } : { id: "", count: 0 };
+        if (!forGood(e) && !(serverError && failures.count >= TRIES)) return;
       }
       const ids = new Set(batch.map((e) => e.id));
       const kept = load();
-      saveKept(KEY, { ...kept, wants: wants ?? kept.wants, events: wants === "off" ? [] : kept.events.filter((e) => !ids.has(e.id)) });
+      saveKept(key, { ...kept, wants: wants ?? kept.wants, events: wants === "off" ? [] : kept.events.filter((e) => !ids.has(e.id)) });
       if (batch.length === 0) return;
     }
   }
@@ -143,5 +154,7 @@ export function createEvents({ now = () => new Date(), newId = domainId }: { now
   };
 }
 
-/** The app's one stream, for screens, the store, crashes and the background task. */
+/** The app's stream, for screens, the store and crashes. */
 export const events = createEvents();
+/** The background recording task's (track/background.ts), sent by the open app with the app's. */
+export const taskEvents = createEvents({ key: "eventsTask" });

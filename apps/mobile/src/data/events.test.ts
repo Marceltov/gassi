@@ -164,3 +164,38 @@ test("an error that can't even be turned into text doesn't throw", () => {
   expect(() => events.error("Absturz", Object.create(null))).not.toThrow();
   expect(events.waiting().at(-1)).toMatchObject({ kind: "error", name: "Absturz" });
 });
+
+test("a refusal for good (413, 422 …) drops the batch; a server error three times in a row too; no reception never", async () => {
+  const { events, sent } = setup();
+  let status: number | null = 413;
+  const send = async (batch: ClientEvent[]) => {
+    if (status !== null) throw new ApiError(status, "no");
+    sent.push(batch);
+    return { wants: "all" as const };
+  };
+  events.record("tap", "a");
+  await events.flush(send);
+  expect(events.waiting()).toEqual([]);
+  events.record("tap", "b");
+  status = 500;
+  await events.flush(send);
+  await events.flush(send);
+  expect(events.waiting()).toHaveLength(1);
+  await events.flush(send);
+  expect(events.waiting()).toEqual([]);
+  events.record("tap", "c");
+  for (const s of [0, 0, 0, 0, 429, 429, 429, 429, 401, 401, 401, 401]) {
+    status = s;
+    await events.flush(send);
+  }
+  expect(events.waiting()).toHaveLength(1);
+});
+
+test("the background task keeps its events apart, so it and the open app never write over each other", () => {
+  const app = createEvents();
+  const task = createEvents({ key: "eventsTask" });
+  app.record("tap", "a");
+  task.record("track", "batch");
+  expect(app.waiting().map((e) => e.name)).toEqual(["a"]);
+  expect(task.waiting().map((e) => e.name)).toEqual(["batch"]);
+});

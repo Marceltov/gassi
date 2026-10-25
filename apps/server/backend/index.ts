@@ -1,7 +1,7 @@
 // The backend's boundary: the only module app/ may import from backend/ (enforced in eslint.config.mjs). The route
 // handlers are mounted as they are; the link page asks for its content here.
 import { type Mailer, smtpMailer } from "./auth/mail";
-import { clientOf, REPORT_LIMITS, Throttle } from "./auth/throttle";
+import { clientOf, EVENT_LIMITS, REPORT_LIMITS, Throttle } from "./auth/throttle";
 import { config } from "./config";
 import { database } from "./db/open";
 import { apiRouter } from "./http/api";
@@ -22,6 +22,7 @@ const mailer = (smtp: { url: string; from: string }): Mailer => (cachedMailer?.u
 // Wrong sign-in codes and reports from the app, counted across requests for the life of the process.
 const codeThrottle = new Throttle();
 const reportThrottle = new Throttle(REPORT_LIMITS);
+const eventThrottle = new Throttle(EVENT_LIMITS);
 
 // One GitHub client per process, so its list stays cached between requests.
 let cachedIssues: { key: string; issues: Issues } | null = null;
@@ -33,7 +34,7 @@ const issuesOf = (gh: { repo: string; token: string }): Issues => {
 /** Every endpoint of the API contract (packages/api-client), and their CORS preflight (OPTIONS). */
 export const api = logged(async (req) => {
   const { publicUrl, oidc, smtp, timeZone, defaultDogName, secret, dataDir, corsOrigin, github, clientEvents } = config();
-  return cors(corsOrigin, async (req) => apiRouter({ db: await database(), now: () => new Date(), publicUrl, codeKey: linkCodeKey(secret, dataDir), codeThrottle, client: clientOf(req), oidc: oidc !== null, mailer: smtp && mailer(smtp), timeZone, defaultDogName, issues: github && issuesOf(github), reportThrottle, clientEvents })(req))(req);
+  return cors(corsOrigin, async (req) => apiRouter({ db: await database(), now: () => new Date(), publicUrl, codeKey: linkCodeKey(secret, dataDir), codeThrottle, client: clientOf(req), oidc: oidc !== null, mailer: smtp && mailer(smtp), timeZone, defaultDogName, issues: github && issuesOf(github), reportThrottle, eventThrottle, clientEvents })(req))(req);
 });
 export const health = logged(() => healthRoute());
 export const oidcStart = logged((req) => oidcStartRoute(req));

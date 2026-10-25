@@ -11,6 +11,10 @@ export const CODE_LIMITS = { client: { burst: 10, everyMs: 60_000 }, all: { burs
 /** 5 reports in a row per device, then one every 10 minutes; 20 for everyone together, then one a minute. */
 export const REPORT_LIMITS = { client: { burst: 5, everyMs: 600_000 }, all: { burst: 20, everyMs: 60_000 } };
 
+/** The app's event batches: 20 in a row per device, then one every 10 s (it sends every 30 s); 200 for everyone
+ * together, then one a second. */
+export const EVENT_LIMITS = { client: { burst: 20, everyMs: 10_000 }, all: { burst: 200, everyMs: 1000 } };
+
 type Level = { level: number; at: number };
 const ALL = "*";
 

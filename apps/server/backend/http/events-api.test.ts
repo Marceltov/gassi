@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { freshDatabase, HERZII } from "../db/testing";
 import { logTo } from "../log";
+import { Throttle } from "../auth/throttle";
 import { apiCaller } from "./testing";
 
 const { db } = freshDatabase();
@@ -36,6 +37,26 @@ describe("the app's events", () => {
     const { json, tokenFor } = apiCaller(db, () => NOW, () => ({ clientEvents: "errors" }));
     const token = await tokenFor(HERZII.id);
     expect(await json("/api/events", { method: "POST", token, body })).toEqual({ status: 200, body: { received: 1, wants: "errors" } });
+  });
+
+  test("a device that sends too often waits (429)", async () => {
+    const eventThrottle = new Throttle({ client: { burst: 2, everyMs: 60_000 }, all: { burst: 100, everyMs: 1000 } });
+    const { json, tokenFor } = apiCaller(db, () => NOW, () => ({ eventThrottle }));
+    const token = await tokenFor(HERZII.id);
+    const one = (id: string) => ({ ...body, events: [{ ...events[1], id }] });
+    expect((await json("/api/events", { method: "POST", token, body: one("a") })).status).toBe(200);
+    expect((await json("/api/events", { method: "POST", token, body: one("b") })).status).toBe(200);
+    expect((await json("/api/events", { method: "POST", token, body: one("c") })).status).toBe(429);
+  });
+
+  test("an event's data can't pass itself off as another person or device in the log", async () => {
+    const lines: Record<string, unknown>[] = [];
+    restore = logTo((line) => void lines.push(JSON.parse(line)));
+    const { json, tokenFor } = apiCaller(db, () => NOW);
+    const token = await tokenFor(HERZII.id);
+    const forged = { ...events[0], id: "f1", data: { message: "x", person: "Hirsch", device: "Anderes" } };
+    await json("/api/events", { method: "POST", token, body: { ...body, events: [forged] } });
+    expect(lines.find((l) => l.component === "client-error")).toMatchObject({ person: "Herzii", device: "Testgerät" });
   });
 
   test("need a signed-in device", async () => {

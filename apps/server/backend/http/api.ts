@@ -31,6 +31,7 @@ export type ApiDeps = {
   issues?: Issues | null; // Wünsche und Fehler on GitHub, when configured
   reportThrottle?: Throttle; // reports from the app, per device, kept across requests
   clientEvents?: ClientEventWants; // what is kept of the app's events (CLIENT_EVENTS), default all
+  eventThrottle?: Throttle; // the app's event batches, per device, kept across requests
 };
 
 const names = (deps: ApiDeps) => new PeopleRepository(deps.db).names();
@@ -144,11 +145,15 @@ const implementations: Implementations<ApiDeps> = {
   issues: async ({ deps }) => ({ issues: await issues(deps).list(deps.now().getTime()) }),
   reportEvents: async ({ input, auth, deps }) => {
     const wants = deps.clientEvents ?? "all";
+    const device = `device ${auth.device.id}`;
+    const now = deps.now().getTime();
+    if (deps.eventThrottle?.blocked(device, now)) throw new TooMany("Gerade viel gemeldet. Bitte später nochmal.");
+    deps.eventThrottle?.count(device, now);
     const stored = await storeEvents(deps.db, auth.device.id, auth.person.id, input, deps.now().toISOString(), wants);
     // errors also as a log line each, for `docker compose logs gassi | grep client-error`
     const log = logger("client-error");
     const who = { person: auth.person.name, device: auth.device.name, kind: auth.device.kind, version: input.version, platform: input.platform };
-    for (const e of stored) if (e.kind === "error") log.warn({ ...who, at: e.at, name: e.name, ...e.data }, "client error");
+    for (const e of stored) if (e.kind === "error") log.warn({ ...e.data, at: e.at, name: e.name, ...who }, "client error");
     return { received: stored.length, wants };
   },
   reportIssue: async ({ input, auth, deps }) => {

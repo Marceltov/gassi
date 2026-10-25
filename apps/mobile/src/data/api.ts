@@ -3,7 +3,7 @@
 // removed or its token is gone) and forgets what it showed, which brings up the sign-in.
 import { ApiError, type Client, createClient } from "@gassi/api-client";
 import { clearDevice, type Device, loadDevice } from "./device";
-import { events } from "./events";
+import { events, taskEvents } from "./events";
 import { clearKept } from "./kept";
 
 /** The server: empty on the web, where the server serves the app (same origin); set for development. */
@@ -66,6 +66,7 @@ export function apiFor(device: Device, { fetch: fetchFn = (...a) => fetch(...a),
 export function forgetDevice(): void {
   clearKept();
   events.forget();
+  taskEvents.forget();
   clearDevice();
 }
 

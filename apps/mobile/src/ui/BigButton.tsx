@@ -7,6 +7,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { type ButtonKind, FIELD_HEIGHT, type Palette, radius, useTheme } from "../theme";
 import { Icon, type IconName } from "./Icon";
 import { events } from "../data/events";
+import { tapName } from "../data/usage";
 
 const sizes = { xl: { height: 100, font: 21, icon: 26 }, l: { height: 72, font: 17, icon: 22 }, m: { height: 52, font: 15, icon: 18 }, s: { height: FIELD_HEIGHT, font: 15, icon: 16 } };
 
@@ -25,14 +26,16 @@ type Props = {
   /** Greyed out and not tappable. */
   disabled?: boolean;
   stacked?: boolean;
+  /** the tap's name in the app's usage events when label or a11y hold data (typed text, the household's names) */
+  event?: string;
 };
 
-export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, disabled, stacked, size = "xl" }: Props) {
+export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, event, disabled, stacked, size = "xl" }: Props) {
   const theme = useTheme();
   const { height, font, icon: iconSize } = sizes[size];
   const look = lookOf(kind, theme, !!disabled);
   // the button's name for the app's usage events (#115): what it says, never what was typed
-  const tapped = (hold: boolean) => events.record("tap", a11y ?? label, hold ? { hold } : undefined);
+  const tapped = (hold: boolean) => events.record("tap", tapName({ event, a11y, label }), hold ? { hold } : undefined);
   return (
     <Pressable
       accessibilityRole="button"

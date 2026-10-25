@@ -13,6 +13,10 @@ export function commandEvent(c: Command): Usage {
   return { name: c.kind, data };
 }
 
+/** A tap's name: the button's own event name when its label or accessibility name holds data (a typed amount, the
+ * household's exercise names), else its accessibility name or label. */
+export const tapName = ({ event, a11y, label }: { event?: string; a11y?: string; label: string }): string => event ?? a11y ?? label;
+
 /** A call to the server for the household, the queue's taps or the running walk: how long, whether it worked, and
  * how many taps wait. */
 export const syncEvent = (part: "household" | "commands" | "sessions", ms: number, ok: boolean, queued: number): Usage => ({ name: part, data: { ms: Math.round(ms), ok, queued } });

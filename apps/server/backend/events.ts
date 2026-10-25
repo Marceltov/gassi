@@ -12,13 +12,16 @@ type Batch = { events: ClientEvent[]; version: string; platform: string };
 /** Keeps what the server wants of `batch`; the events stored now (not those it had already). */
 export async function storeEvents(db: DB, deviceId: number, personId: string, batch: Batch, receivedAt: string, wants: ClientEventWants): Promise<ClientEvent[]> {
   const kept = batch.events.filter((e) => wants === "all" || (wants === "errors" && e.kind === "error"));
-  const stored: ClientEvent[] = [];
-  for (const e of kept) {
-    const row = { device_id: deviceId, id: e.id, person_id: personId, at: e.at, kind: e.kind, name: e.name, data: e.data ? JSON.stringify(e.data) : null, version: batch.version, platform: batch.platform, received_at: receivedAt };
-    const r = await db.insertInto("client_event").values(row).onConflict((oc) => oc.doNothing()).executeTakeFirst();
-    if (Number(r.numInsertedOrUpdatedRows ?? 0) > 0) stored.push(e);
-  }
-  return stored;
+  // one transaction for the batch: one write to disk, not one per event
+  return db.transaction().execute(async (tx) => {
+    const stored: ClientEvent[] = [];
+    for (const e of kept) {
+      const row = { device_id: deviceId, id: e.id, person_id: personId, at: e.at, kind: e.kind, name: e.name, data: e.data ? JSON.stringify(e.data) : null, version: batch.version, platform: batch.platform, received_at: receivedAt };
+      const r = await tx.insertInto("client_event").values(row).onConflict((oc) => oc.doNothing()).executeTakeFirst();
+      if (Number(r.numInsertedOrUpdatedRows ?? 0) > 0) stored.push(e);
+    }
+    return stored;
+  });
 }
 
 /** Deletes what was received over 30 days before `now`; how many. */

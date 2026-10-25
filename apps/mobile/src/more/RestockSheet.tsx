@@ -140,7 +140,7 @@ function RestockForm({ onDone, stock }: { onDone: () => void; stock: Stock | nul
           {message}
         </Text>
       ) : null}
-      <BigButton kind="food" size="m" icon="check" label={label} disabled={!ready} onPress={save} />
+      <BigButton kind="food" size="m" icon="check" label={label} event="Vorrat eintragen" disabled={!ready} onPress={save} />
     </View>
   );
 }

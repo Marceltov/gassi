@@ -10,7 +10,7 @@
 import { ApiError, type Client, trackPointSchema } from "@gassi/api-client";
 import { createLiveFilter, newId, type TrackPoint } from "@gassi/domain";
 import { loadKept, saveKept } from "../data/kept";
-import { events } from "../data/events";
+import { type Events, events } from "../data/events";
 import { batchEvent } from "../data/usage";
 
 export type Batch = { trackId: string; walkKey: string; source: "phone"; seq: number; points: TrackPoint[] };
@@ -25,16 +25,16 @@ export class RejectedBatch extends Error {}
 
 /** The upload through `api`, a refusal for good as RejectedBatch; answers whether this device still records. */
 export const uploadWith =
-  (api: Client) =>
+  (api: Client, stream: Events = events) =>
   async (b: Batch): Promise<{ recording: boolean }> => {
     try {
       const answer = await api.uploadTrack(b);
       const { name, data } = batchEvent(b.points.length, answer);
-      events.record("track", name, data);
+      stream.record("track", name, data);
       return answer;
     } catch (e) {
       const { name, data } = batchEvent(b.points.length, null);
-      events.record("track", name, data);
+      stream.record("track", name, data);
       throw e instanceof ApiError && e.status === 400 ? new RejectedBatch() : e;
     }
   };

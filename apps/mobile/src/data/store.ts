@@ -9,7 +9,7 @@ import { apiFor, errorMessage, NO_ANSWER_STATUS, WRITE_TIMEOUT_MS } from "./api"
 import { type Device, loadDevice } from "./device";
 import { onReconnect } from "./network";
 import { platformName } from "./thisDevice";
-import { events } from "./events";
+import { events, taskEvents } from "./events";
 import { commandEvent, syncEvent } from "./usage";
 import { onStoredElsewhere, storage } from "./storage";
 import { loadSnapshot, saveSnapshot } from "./snapshot";
@@ -109,7 +109,9 @@ export function createGassiStore(device: Device, { fetch: fetchFn, version = "?"
   let answers = 0;
   const errors: Record<Part, string | null> = { household: null, commands: null, sessions: null };
   // the same error goes to the server too (events.ts), once a minute at most
-  const flushEvents = () => events.flush((batch) => api.reportEvents({ events: batch, version, platform: platformName() }));
+  // the background task's too (kept apart, so neither writes over the other's)
+  const post = (batch: Parameters<typeof api.reportEvents>[0]["events"]) => api.reportEvents({ events: batch, version, platform: platformName() });
+  const flushEvents = () => Promise.all([events.flush(post), taskEvents.flush(post)]);
   const failed = (part: Part, e: unknown) => {
     if (quiet(e)) return;
     errors[part] = e instanceof ApiError ? e.message : errorMessage(e) + (e instanceof Error ? ` (${e.message})` : "");
