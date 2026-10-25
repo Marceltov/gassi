@@ -20,6 +20,9 @@ export function normalizeServer(typed: string): string {
   return withScheme.match(/^https?:\/\/[^/?#]+/i)?.[0] ?? withScheme;
 }
 
+/** The server the address field names, or null while it's empty. */
+export const typedServer = (typed: string): string | null => (typed.trim() ? normalizeServer(typed) : null);
+
 export async function linkKind(server: string, key: LinkKey, fetchFn?: typeof fetch): Promise<LinkKind> {
   return (await publicApi(server, fetchFn).linkInfo(key)).kind;
 }

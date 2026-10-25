@@ -11,9 +11,13 @@ export function onCrash(fn: (message: string) => void): () => void {
   const utils = (globalThis as { ErrorUtils?: ErrorUtils }).ErrorUtils;
   if (!utils) return () => {};
   const before = utils.getGlobalHandler();
-  utils.setGlobalHandler((error, isFatal) => {
+  const ours: Handler = (error, isFatal) => {
     fn(errorText(error));
     before(error, isFatal);
-  });
-  return () => utils.setGlobalHandler(before);
+  };
+  utils.setGlobalHandler(ours);
+  // a handler installed after ours stays
+  return () => {
+    if (utils.getGlobalHandler() === ours) utils.setGlobalHandler(before);
+  };
 }

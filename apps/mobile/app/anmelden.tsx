@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { Platform, StyleSheet, Text, TextInput } from "react-native";
 import { API_URL } from "@/src/data/api";
-import { normalizeServer, signInOptions } from "@/src/data/signin";
+import { signInOptions, typedServer } from "@/src/data/signin";
 import { startOidc } from "@/src/signin/oidc";
 import { SignIn } from "@/src/signin/SignIn";
 import { radius, space, useTheme } from "@/src/theme";
@@ -21,18 +21,22 @@ export default function SignInScreen() {
   const theme = useTheme();
   const web = Platform.OS === "web";
   const [typed, setTyped] = useState("");
-  const [server, setServer] = useState<string | null>(web ? API_URL : null);
+  // the server follows the field as it is typed: on Android the first tap on "Anmelden" may only close the keyboard,
+  // so the field's end of editing can come too late
+  const server = web ? API_URL : typedServer(typed);
   // what the server offers, kept with the server it came from: another address asks again
   const [options, setOptions] = useState<{ server: string; oidc: boolean } | null>(null);
   const oidc = options?.server === server && options.oidc;
   useEffect(() => {
     if (server === null) return;
     let alive = true; // the sign-in may be left (a link signs in), or the server changed, before the answer comes
-    void signInOptions(server).then((o) => alive && setOptions({ server, oidc: o.oidc }));
+    // asked once typing pauses, not at every letter
+    const asking = setTimeout(() => void signInOptions(server).then((o) => alive && setOptions({ server, oidc: o.oidc })), web ? 0 : 500);
     return () => {
       alive = false;
+      clearTimeout(asking);
     };
-  }, [server]);
+  }, [server, web]);
   return (
     <SignIn
       server={server}
@@ -47,7 +51,6 @@ export default function SignInScreen() {
             autoCorrect={false}
             value={typed}
             onChangeText={setTyped}
-            onEndEditing={() => setServer(typed.trim() ? normalizeServer(typed) : null)}
             style={[styles.input, { backgroundColor: theme.surface, color: theme.ink, borderColor: theme.line }]}
           />
         )

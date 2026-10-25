@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { loadDevice } from "./device";
-import { linkKind, needsName, normalizeServer, signIn, signInOptions } from "./signin";
+import { linkKind, needsName, normalizeServer, signIn, signInOptions, typedServer } from "./signin";
 import { fakeServer, status } from "./testing";
 
 test("a person or setup link asks for a name, a device link doesn't", async () => {
@@ -45,4 +45,10 @@ test("normalizeServer: a pasted link keeps only its server", () => {
   expect(normalizeServer("gassi.example.org/join?token=abc")).toBe("https://gassi.example.org");
   expect(normalizeServer("https://gassi.example.org:8443/mehr/haushalt#x")).toBe("https://gassi.example.org:8443");
   expect(normalizeServer("gassi.example.org?token=abc")).toBe("https://gassi.example.org");
+});
+
+test("typedServer: what the field holds, as a server, at every keystroke; nothing while it's empty", () => {
+  expect(typedServer("")).toBeNull();
+  expect(typedServer("  ")).toBeNull();
+  expect(typedServer("gassi.example.org/join?token=abc")).toBe("https://gassi.example.org");
 });
