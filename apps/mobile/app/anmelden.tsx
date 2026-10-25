@@ -26,7 +26,7 @@ export default function SignInScreen() {
   const server = web ? API_URL : typedServer(typed);
   // what the server offers, kept with the server it came from: another address asks again
   const [options, setOptions] = useState<{ server: string; oidc: boolean } | null>(null);
-  const oidc = options?.server === server && options.oidc;
+  const oidc = options !== null && options.server === server && options.oidc;
   useEffect(() => {
     if (server === null) return;
     let alive = true; // the sign-in may be left (a link signs in), or the server changed, before the answer comes
