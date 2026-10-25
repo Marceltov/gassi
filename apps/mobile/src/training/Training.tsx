@@ -148,10 +148,10 @@ export function Training() {
                   <Text style={[styles.name, { color: theme.ink }]}>{`${e.name} · ${t.ok}/${t.ok + t.fail}`}</Text>
                   <View style={styles.row}>
                     <View style={styles.cell}>
-                      <BigButton kind="walk" size="m" icon="check" label="klappt" a11y={`${e.name} klappt`} onPress={() => tap(e.id, true)} onLongPress={() => undo(e.id, true)} />
+                      <BigButton kind="walk" size="m" icon="check" label="klappt" a11y={`${e.name} klappt`} event="klappt" onPress={() => tap(e.id, true)} onLongPress={() => undo(e.id, true)} />
                     </View>
                     <View style={styles.cell}>
-                      <BigButton kind="neutral" size="m" icon="cross" label="klappt nicht" a11y={`${e.name} klappt nicht`} onPress={() => tap(e.id, false)} onLongPress={() => undo(e.id, false)} />
+                      <BigButton kind="neutral" size="m" icon="cross" label="klappt nicht" a11y={`${e.name} klappt nicht`} event="klappt nicht" onPress={() => tap(e.id, false)} onLongPress={() => undo(e.id, false)} />
                     </View>
                   </View>
                 </View>
@@ -165,7 +165,7 @@ export function Training() {
             <View style={[styles.row, styles.wrap]}>
               {treatKinds.map((k) => (
                 <View key={k.id} style={[styles.cell, styles.treat]}>
-                  <BigButton kind="food" size="m" icon="treat" label={`${k.name} · ${training.treats[k.id] ?? 0}`} sub="+1" a11y={`${k.name} +1`} onPress={() => treat(k.id, 1)} onLongPress={() => treat(k.id, -1)} />
+                  <BigButton kind="food" size="m" icon="treat" label={`${k.name} · ${training.treats[k.id] ?? 0}`} sub="+1" a11y={`${k.name} +1`} event="Leckerli +1" onPress={() => treat(k.id, 1)} onLongPress={() => treat(k.id, -1)} />
                 </View>
               ))}
             </View>

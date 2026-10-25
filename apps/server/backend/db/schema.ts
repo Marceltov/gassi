@@ -136,6 +136,21 @@ export interface SessionAliasTable {
   entry_id: number;
 }
 
+// What happened in the app (#115): one row per event and device, kept 30 days (events.ts). No foreign keys: an event
+// outlives a removed device for those days.
+export interface ClientEventTable {
+  device_id: number;
+  id: string; // the app's id, unique per device
+  person_id: string;
+  at: string;
+  kind: string;
+  name: string;
+  data: string | null; // JSON
+  version: string;
+  platform: string;
+  received_at: string;
+}
+
 export interface Schema {
   dog: DogTable;
   entry: EntryTable;
@@ -154,6 +169,7 @@ export interface Schema {
   training_treat: TrainingTreatTable;
   applied_command: AppliedCommandTable;
   session_alias: SessionAliasTable;
+  client_event: ClientEventTable;
 }
 
 export type EntryRow = Selectable<EntryTable>;

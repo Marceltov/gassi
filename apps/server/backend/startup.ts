@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { ensureSetupLink } from "./auth/links";
 import { startBackups } from "./backup";
 import { config } from "./config";
+import { startEventCleanup } from "./events";
 import { linkCodeKey } from "./secret";
 import { database } from "./db/open";
 import { logger } from "./log";
@@ -27,4 +28,6 @@ export async function startup(): Promise<void> {
   const log = logger("backup");
   // the daily copy of the database; a failure is logged and tried again the next hour, it never stops the app
   await startBackups({ db, dir: join(dataDir, "backups"), timeZone, onError: (e) => log.error({ err: e }, "backup failed"), onWritten: (path) => log.info({ path }, "backup written") });
+  // the app's events are kept 30 days (#115)
+  await startEventCleanup({ db, onError: (e) => logger("events").error({ err: e }, "event cleanup failed") });
 }

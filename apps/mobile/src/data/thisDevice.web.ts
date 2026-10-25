@@ -22,10 +22,15 @@ export function thisDeviceName(): string {
   return deviceName(typeof navigator === "undefined" ? "" : navigator.userAgent);
 }
 
+/** "ios-web" for the home-screen app or Safari on an iPhone or iPad, else "web" (events.ts). */
+export function platformName(): string {
+  return /iPhone|iPad|iPod/.test(typeof navigator === "undefined" ? "" : navigator.userAgent) ? "ios-web" : "web";
+}
+
 /** The server that serves this page; a link's `server` is ignored (it is this one anyway). */
 export function linkedServer(_param: string | undefined): string | null {
   return API_URL;
 }
 
-const sameAsNative: Omit<typeof Native, "DEVICE_KIND"> = { thisDeviceName, linkedServer };
+const sameAsNative: Omit<typeof Native, "DEVICE_KIND"> = { thisDeviceName, linkedServer, platformName };
 void sameAsNative;

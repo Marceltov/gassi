@@ -189,13 +189,24 @@ test("no reception is no sync error", async () => {
   expect(store.get()).toMatchObject({ online: false, syncError: null });
 });
 
-test("a sync error goes to the server's log too", async () => {
+test("a sync error goes to the server too, as an event", async () => {
   const server = household();
   server.handlers["GET /api/sessions"] = () => ({ walk: "kaputt", training: null });
-  server.handlers["POST /api/client-errors"] = (body) => ({ received: (body as { errors: unknown[] }).errors.length });
+  server.handlers["POST /api/events"] = (body) => ({ received: (body as { events: unknown[] }).events.length, wants: "all" });
   const store = createGassiStore({ token: "t", serverUrl: "", person: HIRSCH }, { fetch: server.fetch, version: "0.3.0" });
   await store.refresh();
   await settle();
-  const sent = server.calls.filter((c) => c.route === "POST /api/client-errors");
-  expect(sent).toEqual([expect.objectContaining({ body: { version: "0.3.0", errors: [expect.objectContaining({ part: "Runde und Training", message: expect.stringMatching(/^Die Antwort des Servers passt nicht/) })] } })]);
+  const sent = server.calls.filter((c) => c.route === "POST /api/events");
+  expect(sent).toEqual([
+    expect.objectContaining({
+      body: {
+        version: "0.3.0",
+        platform: "web",
+        events: expect.arrayContaining([
+          expect.objectContaining({ kind: "error", name: "Runde und Training", data: { message: expect.stringMatching(/^Die Antwort des Servers passt nicht/) } }),
+          expect.objectContaining({ kind: "sync", name: "sessions", data: expect.objectContaining({ ok: false }) }),
+        ]),
+      },
+    }),
+  ]);
 });

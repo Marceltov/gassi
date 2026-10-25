@@ -12,6 +12,7 @@ import { recordingGeo, stopStaleBackground } from "./geo";
 import { type Batch, createRecorder, type Recorder, type RecordingStatus, sendLeftovers, uploadWith } from "./recorder";
 import { useScreenOn } from "./screenOn";
 import { holdScreen } from "./wakeLock";
+import { events } from "../data/events";
 
 export type Recording = {
   mine: boolean;
@@ -34,7 +35,9 @@ function liveStore() {
   let live = NOTHING;
   const listeners = new Set<() => void>();
   const changed = () => {
+    const before = live.status;
     live = recorder ? { status: recorder.status(), distanceM: recorder.distanceM(), points: recorder.points() } : NOTHING;
+    if (recorder && live.status !== before) events.record("track", "status", { status: live.status });
     listeners.forEach((fn) => fn());
   };
   return {

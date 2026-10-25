@@ -1,5 +1,6 @@
 // Every environment variable the server reads, parsed and checked once (zod). A missing or invalid variable fails with
 // its name. config() is what the app uses; parseConfig() is the pure part, for tests.
+import { CLIENT_EVENT_WANTS, type ClientEventWants } from "@gassi/api-client";
 import { z } from "zod";
 import { processState } from "./state";
 
@@ -35,6 +36,7 @@ const schema = z
     CORS_ORIGIN: optional(z.url({ protocol: /^https?$/ })).transform((u) => u && new URL(u).origin),
     FEEDBACK_GITHUB_REPO: optional(z.string().trim().regex(/^[\w.-]+\/[\w.-]+$/, "must be owner/name")),
     FEEDBACK_GITHUB_TOKEN: optional(z.string().trim().min(1)),
+    CLIENT_EVENTS: optional(z.enum(CLIENT_EVENT_WANTS)).default("all"),
   })
   .refine((c) => new Set([!!c.OIDC_ISSUER, !!c.OIDC_CLIENT_ID, !!c.OIDC_CLIENT_SECRET]).size === 1, { path: ["OIDC_ISSUER"], message: "OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET go together" })
   .refine((c) => !!c.FEEDBACK_GITHUB_REPO === !!c.FEEDBACK_GITHUB_TOKEN, { path: ["FEEDBACK_GITHUB_REPO"], message: "FEEDBACK_GITHUB_REPO and FEEDBACK_GITHUB_TOKEN go together" });
@@ -53,6 +55,7 @@ export type Config = {
   setupLinkFile: string | null; // where the setup link is also written (the e2e tests read it there)
   corsOrigin: string | null; // dev only: the Expo dev server (http://localhost:8081) calling the API from another origin
   github: { repo: string; token: string } | null; // where Wünsche und Fehler are read and filed (#45, #39)
+  clientEvents: ClientEventWants; // what the server keeps of the app's events (#115)
 };
 
 export function parseConfig(env: Record<string, string | undefined>): Config {
@@ -74,6 +77,7 @@ export function parseConfig(env: Record<string, string | undefined>): Config {
     setupLinkFile: c.SETUP_LINK_FILE ?? null,
     corsOrigin: c.CORS_ORIGIN ?? null,
     github: c.FEEDBACK_GITHUB_REPO ? { repo: c.FEEDBACK_GITHUB_REPO, token: c.FEEDBACK_GITHUB_TOKEN! } : null,
+    clientEvents: c.CLIENT_EVENTS,
   };
 }
 

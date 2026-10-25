@@ -46,6 +46,25 @@ export const deviceKinds = ["phone", "watch", "web", "script"] as const;
 export const deviceSchema = z.object({ id: z.number(), kind: z.enum(deviceKinds), name: z.string() });
 
 export const ISSUE_KINDS = ["wish", "bug"] as const;
+
+// What happens in the app, for error traces and usage statistics on the household's own server (#115, ADR 0016).
+export const CLIENT_EVENT_KINDS = ["error", "screen", "tap", "command", "sync", "track", "app"] as const;
+/** What the server keeps of the app's events (its CLIENT_EVENTS); the app then records only that. */
+export const CLIENT_EVENT_WANTS = ["off", "errors", "all"] as const;
+export const EVENT_DATA_KEYS = 20;
+export const EVENT_TEXT = 4000;
+export const clientEventSchema = z.object({
+  id: z.string().min(1).max(40),
+  at: z.string().max(40),
+  kind: z.enum(CLIENT_EVENT_KINDS),
+  name: z.string().max(80),
+  data: z
+    .record(z.string().max(40), z.union([z.string().max(EVENT_TEXT), z.number(), z.boolean(), z.null()]))
+    .refine((d) => Object.keys(d).length <= EVENT_DATA_KEYS, `at most ${EVENT_DATA_KEYS} keys`)
+    .optional(),
+});
+export type ClientEvent = z.infer<typeof clientEventSchema>;
+export type ClientEventWants = (typeof CLIENT_EVENT_WANTS)[number];
 // `at`: when an open issue was opened, when a closed one was closed
 export const issueSchema = z.object({ number: z.number(), title: z.string(), open: z.boolean(), kind: z.enum(ISSUE_KINDS).nullable(), fromApp: z.boolean(), at: z.string(), url: z.string() });
 
@@ -325,15 +344,13 @@ export const contract = {
     output: issueSchema,
     messages: { kind: "Wunsch oder Fehler?", title: "Worum geht es? Kurz, höchstens 120 Zeichen.", text: "Höchstens 5000 Zeichen." },
   }),
-  // what went wrong in the app (a sync that failed, a crash), into the server's log for debugging (#106)
-  reportErrors: endpoint({
+  // what happens in the app (errors with their stacks, screens, taps, sync and recording health), kept 30 days (#115);
+  // an empty batch only asks what the server wants
+  reportEvents: endpoint({
     method: "POST",
-    path: "/api/client-errors",
-    input: z.object({
-      errors: z.array(z.object({ at: z.string().max(40), part: z.string().max(40), message: z.string().max(2000) })).min(1).max(20),
-      version: z.string().max(20),
-    }),
-    output: z.object({ received: z.number() }),
+    path: "/api/events",
+    input: z.object({ events: z.array(clientEventSchema).max(100), version: z.string().max(20), platform: z.string().max(20) }),
+    output: z.object({ received: z.number(), wants: z.enum(CLIENT_EVENT_WANTS) }),
   }),
 };
 

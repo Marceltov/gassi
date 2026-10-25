@@ -49,8 +49,9 @@ the same app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay
   that records it (ADR 0014): positions (`geo.web.ts`; on Android a foreground service whose task runs headless, `background.ts` and `headless.ts`, defined at the entry `index.ts`), batches kept and sent (`recorder.ts`), the wake lock (web), Android's "Immer zulassen" and battery hints (`hints.ts`). No domain rules here; writes other than taps need the
   server and say `OFFLINE`. `public/` holds the web page template, manifest and service worker. Its e2e tests run
   against the server's build in `apps/server/e2e` (`app-*.spec.ts`). During development a sync error shows as a
-  banner on every screen (`ui/SyncBanner.tsx`), and sync errors and crashes go to the server's log
-  (`data/reports.ts`, `POST /api/client-errors`; read them with `docker compose logs gassi | grep client-error`).
+  banner on every screen (`ui/SyncBanner.tsx`). What happens in the app (errors with stacks, screens, taps, commands,
+  sync and recording health) goes to the server as events (`data/events.ts`, `POST /api/events`, ADR 0016), kept 30
+  days in `client_event`; errors also as log lines (`docker compose logs gassi | grep client-error`).
 - Tests sit next to the code. Outside calls are injected (`fetch`, `now`, the database), not mocked:
   `backend/db/testing.ts` is a fresh database per test (seeded with Toffee, Hirsch, Herzii unless `{ empty: true }`),
   `backend/http/testing.ts` calls the API with device tokens, `backend/oidc/testing.ts` is a stub issuer.
