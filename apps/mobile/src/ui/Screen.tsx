@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { space, useTheme } from "../theme";
 import { useEdges } from "./edges";
 import { SyncBanner } from "./SyncBanner";
+import { VersionBanner } from "./VersionBanner";
 
 /** `topMin`: how much of the top stays readable when a tall bottom has to give way (the clock, a summary line). */
 /** `low`: the top's content sits at its bottom, right above the controls, while it is shorter than the space (rows
@@ -25,6 +26,7 @@ export function Screen({ head, top, bottom, topMin, fill, low }: { head?: ReactN
   return (
     <View style={[styles.screen, { backgroundColor: theme.background, paddingTop: insets.top }]}>
       <SyncBanner style={sides} />
+      <VersionBanner style={sides} />
       {head ? (
         <View testID="screen-head" style={[styles.head, sides]}>
           {head}
