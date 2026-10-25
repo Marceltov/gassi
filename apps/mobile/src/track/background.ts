@@ -8,7 +8,7 @@ import * as TaskManager from "expo-task-manager";
 import { AppState, PermissionsAndroid, Platform } from "react-native";
 import { apiFor } from "../data/api";
 import { loadDevice } from "../data/device";
-import { backgroundWalk, beginBackground, clearBackground, distanceOf, endedEarly, type Location as Delivered, locationOptions, notificationBody, onLocations, pointEvents, queuedFor } from "./headless";
+import { backgroundWalk, beginBackground, clearBackground, distanceOf, endedEarly, type Location as Delivered, locationOptions, notificationBody, onLocations, pointEvents, queuedFor, stopWhenSignedOut } from "./headless";
 import { uploadWith } from "./recorder";
 
 const TASK = "gassi-recording";
@@ -29,6 +29,8 @@ TaskManager.defineTask<{ locations: Delivered[] }>(TASK, async ({ data, error })
 async function stopService(): Promise<void> {
   if (await Location.hasStartedLocationUpdatesAsync(TASK)) await Location.stopLocationUpdatesAsync(TASK);
 }
+
+stopWhenSignedOut(stopService);
 
 const options = (body: string): Location.LocationTaskOptions => ({ accuracy: Location.Accuracy.High, ...locationOptions(body) });
 

@@ -31,7 +31,7 @@ export type CommandQueue = {
 };
 
 // null when storage can't be read at all; broken content counts as empty.
-function load(storage: Storage, key: string): Command[] | null {
+function load(storage: Pick<Storage, "getItem">, key: string): Command[] | null {
   let raw: string | null;
   try {
     raw = storage.getItem(key);
@@ -45,6 +45,12 @@ function load(storage: Storage, key: string): Command[] | null {
     return [];
   }
 }
+
+/** Where `personId`'s queue lives in storage. */
+export const queueKeyOf = (personId: string): string => `${STORAGE_KEY}.${personId}`;
+
+/** What waits in the queue under `key`, read without a queue (the Android recording task, which sends no taps). */
+export const pendingIn = (storage: Pick<Storage, "getItem">, key: string): readonly Command[] => load(storage, key) ?? [];
 
 type Options = { storage: Storage; send: (commands: Command[]) => Promise<CommandAnswer>; key?: string };
 

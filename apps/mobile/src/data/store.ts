@@ -4,7 +4,7 @@
 // without reception. What the server showed last is kept (snapshot.ts), so a reopened app shows the household and a
 // running walk at once, before or without an answer.
 import { ApiError, type Client, type Output } from "@gassi/api-client";
-import { type Command, createCommandQueue, type Person, project, RejectedCommands, type SessionsView } from "@gassi/domain";
+import { type Command, createCommandQueue, type Person, project, queueKeyOf, RejectedCommands, type SessionsView } from "@gassi/domain";
 import { apiFor, errorMessage, NO_ANSWER_STATUS, WRITE_TIMEOUT_MS } from "./api";
 import { type Device, loadDevice } from "./device";
 import { onReconnect } from "./network";
@@ -126,7 +126,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn, version = "?"
   };
 
   // the queue of the person signed in, there from the start: taps without reception are kept from the first one
-  const queueKey = `gassi.commands.${device.person.id}`;
+  const queueKey = queueKeyOf(device.person.id);
   const queue = createCommandQueue({ storage, send: sendCommands, key: queueKey });
   queue.subscribe((_, view) => {
     if (view) {

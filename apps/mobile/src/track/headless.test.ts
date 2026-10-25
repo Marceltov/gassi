@@ -1,8 +1,9 @@
 import type { TrackPoint } from "@gassi/domain";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { loadKept } from "../data/kept";
+import { clearDevice, saveDevice } from "../data/device";
 import { storage } from "../data/storage";
-import { backgroundWalk, beginBackground, distanceOf, endedEarly, type HeadlessDeps, type Location, locationOptions, notificationBody, onLocations, queuedFor, staleBackground } from "./headless";
+import { backgroundWalk, beginBackground, distanceOf, endedEarly, type HeadlessDeps, type Location, locationOptions, notificationBody, onLocations, queuedFor, staleBackground, stopWhenSignedOut } from "./headless";
 import { type Batch, createRecorder } from "./recorder";
 
 const T0 = Date.parse("2026-10-24T12:00:00Z");
@@ -147,4 +148,15 @@ test("ended early: positions stopped coming over 2 minutes ago while the walk st
   expect(endedEarly("w", T0 + 60_000)).toBe(false);
   expect(endedEarly("w", T0 + 121_000)).toBe(true);
   expect(endedEarly("other", T0 + 121_000)).toBe(false);
+});
+
+test("signing out stops the service at once, not at the next position", () => {
+  saveDevice({ token: "t", serverUrl: "https://gassi.example.org", person: { id: "herzii", name: "Herzii" } });
+  let stops = 0;
+  const unsubscribe = stopWhenSignedOut(async () => void stops++);
+  saveDevice({ token: "t2", serverUrl: "https://gassi.example.org", person: { id: "herzii", name: "Herzii" } });
+  expect(stops).toBe(0); // signed in again, not out
+  clearDevice();
+  expect(stops).toBe(1);
+  unsubscribe();
 });

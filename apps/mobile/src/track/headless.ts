@@ -3,8 +3,9 @@
 // recording (recorder.ts), tells an open screen, and sends a batch every 30 s. The track upload's answer says whether
 // this device still records; once it doesn't (the walk ended, another phone took the route), the task sends the rest
 // and stops the service. Which walk it records is kept (`background`), so the task needs nothing but storage.
-import { type Command, createLiveFilter, formatDistance, type TrackPoint } from "@gassi/domain";
+import { createLiveFilter, formatDistance, pendingIn, queueKeyOf, type TrackPoint } from "@gassi/domain";
 import { kinds } from "../colors";
+import { loadDevice, subscribeDevice } from "../data/device";
 import { loadKept, saveKept, dropKept } from "../data/kept";
 import { storage } from "../data/storage";
 import { hhmm } from "../time";
@@ -67,14 +68,14 @@ export const clearBackground = (): void => dropKept(KEY);
 export const toPoint = ({ timestamp, coords }: Location): TrackPoint => ({ t: new Date(timestamp).toISOString(), lat: coords.latitude, lon: coords.longitude, ele: coords.altitude ?? null, acc: coords.accuracy ?? null });
 
 /** Whether `personId`'s queue still holds a command for `walkKey`. */
-export function queuedFor(personId: string, walkKey: string): boolean {
-  try {
-    const queue = JSON.parse(storage.getItem(`gassi.commands.${personId}`) ?? "[]") as Command[];
-    return Array.isArray(queue) && queue.some((c) => "walkKey" in c && c.walkKey === walkKey);
-  } catch {
-    return false;
-  }
-}
+export const queuedFor = (personId: string, walkKey: string): boolean => pendingIn(storage, queueKeyOf(personId)).some((c) => "walkKey" in c && c.walkKey === walkKey);
+
+/** Stops the service as soon as this device signs out (the kept walk is gone with it, kept.ts), not only at the next
+ * position; returns the unsubscribe. */
+export const stopWhenSignedOut = (stopService: () => Promise<void>): (() => void) =>
+  subscribeDevice(() => {
+    if (!loadDevice()) void stopService();
+  });
 
 /** The task's work for one delivery of positions. */
 export async function onLocations(locations: Location[], deps: HeadlessDeps): Promise<void> {

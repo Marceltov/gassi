@@ -51,7 +51,9 @@ const save = (walkKey: string, r: Recording | null) => {
  * refuses it (a laptop's accuracy of kilometres would hold up every batch after it). */
 export function keepPoint(walkKey: string, p: TrackPoint): boolean {
   const r = all()[walkKey];
-  if (!r || r.points.at(-1)?.t === p.t || !trackPointSchema.safeParse(p).success) return false;
+  // in time order: the same time again, or an older one delivered late, is dropped
+  const last = r?.points.at(-1);
+  if (!r || (last && Date.parse(p.t) <= Date.parse(last.t)) || !trackPointSchema.safeParse(p).success) return false;
   save(walkKey, { ...r, points: [...r.points, p] });
   return true;
 }
@@ -97,7 +99,9 @@ export async function sendRecording(walkKey: string, upload: (b: Batch) => Promi
         if (e instanceof RejectedBatch && all()[walkKey]?.ended) save(walkKey, null);
         return undefined;
       }
-      const now = all()[walkKey] ?? r;
+      // gone meanwhile (signed out, kept.ts): nothing to save back
+      const now = all()[walkKey];
+      if (!now) return answer;
       save(walkKey, { ...now, sent: to, nextSeq: seq + 1, inflight: null });
     }
   } finally {

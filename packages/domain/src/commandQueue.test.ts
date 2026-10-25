@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { Command } from "./commands";
-import { type CommandAnswer, createCommandQueue, RejectedCommands } from "./commandQueue";
+import { type CommandAnswer, createCommandQueue, pendingIn, queueKeyOf, RejectedCommands } from "./commandQueue";
 
 const memory = () => {
   const data = new Map<string, string>();
@@ -112,4 +112,15 @@ test("two tabs on the same storage keep each other's commands", async () => {
   await online.flush();
   expect(sent).toEqual(["a", "b", "c"]);
   expect(JSON.parse(storage.data.get("gassi.commands")!)).toEqual([]);
+});
+
+test("a person's queue is read without a queue: where it lives, what waits, broken storage as nothing", () => {
+  const storage = memory();
+  expect(queueKeyOf("herzii")).toBe("gassi.commands.herzii");
+  expect(pendingIn(storage, queueKeyOf("herzii"))).toEqual([]);
+  storage.setItem(queueKeyOf("herzii"), JSON.stringify([pipi("a")]));
+  expect(pendingIn(storage, queueKeyOf("herzii"))).toEqual([pipi("a")]);
+  storage.setItem(queueKeyOf("herzii"), "{kaputt");
+  expect(pendingIn(storage, queueKeyOf("herzii"))).toEqual([]);
+  expect(pendingIn({ getItem: () => { throw new Error("no storage"); } }, "k")).toEqual([]);
 });

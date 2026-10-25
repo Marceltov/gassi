@@ -1,6 +1,6 @@
 import type { TrackPoint } from "@gassi/domain";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { loadKept } from "../data/kept";
+import { clearKept, loadKept } from "../data/kept";
 import { createRecorder, type Batch, endRecording, type Geo, keepPoint, type Locks, RejectedBatch, sendLeftovers, sendRecording } from "./recorder";
 
 const T0 = Date.parse("2026-10-24T09:00:00Z");
@@ -249,6 +249,26 @@ test("keepPoint drops a repeated or refused point", () => {
   expect(keepPoint("w", { ...point(5), acc: 50_000 })).toBe(false); // the contract refuses it
   expect(keepPoint("other", point(5))).toBe(false); // no recording of that walk
   expect((loadKept("recordings") as Record<string, { points: TrackPoint[] }>).w.points).toEqual([point(0)]);
+});
+
+test("keepPoint drops a point older than the last, delivered again late", () => {
+  createRecorder({ walkKey: "w", geo: fakeGeo(), upload: fakeUpload().send, locks: null }).close();
+  keepPoint("w", point(0));
+  keepPoint("w", point(5));
+  expect(keepPoint("w", point(0))).toBe(false);
+  expect((loadKept("recordings") as Record<string, { points: TrackPoint[] }>).w.points).toEqual([point(0), point(5)]);
+});
+
+test("a sign-out while a batch is out keeps nothing of the recording", async () => {
+  const geo = fakeGeo();
+  const r = createRecorder({ walkKey: "w", geo, upload: fakeUpload().send, locks: null });
+  geo.fix(0);
+  r.close();
+  await sendRecording("w", async () => {
+    clearKept(); // signed out meanwhile
+    return { stored: true, recording: true };
+  });
+  expect(loadKept("recordings")?.["w" as never]).toBeUndefined();
 });
 
 test("a point kept elsewhere (the background task) shows once", async () => {
