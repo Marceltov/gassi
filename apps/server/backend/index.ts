@@ -32,8 +32,8 @@ const issuesOf = (gh: { repo: string; token: string }): Issues => {
 
 /** Every endpoint of the API contract (packages/api-client), and their CORS preflight (OPTIONS). */
 export const api = logged(async (req) => {
-  const { publicUrl, oidc, smtp, timeZone, defaultDogName, secret, dataDir, corsOrigin, github } = config();
-  return cors(corsOrigin, async (req) => apiRouter({ db: await database(), now: () => new Date(), publicUrl, codeKey: linkCodeKey(secret, dataDir), codeThrottle, client: clientOf(req), oidc: oidc !== null, mailer: smtp && mailer(smtp), timeZone, defaultDogName, issues: github && issuesOf(github), reportThrottle })(req))(req);
+  const { publicUrl, oidc, smtp, timeZone, defaultDogName, secret, dataDir, corsOrigin, github, clientEvents } = config();
+  return cors(corsOrigin, async (req) => apiRouter({ db: await database(), now: () => new Date(), publicUrl, codeKey: linkCodeKey(secret, dataDir), codeThrottle, client: clientOf(req), oidc: oidc !== null, mailer: smtp && mailer(smtp), timeZone, defaultDogName, issues: github && issuesOf(github), reportThrottle, clientEvents })(req))(req);
 });
 export const health = logged(() => healthRoute());
 export const oidcStart = logged((req) => oidcStartRoute(req));

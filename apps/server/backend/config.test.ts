@@ -18,7 +18,14 @@ describe("parseConfig", () => {
       setupLinkFile: null,
       corsOrigin: null,
       github: null,
+      clientEvents: "all",
     });
+  });
+
+  test("CLIENT_EVENTS says what the server keeps of the app's events", () => {
+    expect(parseConfig({ ...ENV, CLIENT_EVENTS: "errors" }).clientEvents).toBe("errors");
+    expect(parseConfig({ ...ENV, CLIENT_EVENTS: "off" }).clientEvents).toBe("off");
+    expect(() => parseConfig({ ...ENV, CLIENT_EVENTS: "some" })).toThrow("CLIENT_EVENTS");
   });
 
   test("Wünsche und Fehler need the repo (owner/name) and its token together", () => {

@@ -1,4 +1,5 @@
 // The implementations of the API contract, each a thin call into a use case.
+import type { ClientEventWants } from "@gassi/api-client";
 import { Devices } from "../auth/devices";
 import { appLink, INVITE_TTL, type LinkKey, Links, WrongLink } from "../auth/links";
 import { type Mailer, sendMagicLink } from "../auth/mail";
@@ -7,6 +8,7 @@ import { InputError } from "../errors";
 import type { Issues } from "../issues";
 import { Catalog } from "../catalog";
 import { Diary } from "../diary";
+import { storeEvents } from "../events";
 import { DogRepository } from "../dogs";
 import { logger } from "../log";
 import { PeopleRepository } from "../people";
@@ -28,6 +30,7 @@ export type ApiDeps = {
   defaultDogName?: string | null; // DOG_NAME
   issues?: Issues | null; // Wünsche und Fehler on GitHub, when configured
   reportThrottle?: Throttle; // reports from the app, per device, kept across requests
+  clientEvents?: ClientEventWants; // what is kept of the app's events (CLIENT_EVENTS), default all
 };
 
 const names = (deps: ApiDeps) => new PeopleRepository(deps.db).names();
@@ -139,11 +142,14 @@ const implementations: Implementations<ApiDeps> = {
     return { removed: true as const };
   },
   issues: async ({ deps }) => ({ issues: await issues(deps).list(deps.now().getTime()) }),
-  reportErrors: async ({ input, auth }) => {
+  reportEvents: async ({ input, auth, deps }) => {
+    const wants = deps.clientEvents ?? "all";
+    const stored = await storeEvents(deps.db, auth.device.id, auth.person.id, input, deps.now().toISOString(), wants);
+    // errors also as a log line each, for `docker compose logs gassi | grep client-error`
     const log = logger("client-error");
-    const who = { person: auth.person.name, device: auth.device.name, kind: auth.device.kind, version: input.version };
-    for (const e of input.errors) log.warn({ ...who, ...e }, "client error");
-    return { received: input.errors.length };
+    const who = { person: auth.person.name, device: auth.device.name, kind: auth.device.kind, version: input.version, platform: input.platform };
+    for (const e of stored) if (e.kind === "error") log.warn({ ...who, at: e.at, name: e.name, ...e.data }, "client error");
+    return { received: stored.length, wants };
   },
   reportIssue: async ({ input, auth, deps }) => {
     const filed = issues(deps);

@@ -174,6 +174,26 @@ const migrations: Record<string, Migration> = {
         .execute();
     },
   },
+  // What happens in the app, kept 30 days (#115): a new table, so every row stays as it was.
+  "0.6_client_event": {
+    async up(db: Kysely<any>) {
+      await db.schema
+        .createTable("client_event")
+        .addColumn("device_id", "integer", (c) => c.notNull())
+        .addColumn("id", "text", (c) => c.notNull())
+        .addColumn("person_id", "text", (c) => c.notNull())
+        .addColumn("at", "text", (c) => c.notNull())
+        .addColumn("kind", "text", (c) => c.notNull())
+        .addColumn("name", "text", (c) => c.notNull())
+        .addColumn("data", "text")
+        .addColumn("version", "text", (c) => c.notNull())
+        .addColumn("platform", "text", (c) => c.notNull())
+        .addColumn("received_at", "text", (c) => c.notNull())
+        .addPrimaryKeyConstraint("client_event_pk", ["device_id", "id"])
+        .execute();
+      await db.schema.createIndex("client_event_received").on("client_event").column("received_at").execute();
+    },
+  },
 };
 
 const provider: MigrationProvider = { getMigrations: async () => migrations };
