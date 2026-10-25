@@ -1,11 +1,10 @@
 // Errors nobody caught, from the browser: thrown ones and promises rejected without a catch. Same interface as
 // crashes.ts.
 import type * as Native from "./crashes.ts";
-import { errorText } from "./reports";
 
-export function onCrash(fn: (message: string) => void): () => void {
-  const thrown = (e: ErrorEvent) => fn(errorText(e.error ?? e.message));
-  const rejected = (e: PromiseRejectionEvent) => fn(errorText(e.reason));
+export function onCrash(fn: (error: unknown) => void): () => void {
+  const thrown = (e: ErrorEvent) => fn(e.error ?? e.message);
+  const rejected = (e: PromiseRejectionEvent) => fn(e.reason);
   window.addEventListener("error", thrown);
   window.addEventListener("unhandledrejection", rejected);
   return () => {

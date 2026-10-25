@@ -18,11 +18,11 @@ afterEach(() => {
 test("onCrash reports an uncaught error and still hands it on", () => {
   const seen: unknown[] = [];
   const utils = errorUtils((e) => seen.push(e));
-  const reported: string[] = [];
+  const reported: unknown[] = [];
   const stop = onCrash((m) => reported.push(m));
   utils.current()(new Error("kaputt"), true);
   expect(reported).toHaveLength(1);
-  expect(reported[0]).toContain("kaputt");
+  expect(String(reported[0])).toContain("kaputt");
   expect(seen).toHaveLength(1);
   stop();
   utils.current()(new Error("danach"));

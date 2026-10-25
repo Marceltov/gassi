@@ -8,6 +8,7 @@ import { createContext, type ReactNode, useContext, useEffect, useMemo, useSyncE
 import { AppState } from "react-native";
 import { APP_VERSION } from "../version";
 import { onCrash } from "./crashes";
+import { events } from "./events";
 import { loadDevice, subscribeDevice } from "./device";
 import { createGassiStore, type GassiState, type GassiStore } from "./store";
 
@@ -30,7 +31,7 @@ export function GassiProvider({ children }: { children: ReactNode }) {
     const stop = store.start();
     void store.refresh();
     const onFront = AppState.addEventListener("change", (s) => s === "active" && void store.refresh());
-    const stopCrashes = onCrash((message) => store.reportError("Absturz", message));
+    const stopCrashes = onCrash((error) => events.error("Absturz", error));
     return () => {
       stop();
       stopCrashes();

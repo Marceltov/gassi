@@ -344,11 +344,12 @@ export const contract = {
     output: issueSchema,
     messages: { kind: "Wunsch oder Fehler?", title: "Worum geht es? Kurz, höchstens 120 Zeichen.", text: "Höchstens 5000 Zeichen." },
   }),
-  // what happens in the app (errors with their stacks, screens, taps, sync and recording health), kept 30 days (#115)
+  // what happens in the app (errors with their stacks, screens, taps, sync and recording health), kept 30 days (#115);
+  // an empty batch only asks what the server wants
   reportEvents: endpoint({
     method: "POST",
     path: "/api/events",
-    input: z.object({ events: z.array(clientEventSchema).min(1).max(100), version: z.string().max(20), platform: z.string().max(20) }),
+    input: z.object({ events: z.array(clientEventSchema).max(100), version: z.string().max(20), platform: z.string().max(20) }),
     output: z.object({ received: z.number(), wants: z.enum(CLIENT_EVENT_WANTS) }),
   }),
 };

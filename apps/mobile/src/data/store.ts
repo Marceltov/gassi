@@ -8,7 +8,8 @@ import { type Command, createCommandQueue, type Person, project, queueKeyOf, Rej
 import { apiFor, errorMessage, NO_ANSWER_STATUS, WRITE_TIMEOUT_MS } from "./api";
 import { type Device, loadDevice } from "./device";
 import { onReconnect } from "./network";
-import { createErrorReports } from "./reports";
+import { platformName } from "./thisDevice";
+import { events } from "./events";
 import { onStoredElsewhere, storage } from "./storage";
 import { loadSnapshot, saveSnapshot } from "./snapshot";
 
@@ -49,7 +50,6 @@ export type GassiStore = {
   /** Reloads the household, and sends what is queued, then reloads the sessions. */
   refresh(): Promise<void>;
   /** Sends what went wrong outside the store (a crash) to the server's log, like the store's own sync errors. */
-  reportError(part: string, message: string): void;
   /** Listens to other tabs' taps and to reception coming back; returns the stop. */
   start(): () => void;
 };
@@ -61,6 +61,8 @@ const PARTS = { household: "Haushalt", commands: "Senden", sessions: "Runde und 
 type Part = keyof typeof PARTS;
 // no reception or no answer in time is what `online` shows; a 401 signs the device out
 const quiet = (e: unknown) => e instanceof ApiError && (e.status === 0 || e.status === NO_ANSWER_STATUS || e.status === 401);
+
+const EVENTS_MS = 30_000;
 
 const NOTHING_RUNS: SessionsView = { walk: null, training: null };
 
@@ -85,12 +87,12 @@ export function createGassiStore(device: Device, { fetch: fetchFn, version = "?"
   // counts the queue's answers: a sessions answer asked for before one of them is older than it and is not shown
   let answers = 0;
   const errors: Record<Part, string | null> = { household: null, commands: null, sessions: null };
-  // the same error goes to the server's log too (reports.ts), once a minute at most
-  const reports = createErrorReports({ send: (errors) => api.reportErrors({ errors, version }) });
+  // the same error goes to the server too (events.ts), once a minute at most
+  const flushEvents = () => events.flush((batch) => api.reportEvents({ events: batch, version, platform: platformName() }));
   const failed = (part: Part, e: unknown) => {
     if (quiet(e)) return;
     errors[part] = e instanceof ApiError ? e.message : errorMessage(e) + (e instanceof Error ? ` (${e.message})` : "");
-    void reports.report(PARTS[part], errors[part]);
+    events.error(PARTS[part], errors[part]);
   };
   const syncError = () => {
     const part = (Object.keys(errors) as Part[]).find((p) => errors[p] !== null);
@@ -170,7 +172,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn, version = "?"
   async function refresh() {
     await Promise.all([loadHousehold(), loadSessions()]);
     update();
-    void reports.flush(); // what waited without reception
+    void flushEvents(); // what waited without reception
   }
 
   return {
@@ -185,16 +187,16 @@ export function createGassiStore(device: Device, { fetch: fetchFn, version = "?"
       void queue.push(cmd);
     },
     refresh,
-    reportError(part, message) {
-      void reports.report(part, message);
-    },
     start() {
       // another tab's taps (the queue re-reads storage) show here too; reception back sends the queued ones at once
       const stopWatching = onStoredElsewhere(queueKey, () => queue.refresh());
       const stopReconnect = onReconnect(() => void refresh());
+      // the app's events go every 30 s, also while nothing else is asked
+      const sendEvents = setInterval(() => void flushEvents(), EVENTS_MS);
       return () => {
         stopWatching();
         stopReconnect();
+        clearInterval(sendEvents);
       };
     },
   };
