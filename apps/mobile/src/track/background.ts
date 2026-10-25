@@ -8,22 +8,29 @@ import * as TaskManager from "expo-task-manager";
 import { AppState, PermissionsAndroid, Platform } from "react-native";
 import { apiFor } from "../data/api";
 import { loadDevice } from "../data/device";
+import { events } from "../data/events";
 import { backgroundWalk, beginBackground, clearBackground, distanceOf, type Location as Delivered, locationOptions, notificationBody, onLocations, pointEvents, queuedFor, stopWhenSignedOut } from "./headless";
 import { uploadWith } from "./recorder";
 
 const TASK = "gassi-recording";
 
 TaskManager.defineTask<{ locations: Delivered[] }>(TASK, async ({ data, error }) => {
+  if (error) events.error("Aufnahme", error);
   if (error || !data) return;
   const device = loadDevice();
-  await onLocations(data.locations, {
-    now: () => Date.now(),
-    // signed out: the kept walk is gone too (kept.ts), so the task stops before it sends
-    upload: device ? uploadWith(apiFor(device)) : () => Promise.reject(new Error("signed out")),
-    stopService: stopService,
-    queued: (walkKey) => !!device && queuedFor(device.person.id, walkKey),
-    onPoint: pointEvents.emit,
-  });
+  try {
+    await onLocations(data.locations, {
+      now: () => Date.now(),
+      // signed out: the kept walk is gone too (kept.ts), so the task stops before it sends
+      upload: device ? uploadWith(apiFor(device)) : () => Promise.reject(new Error("signed out")),
+      stopService: stopService,
+      queued: (walkKey) => !!device && queuedFor(device.person.id, walkKey),
+      onPoint: pointEvents.emit,
+    });
+  } catch (e) {
+    // kept for the server like any error; the next delivery tries again
+    events.error("Aufnahme", e);
+  }
 });
 
 async function stopService(): Promise<void> {

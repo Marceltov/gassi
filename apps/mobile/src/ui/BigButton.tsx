@@ -6,6 +6,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { type ButtonKind, FIELD_HEIGHT, type Palette, radius, useTheme } from "../theme";
 import { Icon, type IconName } from "./Icon";
+import { events } from "../data/events";
 
 const sizes = { xl: { height: 100, font: 21, icon: 26 }, l: { height: 72, font: 17, icon: 22 }, m: { height: 52, font: 15, icon: 18 }, s: { height: FIELD_HEIGHT, font: 15, icon: 16 } };
 
@@ -30,14 +31,16 @@ export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, 
   const theme = useTheme();
   const { height, font, icon: iconSize } = sizes[size];
   const look = lookOf(kind, theme, !!disabled);
+  // the button's name for the app's usage events (#115): what it says, never what was typed
+  const tapped = (hold: boolean) => events.record("tap", a11y ?? label, hold ? { hold } : undefined);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={a11y ?? (sub ? `${label}, ${sub}` : label)}
       accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
-      onPress={onPress}
-      onLongPress={onLongPress}
+      onPress={onPress && (() => (tapped(false), onPress()))}
+      onLongPress={onLongPress && (() => (tapped(true), onLongPress()))}
       style={({ pressed }) => [styles.button, { height, opacity: disabled ? 0.35 : pressed ? 0.8 : 1 }, look.box, stacked && styles.narrow]}
     >
       <View style={[styles.line, stacked && styles.stacked]}>

@@ -199,7 +199,14 @@ test("a sync error goes to the server too, as an event", async () => {
   const sent = server.calls.filter((c) => c.route === "POST /api/events");
   expect(sent).toEqual([
     expect.objectContaining({
-      body: { version: "0.3.0", platform: "web", events: [expect.objectContaining({ kind: "error", name: "Runde und Training", data: { message: expect.stringMatching(/^Die Antwort des Servers passt nicht/) } })] },
+      body: {
+        version: "0.3.0",
+        platform: "web",
+        events: expect.arrayContaining([
+          expect.objectContaining({ kind: "error", name: "Runde und Training", data: { message: expect.stringMatching(/^Die Antwort des Servers passt nicht/) } }),
+          expect.objectContaining({ kind: "sync", name: "sessions", data: expect.objectContaining({ ok: false }) }),
+        ]),
+      },
     }),
   ]);
 });

@@ -10,6 +10,7 @@ import { type Device, loadDevice } from "./device";
 import { onReconnect } from "./network";
 import { platformName } from "./thisDevice";
 import { events } from "./events";
+import { commandEvent, syncEvent } from "./usage";
 import { onStoredElsewhere, storage } from "./storage";
 import { loadSnapshot, saveSnapshot } from "./snapshot";
 
@@ -69,10 +70,30 @@ const NOTHING_RUNS: SessionsView = { walk: null, training: null };
 /** `version`: the app's, sent with the error reports. */
 export function createGassiStore(device: Device, { fetch: fetchFn, version = "?" }: { fetch?: typeof fetch; version?: string } = {}): GassiStore {
   let online = true;
+  let offlineSince = 0;
   const onReached = (reached: boolean) => {
     if (reached !== online) {
       online = reached;
+      if (reached) events.record("app", "online", { ms: Date.now() - offlineSince });
+      else offlineSince = Date.now();
+      if (!reached) events.record("app", "offline");
       update();
+    }
+  };
+  // how long a call to the server took and whether it worked, as an event
+  const timed = async <T>(part: "household" | "commands" | "sessions", call: () => Promise<T>): Promise<T> => {
+    const start = Date.now();
+    const usage = (ok: boolean) => {
+      const { name, data } = syncEvent(part, Date.now() - start, ok, queue.pending().length);
+      events.record("sync", name, data);
+    };
+    try {
+      const answer = await call();
+      usage(true);
+      return answer;
+    } catch (e) {
+      usage(false);
+      throw e;
     }
   };
   const api = apiFor(device, { fetch: fetchFn, onReached });
@@ -115,14 +136,17 @@ export function createGassiStore(device: Device, { fetch: fetchFn, version = "?"
 
   const sendCommands = async (commands: Command[]) => {
     try {
-      const answer = await api.commands({ commands });
+      const answer = await timed("commands", () => api.commands({ commands }));
       errors.commands = null;
       return answer;
     } catch (e) {
       failed("commands", e);
       update(); // the queue keeps them without telling anyone
       // 400: the server (or the contract, before sending) refuses them for good
-      if (e instanceof ApiError && e.status === 400) throw new RejectedCommands();
+      if (e instanceof ApiError && e.status === 400) {
+        events.record("sync", "rejected", { count: commands.length });
+        throw new RejectedCommands();
+      }
       throw e;
     }
   };
@@ -144,7 +168,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn, version = "?"
   // neither the taps nor what came. The sessions are asked for after the queue, so they show its taps.
   async function loadHousehold() {
     try {
-      const [me, people, dogs, exercises, treatKinds] = await Promise.all([api.me(), api.people(), api.dogs(), api.exercises(), api.treatKinds()]);
+      const [me, people, dogs, exercises, treatKinds] = await timed("household", () => Promise.all([api.me(), api.people(), api.dogs(), api.exercises(), api.treatKinds()]));
       errors.household = null;
       household = { me: me.person, device: { id: me.device.id, name: me.device.name }, household: me.household, people: people.people, dogs: dogs.dogs, exercises: exercises.exercises, treatKinds: treatKinds.treatKinds };
       keep();
@@ -158,7 +182,7 @@ export function createGassiStore(device: Device, { fetch: fetchFn, version = "?"
     await queue.flush(); // never throws: what doesn't go out stays queued
     try {
       const asked = answers;
-      const sessions = await api.sessions();
+      const sessions = await timed("sessions", () => api.sessions());
       errors.sessions = null;
       if (asked === answers) {
         serverView = sessions;
@@ -184,6 +208,8 @@ export function createGassiStore(device: Device, { fetch: fetchFn, version = "?"
       return () => listeners.delete(fn);
     },
     send(cmd) {
+      const { name, data } = commandEvent(cmd);
+      events.record("command", name, data);
       void queue.push(cmd);
     },
     refresh,
