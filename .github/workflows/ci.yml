@@ -19,6 +19,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      # the Android app's native parts still fit its runtime version (#107, scripts/runtime.mjs)
+      - run: npm run runtime:check
 
   # In Playwright's image, which has Chromium and its system packages: installing them took 7-11 minutes whenever the
   # runner got a slow Ubuntu mirror (#88). The tag is the installed Playwright's (tooling/ci.test.ts keeps them equal).
