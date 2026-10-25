@@ -1,6 +1,6 @@
 // Akku (#108): what keeps Android from stopping the recording in the pocket, as two steps: Android's own question to
-// leave the battery unoptimised, and One UI's list of apps that never sleep (no app can set that; the screen says
-// where). Opened once on the first walk this phone records, and from Mehr. "Weiter" leads to "Immer zulassen" unless
+// leave the battery unoptimised, and One UI's list of apps that never sleep (no app can set or open that; the screen
+// says where, and that the list doesn't offer an app whose battery is unrestricted already, #129). Opened once on the first walk this phone records, and from Mehr. "Weiter" leads to "Immer zulassen" unless
 // it is set; "Später" goes back.
 import { useRouter } from "expo-router";
 import { StyleSheet, Text } from "react-native";
@@ -8,7 +8,7 @@ import { useTheme } from "../theme";
 import { BigButton } from "../ui/BigButton";
 import { ButtonRow } from "../ui/ButtonRow";
 import { Screen } from "../ui/Screen";
-import { askBattery, openBatterySettings } from "../track/hints";
+import { askBattery } from "../track/hints";
 import { Step } from "./Step";
 import { useHints } from "./useHints";
 
@@ -35,7 +35,7 @@ export function BatteryHint() {
             <Text style={[styles.small, { color: theme.muted }]}>
               Einstellungen › <Text style={{ color: theme.ink }}>Akku</Text> › <Text style={{ color: theme.ink }}>Hintergrundnutzungslimits</Text> › <Text style={{ color: theme.ink }}>Apps, die nie in den Standby-Modus wechseln</Text> › + › Gassi
             </Text>
-            <BigButton kind="side" size="s" label="Akku-Einstellungen öffnen" onPress={() => void openBatterySettings()} />
+            <Text style={[styles.small, { color: theme.muted }]}>Gassi fehlt in der Liste? Dann reicht Schritt 1: Samsung bietet dort nur Apps an, deren Akku noch optimiert wird.</Text>
           </Step>
         </>
       }

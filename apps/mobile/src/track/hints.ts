@@ -5,7 +5,6 @@ import Constants from "expo-constants";
 import * as Battery from "expo-battery";
 import * as IntentLauncher from "expo-intent-launcher";
 import * as Location from "expo-location";
-import { Linking } from "react-native";
 
 const PACKAGE = Constants.expoConfig?.android?.package ?? "io.github.marceltov.gassi";
 
@@ -22,13 +21,4 @@ export const batteryUnrestricted = async (): Promise<boolean> => !(await Battery
 /** Android's own question "Im Hintergrund ausführen lassen?" for this app. */
 export async function askBattery(): Promise<void> {
   await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, { data: `package:${PACKAGE}` });
-}
-
-/** The battery settings, where One UI keeps "Hintergrundnutzungslimits"; the app's settings where a phone has none. */
-export async function openBatterySettings(): Promise<void> {
-  try {
-    await IntentLauncher.startActivityAsync("android.intent.action.POWER_USAGE_SUMMARY");
-  } catch {
-    await Linking.openSettings();
-  }
 }

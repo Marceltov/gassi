@@ -6,7 +6,6 @@ export const backgroundAllowed = async (): Promise<boolean> => false;
 export const askAlways = async (): Promise<boolean> => false;
 export const batteryUnrestricted = async (): Promise<boolean> => false;
 export const askBattery = async (): Promise<void> => {};
-export const openBatterySettings = async (): Promise<void> => {};
 
-const sameAsNative: typeof Native = { hintsSupported, backgroundAllowed, askAlways, batteryUnrestricted, askBattery, openBatterySettings };
+const sameAsNative: typeof Native = { hintsSupported, backgroundAllowed, askAlways, batteryUnrestricted, askBattery };
 void sameAsNative;
