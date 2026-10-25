@@ -4,8 +4,12 @@
 /** The update endpoint of the server signed in to. */
 export const updateUrlFor = (serverUrl: string): string => `${serverUrl.replace(/\/+$/, "")}/api/updates/manifest`;
 
-/** Whether the app asks another server than the one it signed in to: the override takes effect only after a restart. */
-export const needsRestart = (current: string | null, wanted: string): boolean => current !== wanted;
+/** Whether the app asks another server than the one it signed in to (`stored`: the override set last, `builtIn`: the
+ * APK's own URL, which counts as set): the override takes effect only after a restart. */
+export const needsRestart = (stored: string | null, wanted: string, builtIn: string): boolean => (stored ?? builtIn) !== wanted;
+
+/** Whether the server's update is one the app doesn't run yet (a newer date alone isn't: every image dates it anew). */
+export const isNewUpdate = (offered: string | undefined, running: string | null): boolean => offered !== undefined && offered !== running;
 
 /** Which side is behind: "older" (install the new APK), "newer" (the server isn't updated yet), or null. */
 export function versionGap(app: string, server: string | null): "older" | "newer" | null {

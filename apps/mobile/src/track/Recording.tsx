@@ -11,7 +11,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useL
 import { loadDevice } from "../data/device";
 import { AppState } from "react-native";
 import { useGassi } from "../data/GassiProvider";
-import { applyPending, checkForUpdate, compareRuntime, pointUpdatesAt } from "../data/updates";
+import { checkForUpdate, compareRuntime, pointUpdatesAt } from "../data/updates";
 import { recordingGeo, stopStaleBackground } from "./geo";
 import { type Batch, createRecorder, type Recorder, type RecordingStatus, sendLeftovers, uploadWith } from "./recorder";
 import { useScreenOn } from "./screenOn";
@@ -58,12 +58,11 @@ function liveStore() {
   };
 }
 
-// The app's updates follow the server signed in to; one waits for the end of a walk this phone records (updates.ts)
+// The app's updates follow the server signed in to; none is applied while this phone records a walk (updates.ts)
 function useUpdates(api: Client | null, serverUrl: string | null, mine: boolean) {
   const recording = useRef(mine);
   useEffect(() => {
     recording.current = mine;
-    if (!mine) void applyPending();
   }, [mine]);
   useEffect(() => {
     if (!api || !serverUrl) return;

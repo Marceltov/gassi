@@ -11,7 +11,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { buildManifest, signManifest } from "./app-update-manifest.mjs";
+import { buildManifest, signManifest, verifyManifest } from "./app-update-manifest.mjs";
 import { exportStamp, needsExport, stampToStore } from "./web-stamp.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -71,11 +71,19 @@ for (const name of names) cpSync(dist + name, pub + name, { recursive: true });
 // the Android update's manifest, with the runtime version the APK must have
 const runtimeVersion = JSON.parse(readFileSync(`${root}apps/mobile/app.json`, "utf8")).expo.runtimeVersion;
 const metadata = JSON.parse(readFileSync(`${dist}metadata.json`, "utf8"));
-const update = buildManifest({ metadata, read: (path) => readFileSync(dist + path), runtimeVersion, createdAt: new Date().toISOString() });
+// the app's public config, as expo-constants reads it from a running update
+const config = spawnSync("npx", ["expo", "config", "--type", "public", "--json"], { cwd: `${root}apps/mobile`, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+if (config.status !== 0) throw new Error(`expo config failed: ${config.stderr}`);
+const update = buildManifest({ metadata, read: (path) => readFileSync(dist + path), runtimeVersion, createdAt: new Date().toISOString(), stamp, expoClient: JSON.parse(config.stdout) });
 mkdirSync(`${pub}_app-update`, { recursive: true });
 writeFileSync(`${pub}_app-update/android.json`, update);
 const keyFile = process.env.UPDATES_SIGNING_KEY_FILE;
-if (keyFile) writeFileSync(`${pub}_app-update/android.sig`, signManifest(update, readFileSync(keyFile, "utf8")));
+if (keyFile) {
+  const signature = signManifest(update, readFileSync(keyFile, "utf8"));
+  if (!verifyManifest(update, signature, readFileSync(`${root}apps/mobile/certs/certificate.pem`, "utf8")))
+    throw new Error("UPDATES_SIGNING_KEY doesn't belong to apps/mobile/certs/certificate.pem: phones would reject the update");
+  writeFileSync(`${pub}_app-update/android.sig`, signature);
+}
 else rmSync(`${pub}_app-update/android.sig`, { force: true });
 names.push("_app-update");
 writeFileSync(manifest, `${names.join("\n")}\n`);

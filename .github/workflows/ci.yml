@@ -134,7 +134,8 @@ jobs:
           if gh release view "apk-$runtime" >/dev/null 2>&1; then echo "needed=false"; else echo "needed=true"; fi >> "$GITHUB_OUTPUT"
 
   apk:
-    needs: [apk-needed]
+    # after the image and the e2e run: an APK built later than its image would outrank the image's update with older JS
+    needs: [apk-needed, image, e2e]
     if: needs.apk-needed.outputs.needed == 'true'
     environment: apk
     concurrency:
@@ -154,9 +155,12 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      # a run that waited behind another one for the same runtime finds its release there
+      # a run that waited behind another one for the same runtime finds its release there; a run whose commit is no
+      # longer main's newest leaves the build to the newest one, so the APK never carries older JS than the image
       - id: again
-        run: if gh release view "apk-$RUNTIME" >/dev/null 2>&1; then echo "built=true" >> "$GITHUB_OUTPUT"; fi
+        run: |
+          git fetch -q origin main
+          if gh release view "apk-$RUNTIME" >/dev/null 2>&1 || [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then echo "built=true" >> "$GITHUB_OUTPUT"; fi
       - name: At most 12 EAS builds a month
         if: steps.again.outputs.built != 'true'
         working-directory: apps/mobile
