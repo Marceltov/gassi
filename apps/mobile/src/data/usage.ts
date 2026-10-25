@@ -1,7 +1,7 @@
 // What the app's usage events say (#115, events.ts), shaped here so that nothing personal goes along: a command names
 // its kind and only what kind of tap it was (pee or poop, worked or not), never a note, an encounter's details, a name
 // or a position.
-import type { Command } from "@gassi/domain";
+import { type Command, precise, type TrackPoint } from "@gassi/domain";
 import type { EventData } from "./events";
 
 type Usage = { name: string; data: EventData };
@@ -21,8 +21,9 @@ export const tapName = ({ event, a11y, label }: { event?: string; a11y?: string;
  * how many taps wait. */
 export const syncEvent = (part: "household" | "commands" | "sessions", ms: number, ok: boolean, queued: number): Usage => ({ name: part, data: { ms: Math.round(ms), ok, queued } });
 
-/** A batch of the route sent: how many positions, and the server's answer (null: it didn't arrive). */
-export const batchEvent = (points: number, answer: { stored: boolean; recording: boolean } | null): Usage => ({
-  name: "batch",
-  data: answer ? { points, ok: true, stored: answer.stored, recording: answer.recording } : { points, ok: false },
-});
+/** A batch of the route sent: how many positions, how many of them precise enough for the route (#127), and the
+ * server's answer (null: it didn't arrive). */
+export function batchEvent(points: readonly TrackPoint[], answer: { stored: boolean; recording: boolean } | null): Usage {
+  const counts = { points: points.length, precise: points.filter(precise).length };
+  return { name: "batch", data: answer ? { ...counts, ok: true, stored: answer.stored, recording: answer.recording } : { ...counts, ok: false } };
+}

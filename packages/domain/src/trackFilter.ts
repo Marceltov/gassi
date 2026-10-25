@@ -88,7 +88,8 @@ function frame(origin: TrackPoint) {
   };
 }
 
-const usable = (p: TrackPoint) => p.acc !== null && p.acc <= MAX_ACC_M;
+/** Whether a point is precise enough for the route (GPS, not a network fix of hundreds of metres). */
+export const precise = (p: TrackPoint): boolean => p.acc !== null && p.acc <= MAX_ACC_M;
 
 // The forward filter, one point at a time; `add` returns the step when the point was kept, `restart` true when the
 // filter started over at it.
@@ -100,7 +101,7 @@ function forward() {
   return {
     toPoint: (s: TrackPoint, x: Axis, y: Axis) => f!.toPoint(s, x, y),
     add(point: TrackPoint): (Step & { restart: boolean }) | null {
-      if (!usable(point)) return null;
+      if (!precise(point)) return null;
       f ??= frame(point);
       const t = Date.parse(point.t) / 1000;
       const [zx, zy] = f.toXY(point);

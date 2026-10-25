@@ -4,19 +4,19 @@ import { clearKept, loadKept } from "../data/kept";
 import { createRecorder, type Batch, endRecording, type Geo, keepPoint, type Locks, RejectedBatch, sendLeftovers, sendRecording } from "./recorder";
 
 const T0 = Date.parse("2026-10-24T09:00:00Z");
-const point = (s: number): TrackPoint => ({ t: new Date(T0 + s * 1000).toISOString(), lat: 48.137 + (s * 1.4) / 111_195, lon: 11.575, ele: null, acc: 5 });
+const point = (s: number, acc = 5): TrackPoint => ({ t: new Date(T0 + s * 1000).toISOString(), lat: 48.137 + (s * 1.4) / 111_195, lon: 11.575, ele: null, acc });
 
-// a position source the test drives: `fix(s)` delivers the point at `s` seconds, `deny()` refuses
+// a position source the test drives: `fix(s, acc)` delivers the point at `s` seconds, `deny()` refuses
 function fakeGeo() {
   let handlers: { onPoint: (p: TrackPoint) => void; onDenied: () => void } | null = null;
-  const geo: Geo & { watching: () => boolean; ended: number; fix(s: number): void; deny(): void } = {
+  const geo: Geo & { watching: () => boolean; ended: number; fix(s: number, acc?: number): void; deny(): void } = {
     ended: 0,
     watch(_walkKey, onPoint, onDenied) {
       handlers = { onPoint, onDenied };
       return () => void (handlers = null);
     },
     watching: () => handlers !== null,
-    fix: (s) => handlers?.onPoint(point(s)),
+    fix: (s, acc) => handlers?.onPoint(point(s, acc)),
     deny: () => handlers?.onDenied(),
     async end() {
       geo.ended++;
@@ -129,6 +129,19 @@ test("no fix for 30 s means noSignal", async () => {
   await vi.advanceTimersByTimeAsync(31_000);
   expect(r.status()).toBe("noSignal");
   geo.fix(31);
+  expect(r.status()).toBe("on");
+  r.close();
+});
+
+test("only network fixes for a minute mean rough, until GPS comes back", async () => {
+  const geo = fakeGeo();
+  const r = createRecorder({ walkKey: "w", geo, upload: fakeUpload().send, locks: null });
+  for (let s = 0; s <= 60; s += 5) {
+    geo.fix(s, 250);
+    await vi.advanceTimersByTimeAsync(5000);
+  }
+  expect(r.status()).toBe("rough");
+  geo.fix(65, 12);
   expect(r.status()).toBe("on");
   r.close();
 });

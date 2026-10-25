@@ -19,8 +19,10 @@ test("commandEvent never carries a note, an encounter's details or a name", () =
 
 test("syncEvent and batchEvent", () => {
   expect(syncEvent("sessions", 412.6, true, 3)).toEqual({ name: "sessions", data: { ms: 413, ok: true, queued: 3 } });
-  expect(batchEvent(12, { stored: true, recording: false })).toEqual({ name: "batch", data: { points: 12, ok: true, stored: true, recording: false } });
-  expect(batchEvent(12, null)).toEqual({ name: "batch", data: { points: 12, ok: false } });
+  const at = (acc: number | null) => ({ t: "2026-10-25T14:00:00Z", lat: 49.4, lon: 11.1, ele: null, acc });
+  const points = [at(8), at(250), at(30), at(null)];
+  expect(batchEvent(points, { stored: true, recording: false })).toEqual({ name: "batch", data: { points: 4, precise: 2, ok: true, stored: true, recording: false } });
+  expect(batchEvent(points, null)).toEqual({ name: "batch", data: { points: 4, precise: 2, ok: false } });
 });
 
 test("tapName: a button's own event name before what it says, so typed or household names stay out", () => {
