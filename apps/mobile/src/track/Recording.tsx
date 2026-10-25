@@ -3,12 +3,13 @@
 // when another phone takes over; with "Bildschirm auf der Runde anlassen" on, it keeps the screen on meanwhile.
 // useRecording() gives the walk screen what it shows: whether this phone records, how recording goes, the distance and
 // route so far, who records, and `takeOver`. `sent` counts the batches that reached the server, so the summary asks
-// again once the last one is there.
-import { ApiError } from "@gassi/api-client";
+// again once the last one is there. A gap without positions (a tunnel, or Android ended the service) doesn't end the
+// recording: it goes on when positions come again, and an opened app starts the service again (#108).
 import { newId, type TrackPoint } from "@gassi/domain";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useGassi } from "../data/GassiProvider";
-import { type Batch, createRecorder, type Recorder, type RecordingStatus, RejectedBatch, sendLeftovers } from "./recorder";
+import { recordingGeo, stopStaleBackground } from "./geo";
+import { type Batch, createRecorder, type Recorder, type RecordingStatus, sendLeftovers, uploadWith } from "./recorder";
 import { useScreenOn } from "./screenOn";
 import { holdScreen } from "./wakeLock";
 
@@ -54,6 +55,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   const { view, device, api, send } = useGassi();
   const walk = view.walk;
   const key = walk?.key ?? null;
+  const startedAt = walk?.startedAt ?? null;
   const mine = !!walk && !!device && walk.recorder?.deviceId === device.id;
   const store = useMemo(() => liveStore(), []);
   const live = useSyncExternalStore(store.subscribe, store.get, store.get);
@@ -68,15 +70,17 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   const upload = useCallback(
     async (b: Batch) => {
       if (!api) throw new Error("signed out");
-      try {
-        await api.uploadTrack(b);
-      } catch (e) {
-        throw e instanceof ApiError && e.status === 400 ? new RejectedBatch() : e;
-      }
+      const answer = await uploadWith(api)(b);
       setSent((n) => n + 1);
+      return answer;
     },
     [api],
   );
+
+  // Android: a service still recording a walk that ended or went to another phone while the app was closed stops
+  useEffect(() => {
+    if (device) void stopStaleBackground(key, mine);
+  }, [device, key, mine]);
 
   // what an earlier page, a recording handed over or a Zuhause without reception left unsent
   useEffect(() => {
@@ -84,8 +88,8 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   }, [api, upload, key, mine]);
 
   useEffect(() => {
-    if (!key || !mine || !api) return;
-    const r = createRecorder({ walkKey: key, upload });
+    if (!key || !startedAt || !mine || !api) return;
+    const r = createRecorder({ walkKey: key, upload, geo: recordingGeo(startedAt) });
     const unsubscribe = store.set(r);
     return () => {
       unsubscribe();
@@ -94,7 +98,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
       if (running.current !== key) void r.stop();
       else r.close();
     };
-  }, [key, mine, api, upload, store]);
+  }, [key, startedAt, mine, api, upload, store]);
 
   // "Bildschirm auf der Runde anlassen": the screen stays on while this phone records
   const screenOn = useScreenOn();

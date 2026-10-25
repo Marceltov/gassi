@@ -4,10 +4,11 @@
 // Poopoo, Kommando, Leckerli and Begegnung (#36, #90, #37), Pause/Weiter and Training, Zuhause; with several dogs on the walk
 // each asks which one. Only what happened scrolls, newest first; a tap on one opens it to change or delete (#99). A tap on Kommando or Leckerli logs the usual one they name, a hold chooses (#98). A poop is logged at the tap and then asks how it was (#86), in a sheet like the dog's; closed,
 // it has none; one still in the queue asks again from the list. Every tap goes through the queue and shows at once. When the walk is over
-// (ended here or on another phone), the screen leaves: to the summary after Zuhause, else to Start.
+// (ended here or on another phone), the screen leaves: to the summary after Zuhause, else to Start. On Android, the first
+// walk this phone records opens Akku once (#108).
 import { CONSISTENCIES, CONSISTENCY_LABEL, type Consistency, keepsOne, newId, TYPE_LABEL } from "@gassi/domain";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { walkClock } from "../start/elapsed";
@@ -31,6 +32,9 @@ import { ItemRow } from "./ItemRow";
 import { RoutePill } from "./RoutePill";
 import { RouteSheet } from "./RouteSheet";
 import { useTabPath } from "../ui/tabPath";
+import { takeFirstRecording } from "../track/firstRecording";
+import { hintsSupported } from "../track/hints";
+import { useRecording } from "../track/Recording";
 
 type Kind = "pee" | "mark" | "poop";
 
@@ -59,6 +63,10 @@ export function Walk() {
       if (!walk && !isLeaving()) router.dismissTo("/");
     }, [walk, router, isLeaving]),
   );
+  const { mine } = useRecording();
+  useEffect(() => {
+    if (mine && hintsSupported() && takeFirstRecording()) router.push("/mehr/akku");
+  }, [mine, router]);
   if (!walk) return null;
 
   const at = () => new Date().toISOString();

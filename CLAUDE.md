@@ -46,7 +46,7 @@ the same app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay
   `app/` stay thin and render from `src/` (start, walk, food, training, history, week, more). `src/data` holds the
   device, the command queue and the household snapshot over one `storage` module (`storage.ts` SQLite on Android,
   `storage.web.ts` localStorage); other platform parts the same way (`.web.tsx`: maps, pickers, sheet). `src/track` records the walk's route on the phone
-  that records it (ADR 0014): positions (`geo.web.ts`), batches kept and sent (`recorder.ts`), the wake lock. No domain rules here; writes other than taps need the
+  that records it (ADR 0014): positions (`geo.web.ts`; on Android a foreground service whose task runs headless, `background.ts` and `headless.ts`, defined at the entry `index.ts`), batches kept and sent (`recorder.ts`), the wake lock (web), Android's "Immer zulassen" and battery hints (`hints.ts`). No domain rules here; writes other than taps need the
   server and say `OFFLINE`. `public/` holds the web page template, manifest and service worker. Its e2e tests run
   against the server's build in `apps/server/e2e` (`app-*.spec.ts`). During development a sync error shows as a
   banner on every screen (`ui/SyncBanner.tsx`), and sync errors and crashes go to the server's log

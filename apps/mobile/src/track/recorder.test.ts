@@ -1,7 +1,7 @@
 import type { TrackPoint } from "@gassi/domain";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { loadKept } from "../data/kept";
-import { createRecorder, type Batch, type Geo, type Locks, RejectedBatch, sendLeftovers } from "./recorder";
+import { clearKept, loadKept } from "../data/kept";
+import { createRecorder, type Batch, endRecording, type Geo, keepPoint, type Locks, RejectedBatch, sendLeftovers, sendRecording } from "./recorder";
 
 const T0 = Date.parse("2026-10-24T09:00:00Z");
 const point = (s: number): TrackPoint => ({ t: new Date(T0 + s * 1000).toISOString(), lat: 48.137 + (s * 1.4) / 111_195, lon: 11.575, ele: null, acc: 5 });
@@ -9,14 +9,18 @@ const point = (s: number): TrackPoint => ({ t: new Date(T0 + s * 1000).toISOStri
 // a position source the test drives: `fix(s)` delivers the point at `s` seconds, `deny()` refuses
 function fakeGeo() {
   let handlers: { onPoint: (p: TrackPoint) => void; onDenied: () => void } | null = null;
-  const geo: Geo & { watching: () => boolean; fix(s: number): void; deny(): void } = {
-    watch(onPoint, onDenied) {
+  const geo: Geo & { watching: () => boolean; ended: number; fix(s: number): void; deny(): void } = {
+    ended: 0,
+    watch(_walkKey, onPoint, onDenied) {
       handlers = { onPoint, onDenied };
       return () => void (handlers = null);
     },
     watching: () => handlers !== null,
     fix: (s) => handlers?.onPoint(point(s)),
     deny: () => handlers?.onDenied(),
+    async end() {
+      geo.ended++;
+    },
   };
   return geo;
 }
@@ -187,7 +191,7 @@ test("a recorder takes back a recording that was taken for over (the app opened 
 
 test("a position the server would refuse (accuracy of kilometres, a height out of range) isn't kept", async () => {
   let handlers: { onPoint: (p: TrackPoint) => void } | null = null;
-  const geo: Geo = { watch: (onPoint) => ((handlers = { onPoint }), () => {}) };
+  const geo: Geo = { watch: (_walkKey, onPoint) => ((handlers = { onPoint }), () => {}) };
   const up = fakeUpload();
   const r = createRecorder({ walkKey: "w", geo, upload: up.send, locks: null });
   handlers!.onPoint({ ...point(0), acc: 25_000 }); // a laptop's guess from its network
@@ -236,4 +240,77 @@ test("a tab waiting for the lock shows the recording tab's distance", async () =
   expect(waiting.status()).toBe("on");
   recording.close();
   waiting.close();
+});
+
+test("keepPoint drops a repeated or refused point", () => {
+  createRecorder({ walkKey: "w", geo: fakeGeo(), upload: fakeUpload().send, locks: null }).close();
+  expect(keepPoint("w", point(0))).toBe(true);
+  expect(keepPoint("w", point(0))).toBe(false); // the same time again
+  expect(keepPoint("w", { ...point(5), acc: 50_000 })).toBe(false); // the contract refuses it
+  expect(keepPoint("other", point(5))).toBe(false); // no recording of that walk
+  expect((loadKept("recordings") as Record<string, { points: TrackPoint[] }>).w.points).toEqual([point(0)]);
+});
+
+test("keepPoint drops a point older than the last, delivered again late", () => {
+  createRecorder({ walkKey: "w", geo: fakeGeo(), upload: fakeUpload().send, locks: null }).close();
+  keepPoint("w", point(0));
+  keepPoint("w", point(5));
+  expect(keepPoint("w", point(0))).toBe(false);
+  expect((loadKept("recordings") as Record<string, { points: TrackPoint[] }>).w.points).toEqual([point(0), point(5)]);
+});
+
+test("a sign-out while a batch is out keeps nothing of the recording", async () => {
+  const geo = fakeGeo();
+  const r = createRecorder({ walkKey: "w", geo, upload: fakeUpload().send, locks: null });
+  geo.fix(0);
+  r.close();
+  await sendRecording("w", async () => {
+    clearKept(); // signed out meanwhile
+    return { stored: true, recording: true };
+  });
+  expect(loadKept("recordings")?.["w" as never]).toBeUndefined();
+});
+
+test("a point kept elsewhere (the background task) shows once", async () => {
+  const geo = fakeGeo();
+  const r = createRecorder({ walkKey: "w", geo, upload: fakeUpload().send, locks: null });
+  keepPoint("w", point(0));
+  geo.fix(0); // the task tells the open screen of the point it kept
+  geo.fix(5);
+  expect(r.points()).toHaveLength(2);
+  expect((loadKept("recordings") as Record<string, { points: TrackPoint[] }>).w.points).toHaveLength(2);
+  r.close();
+});
+
+test("sendRecording returns the server's last answer", async () => {
+  const geo = fakeGeo();
+  const r = createRecorder({ walkKey: "w", geo, upload: fakeUpload().send, locks: null });
+  geo.fix(0);
+  r.close();
+  expect(await sendRecording("w", async () => ({ stored: true, recording: false }))).toEqual({ stored: true, recording: false });
+  expect(await sendRecording("w", async () => ({ stored: true, recording: true }))).toBeUndefined(); // nothing left to send
+});
+
+test("stop ends the background before sending the rest; close only lets go", async () => {
+  const geo = fakeGeo();
+  const up = fakeUpload();
+  const first = createRecorder({ walkKey: "w", geo, upload: up.send, locks: null });
+  first.close();
+  expect(geo.ended).toBe(0);
+  const r = createRecorder({ walkKey: "w", geo, upload: up.send, locks: null });
+  geo.fix(0);
+  await r.stop();
+  expect(geo.ended).toBe(1);
+  expect(up.batches).toHaveLength(1);
+  expect(loadKept("recordings")).toEqual({});
+});
+
+test("endRecording marks it over, so the rest is sent and the recording forgotten", async () => {
+  const geo = fakeGeo();
+  const r = createRecorder({ walkKey: "w", geo, upload: fakeUpload().send, locks: null });
+  geo.fix(0);
+  r.close();
+  endRecording("w");
+  await sendRecording("w", async () => ({ stored: true, recording: false }));
+  expect(loadKept("recordings")).toEqual({});
 });

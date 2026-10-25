@@ -1,6 +1,6 @@
 // Mehr: the data first (Gewicht, Vorrat), then the settings (Hunde, Übungen, Leckerli; Haushalt; Meine Geräte) and
 // the Garmin watch, which comes later; then this device's "Bildschirm auf der Runde anlassen" (#104), where the browser
-// can keep the screen on. Each row says in short what is behind it; without reception the rows that need
+// can keep the screen on, or on Android the two settings recording in the pocket needs (Standort, Akku; #108). Each row says in short what is behind it; without reception the rows that need
 // the server stay without that line. Then Wünsche und Fehler (when the server has GitHub set up) and the link to the
 // source code, which the AGPL asks a server to offer its users, and last Abmelden on this device (asked first). Its
 // screens have no Zurück: the tab bar stays, and the Mehr tab leads back here.
@@ -15,7 +15,9 @@ import { Screen } from "../ui/Screen";
 import { Group, Row } from "../ui/List";
 import { setScreenOn, useScreenOn } from "../track/screenOn";
 import { wakeLockSupported } from "../track/wakeLock";
+import { hintsSupported } from "../track/hints";
 import { SignOutSheet } from "./SignOut";
+import { useHints } from "./useHints";
 import { useServer } from "./useServer";
 
 // "1 Übung", "5 Übungen", "keine"
@@ -47,6 +49,8 @@ export function More() {
   const go = (path: Href) => () => router.push(path);
   const [signingOut, setSigningOut] = useState(false);
   const screenOn = useScreenOn();
+  const { always, battery } = useHints();
+  const known = (v: boolean | null, yes: string, no: string) => (v === null ? undefined : v ? yes : no);
 
   return (
     <Screen
@@ -74,6 +78,12 @@ export function More() {
                 label="Bildschirm auf der Runde anlassen"
                 right={<Switch accessibilityLabel="Bildschirm auf der Runde anlassen" value={screenOn} onValueChange={setScreenOn} trackColor={{ true: theme.walk, false: theme.neutral }} />}
               />
+            </Group>
+          ) : null}
+          {hintsSupported() ? (
+            <Group note="Damit die Strecke auch in der Tasche weiterläuft.">
+              <Row testID="more-Standort" icon="location" tone="walk" label="Standort im Hintergrund" value={known(always, "Immer zulassen ✓", "nur bei Nutzung")} onPress={go("/mehr/standort")} />
+              <Row testID="more-Akku" icon="battery" tone="device" label="Akku" value={known(battery, "nicht eingeschränkt ✓", "eingeschränkt")} onPress={go("/mehr/akku")} />
             </Group>
           ) : null}
           <Group>

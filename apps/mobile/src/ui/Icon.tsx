@@ -40,6 +40,8 @@ const SYMBOLS = {
   signIn: sym("arrow.right.circle.fill", "login"),
   signOut: sym("rectangle.portrait.and.arrow.right", "logout"),
   feedback: sym("exclamationmark.bubble.fill", "feedback"),
+  location: sym("location.fill", "location_on"),
+  battery: sym("battery.100", "battery_full"),
 };
 
 export type IconName = keyof typeof SYMBOLS | "poop";

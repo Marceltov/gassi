@@ -34,7 +34,7 @@ test("a fresh server: set up, invite, walk together with two dogs, record a trac
   await asHerzii.commands({ commands: [{ id: "r", at: t(1), kind: "walk.record", walkKey: "w1" }] });
   expect((await asHirsch.sessions()).walk!.recorder).toEqual({ deviceId: herzii.device.id, name: "Pixel 7" });
   const point = (min: number, north: number) => ({ t: t(min), lat: 48.137 + north / 111_195, lon: 11.575, ele: 520, acc: 4 });
-  expect(await asHerzii.uploadTrack({ trackId: "herzii-1", walkKey: "w1", source: "phone", seq: 0, points: [point(1, 0), point(10, 600), point(20, 1200)] })).toEqual({ stored: true });
+  expect(await asHerzii.uploadTrack({ trackId: "herzii-1", walkKey: "w1", source: "phone", seq: 0, points: [point(1, 0), point(10, 600), point(20, 1200)] })).toEqual({ stored: true, recording: true });
   await asHirsch.commands({ commands: [{ id: "e", at: t(25), kind: "walk.stop", walkKey: "w1" }] });
   const walkEntry = (await asHirsch.entries({ type: "walk" })).entries[0];
   const walk = await asHirsch.walk({ id: walkEntry.id });
