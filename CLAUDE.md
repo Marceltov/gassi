@@ -25,9 +25,12 @@ the same app and the Garmin app follow (`docs/PLAN.md`, ADR 0005). Versions stay
 - The app in dev: `npm run web -w @gassi/mobile` (port 8081) against that server, with `CORS_ORIGIN=http://localhost:8081`
   in the server's `.env.local` and `EXPO_PUBLIC_API_URL=http://localhost:3000` in `apps/mobile/.env.local` (see
   `apps/mobile/.env.example`). Development needs no export.
-- Android: `npx eas-cli build -p android --profile preview` in `apps/mobile` (an APK on EAS, free queue; the account
-  is `marceltov-gassi`). No Android SDK here: `npx expo export --platform android --output-dir <scratch>` checks that
-  native files resolve and bundle; native checks run on Bille's phone, one at a time.
+- Android: the app's code arrives as an update from its server (ADR 0015; the image carries the bundle, CI signs it);
+  an APK only for new native parts: bump `runtimeVersion` in `apps/mobile/app.json`, `npm run runtime:record`
+  (`npm run runtime:check` runs in CI), and after the merge CI builds it on EAS once Marcel approves (the account is
+  `marceltov-gassi`; by hand: `npx eas-cli build -p android --profile release` in `apps/mobile`). No Android SDK here:
+  `npx expo export --platform android --output-dir <scratch>` checks that native files resolve and bundle; native
+  checks run on Bille's phone, one at a time.
 - `scripts/quiet.sh <command>` prints only failures and the summary of a long run
 - Installs run without scripts (`.npmrc`): better-sqlite3 loads its prebuilt binary.
 
