@@ -14,7 +14,10 @@ test("the e2e job's Playwright image is the installed Playwright's version", () 
 test("the image job signs the app's update with the key as a BuildKit secret, never a build argument or a layer", () => {
   const ci = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
   const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
-  expect(ci).toMatch(/secrets: \|\n\s+updates_key=\$\{\{ secrets\.UPDATES_SIGNING_KEY \}\}/);
+  // a file, not `secrets:`: the action splits that input into key=value lines and keeps only a PEM's first line
+  expect(ci).toMatch(/UPDATES_SIGNING_KEY: \$\{\{ secrets\.UPDATES_SIGNING_KEY \}\}\n\s+run: printf '%s\\n' "\$UPDATES_SIGNING_KEY" > "\$RUNNER_TEMP\/updates_key\.pem"/);
+  expect(ci).toMatch(/secret-files: \|\n\s+updates_key=\$\{\{ runner\.temp \}\}\/updates_key\.pem/);
+  expect(ci).not.toMatch(/secrets: \|\n\s+updates_key=/);
   expect(ci).not.toMatch(/build-args:[^\n]*UPDATES/);
   expect(dockerfile).toMatch(/RUN --mount=type=secret,id=updates_key[^\n]*\n?[^\n]*UPDATES_SIGNING_KEY_FILE=\/run\/secrets\/updates_key/);
 });
