@@ -23,11 +23,21 @@ function offsetAt(ms: number, timeZone: string): number {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+// the wall time as if it were UTC, or null when it isn't one or names a day or time that doesn't exist (Feb 31, 25:99)
+function asUtcOf(local: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
+  if (!m || +m[4] > 23 || +m[5] > 59) return null;
+  const asUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  return new Date(asUtc).toISOString().slice(0, 16) === local ? asUtc : null;
+}
+
+/** Whether `local` is a date-time like "2026-10-20T14:05" that exists on the calendar. */
+export const isLocalDateTime = (local: string): boolean => asUtcOf(local) !== null;
+
 /** "2026-10-20T14:05" in `timeZone` → the UTC instant (ms). A wall time that happens twice (summer time ending) is its second pass. */
 export function localToUtc(local: string, timeZone: string): number {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
-  if (!m) throw new Error("not a local date-time");
-  const asUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  const asUtc = asUtcOf(local);
+  if (asUtc === null) throw new Error("not a local date-time");
   const first = asUtc - offsetAt(asUtc, timeZone);
   return asUtc - offsetAt(first, timeZone);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { clockTime, dayBounds, dayOf, formatAgo, formatAgoShort, formatElapsed, formatMinutes, localToUtc, utcToLocal } from "./time";
+import { clockTime, dayBounds, dayOf, formatAgo, formatAgoShort, formatElapsed, formatMinutes, isLocalDateTime, localToUtc, utcToLocal } from "./time";
 
 const TZ = "Europe/Berlin";
 const at = (iso: string) => Date.parse(iso);
@@ -22,6 +22,15 @@ describe("localToUtc and utcToLocal", () => {
 
   test("rejects anything that isn't a local date-time", () => {
     expect(() => localToUtc("2026-07-01 14:05", TZ)).toThrow();
+  });
+
+  test("a day or time that doesn't exist is no local date-time, and doesn't roll over into another", () => {
+    expect(isLocalDateTime("2026-10-20T14:05")).toBe(true);
+    expect(isLocalDateTime("2028-02-29T00:00")).toBe(true);
+    for (const t of ["2026-02-31T10:00", "2026-13-01T10:00", "2026-10-00T10:00", "2026-10-20T24:00", "2026-10-20T14:60", "2026-10-20T14:5"]) {
+      expect(isLocalDateTime(t), t).toBe(false);
+    }
+    expect(() => localToUtc("2026-02-31T25:99", TZ)).toThrow();
   });
 });
 

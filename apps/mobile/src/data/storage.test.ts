@@ -23,3 +23,18 @@ test("keys lists what localStorage holds", () => {
   expect(storage.keys()).toEqual(expect.arrayContaining(["gassi.kept.x", "other"]));
   expect(localStorage.getItem("other")).toBe("2");
 });
+
+test("a full localStorage still reads: what went to memory is read from there, until a write fits again", () => {
+  localStorage.setItem("q", "old");
+  const real = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = () => {
+    throw new Error("QuotaExceededError");
+  };
+  storage.setItem("q", "new");
+  storage.setItem("fresh", "1");
+  expect([storage.getItem("q"), storage.getItem("fresh")]).toEqual(["new", "1"]);
+  localStorage.setItem = real;
+  storage.setItem("q", "newer");
+  expect(storage.getItem("q")).toBe("newer");
+  expect(localStorage.getItem("q")).toBe("newer");
+});
