@@ -12,9 +12,13 @@ RUN npm ci
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV EXPO_NO_TELEMETRY=1
-# Exports the Expo web app (apps/mobile) into apps/server/public, then builds the server. Both steps are explicit: the
-# image always exports afresh (there is no dist/ in the build context to skip on).
-RUN npm run build:app && npm run build -w @gassi/server && mkdir /data
+# Exports the Expo app (apps/mobile, web and Android) into apps/server/public, then builds the server. Both steps are
+# explicit: the image always exports afresh (there is no dist/ in the build context to skip on). CI hands the update's
+# signing key as a BuildKit secret (#107): it is read while signing and never kept in a layer; without it (a PR's image,
+# a local build) the update goes unsigned and phones don't take it.
+RUN --mount=type=secret,id=updates_key \
+  if [ -s /run/secrets/updates_key ]; then export UPDATES_SIGNING_KEY_FILE=/run/secrets/updates_key; fi; \
+  npm run build:app && npm run build -w @gassi/server && mkdir /data
 
 # Runtime: only the standalone server and its traced deps. Distroless: Node and its libraries, no shell or npm.
 FROM gcr.io/distroless/nodejs22-debian13

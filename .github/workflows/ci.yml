@@ -106,3 +106,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # signs the Android app's update (#107, ADR 0015); a BuildKit secret, so it stays out of the image
+          secrets: |
+            updates_key=${{ secrets.UPDATES_SIGNING_KEY }}
