@@ -58,7 +58,8 @@
           "locationAlwaysAndWhenInUsePermission": "Gassi zeichnet die Strecke der Runde auch bei ausgeschaltetem Bildschirm auf."
         }
       ],
-      "expo-task-manager"
+      "expo-task-manager",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true

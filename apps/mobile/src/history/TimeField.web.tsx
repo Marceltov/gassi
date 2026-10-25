@@ -1,6 +1,6 @@
 // A date and time in this phone's time zone, with the browser's own picker (datetime-local). Same props as
 // TimeField.tsx; `value` and what `onChange` gets are ISO instants.
-import { localToUtc, utcToLocal } from "@gassi/domain";
+import { isLocalDateTime, localToUtc, utcToLocal } from "@gassi/domain";
 import { useColorScheme } from "react-native";
 import { useTheme } from "../theme";
 import { TIME_ZONE } from "../time";
@@ -21,7 +21,7 @@ export function TimeField({ label, value, onChange }: TimeFieldProps) {
         value={utcToLocal(Date.parse(value), TIME_ZONE)}
         onChange={(e) => {
           // a half-typed or cleared value is left alone
-          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(e.target.value)) onChange(new Date(localToUtc(e.target.value, TIME_ZONE)).toISOString());
+          if (isLocalDateTime(e.target.value)) onChange(new Date(localToUtc(e.target.value, TIME_ZONE)).toISOString());
         }}
         style={{ colorScheme: scheme, background: theme.surface, color: theme.ink, border: `1px solid ${theme.line}`, borderRadius: 12, padding: "10px 12px", fontSize: 16, fontFamily: FONT, minWidth: 0 }}
       />
