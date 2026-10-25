@@ -11,6 +11,7 @@ import { useTheme } from "../theme";
 import { useEdges } from "../ui/edges";
 import { routeBounds } from "./bounds";
 import { Corner } from "./Corner";
+import { routeShapes } from "./shapes";
 
 export type TrackMapProps = { routes: [number, number][][]; height: number | { min: number }; still?: boolean };
 
@@ -45,15 +46,14 @@ function MapBox({ routes, still }: { routes: [number, number][][]; still: boolea
       version: 8,
       sources: {
         osm: { type: "raster", tiles: [TILES], tileSize: 256, maxzoom: 19, attribution: ATTRIBUTION },
-        routes: {
-          type: "geojson",
-          data: { type: "Feature", properties: {}, geometry: { type: "MultiLineString", coordinates: routes.filter((r) => r.length > 0).map((r) => r.map(([lat, lon]) => [lon, lat])) } },
-        },
+        routes: { type: "geojson", data: routeShapes(routes) },
       },
       layers: [
         { id: "osm", type: "raster", source: "osm" },
         // a still map (Verlauf's) keeps a thin line, as on the web
-        { id: "routes", type: "line", source: "routes", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": theme.walk, "line-width": still ? 3 : 4 } },
+        { id: "routes", type: "line", source: "routes", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": theme.walk, "line-width": still ? 3 : 4 } },
+        // a route of one position, as the dot a round-capped line of no length would be
+        { id: "points", type: "circle", source: "routes", filter: ["==", ["geometry-type"], "Point"], paint: { "circle-color": theme.walk, "circle-radius": still ? 3 : 4 } },
       ],
     }),
     [routes, still, theme.walk],

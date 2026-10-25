@@ -1,5 +1,6 @@
 // What survives a reload, in localStorage, shared by every tab of the app; another tab's change arrives as a storage
-// event. Where storage can't be used (blocked, full), values stay in memory for this page. Same interface as
+// event. Where storage can't be used (blocked, full), values stay in memory for this page, and are read from there
+// first (a full localStorage still reads, but its value is the old one). Same interface as
 // storage.ts ("./storage" means this file on the web, so that one is named with its extension).
 import type * as Native from "./storage.ts";
 
@@ -8,6 +9,7 @@ const memory = new Map<string, string>();
 // localStorage looked up on each call: a test (or a browser that blocks storage) may swap or lack it
 export const storage: Native.KeyValue = {
   getItem: (k) => {
+    if (memory.has(k)) return memory.get(k)!;
     try {
       return localStorage.getItem(k);
     } catch {
@@ -17,6 +19,7 @@ export const storage: Native.KeyValue = {
   setItem: (k, v) => {
     try {
       localStorage.setItem(k, v);
+      memory.delete(k);
     } catch {
       memory.set(k, v);
     }

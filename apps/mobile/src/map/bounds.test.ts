@@ -15,3 +15,8 @@ test("routeBounds", () => {
     ]),
   ).toEqual({ ne: [11.6, 48.2], sw: [11.4, 48.0] });
 });
+
+test("routeBounds of a long walk: more points than a call takes arguments", () => {
+  const long = Array.from({ length: 1_000_000 }, (_, i): [number, number] => [48 + i / 1e7, 11 + i / 1e7]);
+  expect(routeBounds([long])).toEqual({ ne: [11 + 999_999 / 1e7, 48 + 999_999 / 1e7], sw: [11, 48] });
+});

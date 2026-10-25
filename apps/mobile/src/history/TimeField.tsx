@@ -1,6 +1,6 @@
-// A time typed as "2026-10-20T14:05" on Android, saved as soon as the text is a complete time; leaving the field with
+// A time typed as "2026-10-20T14:05" on Android, saved as soon as the text is a complete time that exists (no Feb 31); leaving the field with
 // an unfinished one shows the time as it was. Same props as TimeField.web.tsx.
-import { localToUtc, utcToLocal } from "@gassi/domain";
+import { isLocalDateTime, localToUtc, utcToLocal } from "@gassi/domain";
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import { useTheme } from "../theme";
@@ -12,7 +12,7 @@ export function TimeField({ label, value, onChange }: TimeFieldProps) {
   const theme = useTheme();
   const [typed, setTyped] = useState<string | null>(null);
   const type = (text: string) => {
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) {
+    if (isLocalDateTime(text)) {
       onChange(new Date(localToUtc(text, TIME_ZONE)).toISOString());
       setTyped(null);
     } else setTyped(text);
