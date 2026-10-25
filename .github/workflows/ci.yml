@@ -19,6 +19,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      # the Android app's native parts still fit its runtime version (#107, scripts/runtime.mjs)
+      - run: npm run runtime:check
 
   # In Playwright's image, which has Chromium and its system packages: installing them took 7-11 minutes whenever the
   # runner got a slow Ubuntu mirror (#88). The tag is the installed Playwright's (tooling/ci.test.ts keeps them equal).
@@ -106,3 +108,71 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # signs the Android app's update (#107, ADR 0015); a BuildKit secret, so it stays out of the image
+          secrets: |
+            updates_key=${{ secrets.UPDATES_SIGNING_KEY }}
+
+  # The Android APK for a new runtime version (#107, ADR 0015), guarded so it never spends EAS builds by itself: only
+  # on main, only when no release apk-<runtime> exists yet (a JS change ships as an update, not an APK), only after
+  # Marcel approves the `apk` environment, never at 12 or more builds this month, and one at a time. The image doesn't
+  # wait for it; until the release exists the app says the new version follows.
+  apk-needed:
+    needs: [check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      runtime: ${{ steps.runtime.outputs.runtime }}
+      needed: ${{ steps.runtime.outputs.needed }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: runtime
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          runtime=$(node -p 'require("./apps/mobile/app.json").expo.runtimeVersion')
+          echo "runtime=$runtime" >> "$GITHUB_OUTPUT"
+          if gh release view "apk-$runtime" >/dev/null 2>&1; then echo "needed=false"; else echo "needed=true"; fi >> "$GITHUB_OUTPUT"
+
+  apk:
+    # after the image and the e2e run: an APK built later than its image would outrank the image's update with older JS
+    needs: [apk-needed, image, e2e]
+    if: needs.apk-needed.outputs.needed == 'true'
+    environment: apk
+    concurrency:
+      group: apk
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      RUNTIME: ${{ needs.apk-needed.outputs.runtime }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # a run that waited behind another one for the same runtime finds its release there; a run whose commit is no
+      # longer main's newest leaves the build to the newest one, so the APK never carries older JS than the image
+      - id: again
+        run: |
+          git fetch -q origin main
+          if gh release view "apk-$RUNTIME" >/dev/null 2>&1 || [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then echo "built=true" >> "$GITHUB_OUTPUT"; fi
+      - name: At most 12 EAS builds a month
+        if: steps.again.outputs.built != 'true'
+        working-directory: apps/mobile
+        run: npx eas-cli build:list --platform android --limit 50 --json --non-interactive | node ../../scripts/eas-month.mjs 12
+      - name: Build the APK on EAS
+        if: steps.again.outputs.built != 'true'
+        working-directory: apps/mobile
+        run: npx eas-cli build -p android --profile release --non-interactive --wait --json > "$RUNNER_TEMP/build.json"
+      - name: Publish it as the release apk-<runtime>
+        if: steps.again.outputs.built != 'true'
+        run: |
+          url=$(node -p 'require(process.env.RUNNER_TEMP + "/build.json")[0].artifacts.buildUrl')
+          curl -fsSL -o "gassi-$RUNTIME.apk" "$url"
+          gh release create "apk-$RUNTIME" "gassi-$RUNTIME.apk" --target "$GITHUB_SHA" --title "Android app, runtime $RUNTIME" \
+            --notes "The Gassi APK for runtime $RUNTIME, built from $GITHUB_SHA. Install it over the old one; the app links here when its server needs it."

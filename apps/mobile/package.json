@@ -8,7 +8,7 @@
     "start": "expo start",
     "web": "expo start --web --port 8081",
     "android": "expo start --android",
-    "export": "expo export --platform web --output-dir dist",
+    "export": "expo export --platform web --platform android --output-dir dist",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -32,6 +32,7 @@
     "expo-status-bar": "~58.0.3",
     "expo-symbols": "~58.0.4",
     "expo-task-manager": "~58.0.12",
+    "expo-updates": "~58.0.18",
     "expo-web-browser": "~58.0.6",
     "leaflet": "1.9.4",
     "react": "19.3.0",

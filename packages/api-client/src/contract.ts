@@ -237,6 +237,9 @@ export const contract = {
   }),
   // what the sign-in can offer before there is a token: the household's OIDC provider, a link by e-mail
   options: endpoint({ method: "GET", path: "/api/auth/options", auth: false, input: none, output: z.object({ oidc: z.boolean(), mail: z.boolean() }) }),
+  // which runtime the server's Android update is for (#107): an app on another one is told to install a new version
+  // or that the server is behind; null when the server has no update
+  appInfo: endpoint({ method: "GET", path: "/api/app", auth: false, input: none, output: z.object({ runtimeVersion: z.string().nullable() }) }),
   magicLink: endpoint({
     method: "POST",
     path: "/api/auth/magic",

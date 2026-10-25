@@ -18,6 +18,7 @@ tooling
 .superpowers
 !scripts/web.mjs
 !scripts/web-stamp.mjs
+!scripts/app-update-manifest.mjs
 # Local builds of the Expo web app; the image exports its own. In public/ only the server's own files (the icons)
 # go in, as in .gitignore.
 apps/mobile/dist

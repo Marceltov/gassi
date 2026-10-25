@@ -5,9 +5,13 @@
 // route so far, who records, and `takeOver`. `sent` counts the batches that reached the server, so the summary asks
 // again once the last one is there. A gap without positions (a tunnel, or Android ended the service) doesn't end the
 // recording: it goes on when positions come again, and an opened app starts the service again (#108).
+import type { Client } from "@gassi/api-client";
 import { newId, type TrackPoint } from "@gassi/domain";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { loadDevice } from "../data/device";
+import { AppState } from "react-native";
 import { useGassi } from "../data/GassiProvider";
+import { checkForUpdate, compareRuntime, pointUpdatesAt } from "../data/updates";
 import { recordingGeo, stopStaleBackground } from "./geo";
 import { type Batch, createRecorder, type Recorder, type RecordingStatus, sendLeftovers, uploadWith } from "./recorder";
 import { useScreenOn } from "./screenOn";
@@ -54,12 +58,32 @@ function liveStore() {
   };
 }
 
+// The app's updates follow the server signed in to; none is applied while this phone records a walk (updates.ts)
+function useUpdates(api: Client | null, serverUrl: string | null, mine: boolean) {
+  const recording = useRef(mine);
+  useEffect(() => {
+    recording.current = mine;
+  }, [mine]);
+  useEffect(() => {
+    if (!api || !serverUrl) return;
+    pointUpdatesAt(serverUrl);
+    const look = () => {
+      void checkForUpdate(recording.current);
+      void compareRuntime(api);
+    };
+    look();
+    const front = AppState.addEventListener("change", (s) => s === "active" && look());
+    return () => front.remove();
+  }, [api, serverUrl]);
+}
+
 export function RecordingProvider({ children }: { children: ReactNode }) {
   const { view, device, api, send } = useGassi();
   const walk = view.walk;
   const key = walk?.key ?? null;
   const startedAt = walk?.startedAt ?? null;
   const mine = !!walk && !!device && walk.recorder?.deviceId === device.id;
+  useUpdates(api, loadDevice()?.serverUrl || null, mine);
   const store = useMemo(() => liveStore(), []);
   const live = useSyncExternalStore(store.subscribe, store.get, store.get);
   const [sent, setSent] = useState(0);

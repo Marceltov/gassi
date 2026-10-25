@@ -10,6 +10,7 @@ import { Catalog } from "../catalog";
 import { Diary } from "../diary";
 import { storeEvents } from "../events";
 import { DogRepository } from "../dogs";
+import { loadUpdate, type Update } from "../updates";
 import { logger } from "../log";
 import { PeopleRepository } from "../people";
 import { Sessions } from "../sessions";
@@ -32,6 +33,7 @@ export type ApiDeps = {
   reportThrottle?: Throttle; // reports from the app, per device, kept across requests
   clientEvents?: ClientEventWants; // what is kept of the app's events (CLIENT_EVENTS), default all
   eventThrottle?: Throttle; // the app's event batches, per device, kept across requests
+  update?: () => Update | null; // the image's Android update (updates.ts), injected in tests
 };
 
 const names = (deps: ApiDeps) => new PeopleRepository(deps.db).names();
@@ -63,6 +65,7 @@ const implementations: Implementations<ApiDeps> = {
   redeem: async ({ input, deps }) => byCode(deps, linkKey(input), (key) => links(deps).redeem(key, input)),
   linkInfo: async ({ input, deps }) => byCode(deps, linkKey(input), (key) => links(deps).info(key)),
   options: async ({ deps }) => ({ oidc: deps.oidc, mail: deps.mailer !== null }),
+  appInfo: async ({ deps }) => ({ runtimeVersion: (deps.update ?? loadUpdate)()?.runtimeVersion ?? null }),
   magicLink: async ({ input, deps }) => {
     if (!deps.mailer) throw new InputError("E-Mail ist auf diesem Server nicht eingerichtet.");
     await sendMagicLink(deps.db, deps.now, deps.publicUrl, deps.codeKey, deps.mailer, input.email);

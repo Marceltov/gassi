@@ -1,5 +1,7 @@
-// Exports the Expo web app (apps/mobile) and copies the export into apps/server/public, where Next serves it; the
-// fallback rewrite in next.config.ts answers every other path with its index.html.
+// Exports the Expo app (apps/mobile) for the web and Android and copies the export into apps/server/public, where Next
+// serves it; the fallback rewrite in next.config.ts answers every other path with its index.html. The Android bundle
+// is the app's update (#107): its manifest goes to public/_app-update/android.json, signed into android.sig when CI
+// hands the key (UPDATES_SIGNING_KEY_FILE, a PEM file; app-update-manifest.mjs).
 // The export (about a minute) is skipped when nothing it depends on changed since the last one: a hash over the app's
 // sources, the two packages it imports (with their package.json), the lockfile, the installed packages and the EXPO_PUBLIC_* variables is kept in apps/mobile/dist/.stamp.
 // `--force` exports anyway. The copy always runs (it is fast), so a cleaned public/ is refilled.
@@ -7,8 +9,9 @@
 // copy put there is listed in public/.web-export and removed first, so old hashed bundles don't pile up.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { buildManifest, signManifest, verifyManifest } from "./app-update-manifest.mjs";
 import { exportStamp, needsExport, stampToStore } from "./web-stamp.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -65,5 +68,23 @@ const names = readdirSync(dist).filter((name) => name !== ".stamp");
 const clash = names.filter((name) => existsSync(pub + name));
 if (clash.length) throw new Error(`The web export would overwrite the server's own public files: ${clash.join(", ")}`);
 for (const name of names) cpSync(dist + name, pub + name, { recursive: true });
+// the Android update's manifest, with the runtime version the APK must have
+const runtimeVersion = JSON.parse(readFileSync(`${root}apps/mobile/app.json`, "utf8")).expo.runtimeVersion;
+const metadata = JSON.parse(readFileSync(`${dist}metadata.json`, "utf8"));
+// the app's public config, as expo-constants reads it from a running update
+const config = spawnSync("npx", ["expo", "config", "--type", "public", "--json"], { cwd: `${root}apps/mobile`, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+if (config.status !== 0) throw new Error(`expo config failed: ${config.stderr}`);
+const update = buildManifest({ metadata, read: (path) => readFileSync(dist + path), runtimeVersion, createdAt: new Date().toISOString(), stamp, expoClient: JSON.parse(config.stdout) });
+mkdirSync(`${pub}_app-update`, { recursive: true });
+writeFileSync(`${pub}_app-update/android.json`, update);
+const keyFile = process.env.UPDATES_SIGNING_KEY_FILE;
+if (keyFile) {
+  const signature = signManifest(update, readFileSync(keyFile, "utf8"));
+  if (!verifyManifest(update, signature, readFileSync(`${root}apps/mobile/certs/certificate.pem`, "utf8")))
+    throw new Error("UPDATES_SIGNING_KEY doesn't belong to apps/mobile/certs/certificate.pem: phones would reject the update");
+  writeFileSync(`${pub}_app-update/android.sig`, signature);
+}
+else rmSync(`${pub}_app-update/android.sig`, { force: true });
+names.push("_app-update");
 writeFileSync(manifest, `${names.join("\n")}\n`);
-console.log(`Copied the web app into apps/server/public: ${names.join(", ")}`);
+console.log(`Copied the app into apps/server/public: ${names.join(", ")}${keyFile ? " (update signed)" : " (update not signed)"}`);

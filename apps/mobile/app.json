@@ -69,6 +69,18 @@
       "eas": {
         "projectId": "64643fb1-a3e3-408f-9b6a-d3eba04ebfac"
       }
+    },
+    "runtimeVersion": "1",
+    "updates": {
+      "url": "https://gassi.herziis.de/api/updates/manifest",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "codeSigningCertificate": "./certs/certificate.pem",
+      "codeSigningMetadata": {
+        "keyid": "main",
+        "alg": "rsa-v1_5-sha256"
+      },
+      "disableAntiBrickingMeasures": true
     }
   }
 }
