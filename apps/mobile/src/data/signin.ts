@@ -20,6 +20,12 @@ export function normalizeServer(typed: string): string {
   return withScheme.match(/^https?:\/\/[^/?#]+/i)?.[0] ?? withScheme;
 }
 
+/** The server as Mehr names it (#133): its host, without https://. The web app keeps no address (it asks its own
+ * origin), so it names the page's; null where neither is known. */
+export function serverHost(serverUrl: string, pageOrigin: string | undefined = globalThis.location?.origin): string | null {
+  return (serverUrl || pageOrigin)?.replace(/^https?:\/\//i, "") || null;
+}
+
 /** The server the address field names, or null while it's empty. */
 export const typedServer = (typed: string): string | null => (typed.trim() ? normalizeServer(typed) : null);
 

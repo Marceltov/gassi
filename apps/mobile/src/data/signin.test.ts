@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { loadDevice } from "./device";
-import { linkKind, needsName, normalizeServer, signIn, signInOptions, typedServer } from "./signin";
+import { linkKind, needsName, normalizeServer, serverHost, signIn, signInOptions, typedServer } from "./signin";
 import { fakeServer, status } from "./testing";
 
 test("a person or setup link asks for a name, a device link doesn't", async () => {
@@ -51,4 +51,11 @@ test("typedServer: what the field holds, as a server, at every keystroke; nothin
   expect(typedServer("")).toBeNull();
   expect(typedServer("  ")).toBeNull();
   expect(typedServer("gassi.example.org/join?token=abc")).toBe("https://gassi.example.org");
+});
+
+test("serverHost: the server's host, the page's for the web app, null when neither is known", () => {
+  expect(serverHost("https://gassi-dev.herziis.de", undefined)).toBe("gassi-dev.herziis.de");
+  expect(serverHost("http://192.168.178.162:3000", "https://x.y")).toBe("192.168.178.162:3000");
+  expect(serverHost("", "https://gassi.herziis.de")).toBe("gassi.herziis.de");
+  expect(serverHost("", undefined)).toBeNull();
 });
