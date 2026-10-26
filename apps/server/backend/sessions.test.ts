@@ -256,7 +256,7 @@ describe("commands and treats without a training (#36)", () => {
     const s = sessions();
     const catalog = new Catalog(db());
     const warten = await catalog.addExercise("Warten");
-    const kaese = await catalog.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false });
+    const kaese = await catalog.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false, training: true });
     await s.apply(HIRSCH, [
       cmd(1, { kind: "quick.command", dogId: 1, exerciseId: warten.id, ok: true, treatKindId: kaese.id }),
       cmd(2, { kind: "quick.command", dogId: 1, exerciseId: warten.id, ok: false }),
@@ -319,7 +319,7 @@ describe("trainings", () => {
   });
 
   test("treat counts never go below 0", async () => {
-    const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
+    const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false, training: true });
     const s = sessions();
     await s.apply(HERZII, [
       cmd(0, { kind: "training.start", trainingKey: "t" }),
@@ -374,7 +374,7 @@ describe("trainings", () => {
   test("a walk's summary lists its trainings with their start, exercises and treats", async () => {
     const c = new Catalog(db());
     const sitz = await c.addExercise("Sitz");
-    const kaese = await c.addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
+    const kaese = await c.addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false, training: true });
     const s = sessions();
     await s.apply(HIRSCH, [
       cmd(0, { kind: "walk.start", walkKey: "w" }),
@@ -392,7 +392,7 @@ describe("trainings", () => {
   });
 
   test("a treat tap after the training ended is dropped", async () => {
-    const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
+    const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false, training: true });
     const s = sessions();
     await s.apply(HERZII, [cmd(0, { kind: "training.start", trainingKey: "t" }), cmd(10, { kind: "training.stop", trainingKey: "t" })]);
     const late = cmd(11, { kind: "training.treat", trainingKey: "t", treatKindId: kaese.id, delta: 1 });

@@ -52,3 +52,13 @@ test("0.5 adds walk_recorder and keeps the data", async () => {
   expect(await db.selectFrom("walk_recorder").selectAll().execute()).toEqual([{ entry_id: 1, device_id: 3, from_at: "2026-10-20T09:00:00Z" }]);
   await db.destroy();
 });
+
+test("0.7 keeps the treat kinds and offers each in the training", async () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = new Kysely<any>({ dialect: new SqliteDialect({ database: new Database(":memory:") }) });
+  await migrateTo(db, "0.6_client_event");
+  await db.insertInto("treat_kind").values({ name: "Dentasticks", grams_per_piece: 15, from_dry: 0 }).execute();
+  await migrate(db);
+  expect(await db.selectFrom("treat_kind").select(["name", "grams_per_piece", "training"]).execute()).toEqual([{ name: "Dentasticks", grams_per_piece: 15, training: 1 }]);
+  await db.destroy();
+});

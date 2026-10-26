@@ -41,23 +41,31 @@ describe("exercises", () => {
 describe("treat kinds", () => {
   test("are added with grams per piece and whether they come out of the dry food", async () => {
     const c = catalog();
-    const k = await c.addTreatKind({ name: "Trockenfutter-Stück", gramsPerPiece: 0.5, fromDry: true });
-    expect(k).toEqual({ id: k.id, name: "Trockenfutter-Stück", gramsPerPiece: 0.5, fromDry: true });
-    await c.updateTreatKind(k.id, { name: "Käsewürfel", gramsPerPiece: 2, fromDry: false });
-    expect(await c.treatKinds()).toEqual([{ id: k.id, name: "Käsewürfel", gramsPerPiece: 2, fromDry: false }]);
+    const k = await c.addTreatKind({ name: "Trockenfutter-Stück", gramsPerPiece: 0.5, fromDry: true, training: true });
+    expect(k).toEqual({ id: k.id, name: "Trockenfutter-Stück", gramsPerPiece: 0.5, fromDry: true, training: true });
+    await c.updateTreatKind(k.id, { name: "Käsewürfel", gramsPerPiece: 2, fromDry: false, training: true });
+    expect(await c.treatKinds()).toEqual([{ id: k.id, name: "Käsewürfel", gramsPerPiece: 2, fromDry: false, training: true }]);
+  });
+
+  test("one that stays at home is kept with training off, and switched on again", async () => {
+    const c = catalog();
+    const k = await c.addTreatKind({ name: "Dentasticks", gramsPerPiece: 15, fromDry: false, training: false });
+    expect(await c.treatKinds()).toEqual([{ ...k, training: false }]);
+    await c.updateTreatKind(k.id, { name: "Dentasticks", gramsPerPiece: 15, fromDry: false, training: true });
+    expect(await c.treatKinds()).toEqual([{ ...k, training: true }]);
   });
 
   test("grams per piece stay between 0.1 and 100", async () => {
-    await expect(catalog().addTreatKind({ name: "Staub", gramsPerPiece: 0.05, fromDry: true })).rejects.toThrow(new InputError("Ein Stück wiegt 0,1 bis 100 g."));
-    await expect(catalog().addTreatKind({ name: "Knochen", gramsPerPiece: 101, fromDry: false })).rejects.toThrow(InputError);
+    await expect(catalog().addTreatKind({ name: "Staub", gramsPerPiece: 0.05, fromDry: true, training: true })).rejects.toThrow(new InputError("Ein Stück wiegt 0,1 bis 100 g."));
+    await expect(catalog().addTreatKind({ name: "Knochen", gramsPerPiece: 101, fromDry: false, training: true })).rejects.toThrow(InputError);
   });
 
   test("a duplicate name is refused, an archived one comes back", async () => {
     const c = catalog();
-    const k = await c.addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
-    await expect(c.addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false })).rejects.toThrow(new InputError("Dieses Leckerli gibt es schon."));
+    const k = await c.addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false, training: true });
+    await expect(c.addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false, training: true })).rejects.toThrow(new InputError("Dieses Leckerli gibt es schon."));
     await c.archiveTreatKind(k.id);
     expect(await c.treatKinds()).toEqual([]);
-    expect(await c.addTreatKind({ name: "Käse", gramsPerPiece: 3, fromDry: false })).toEqual({ ...k, gramsPerPiece: 3 });
+    expect(await c.addTreatKind({ name: "Käse", gramsPerPiece: 3, fromDry: false, training: true })).toEqual({ ...k, gramsPerPiece: 3 });
   });
 });

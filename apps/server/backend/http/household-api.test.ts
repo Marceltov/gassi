@@ -14,9 +14,9 @@ describe("the household's lists over the API", () => {
     expect((await json("/api/exercises", { token })).body).toEqual({ exercises: [{ id: sitz.id, name: "Sitz!" }] });
     await json(`/api/exercises/${sitz.id}`, { method: "PATCH", token, body: { archived: true } });
     expect((await json("/api/exercises", { token })).body.exercises).toEqual([]);
-    const { body: kaese } = await json("/api/treat-kinds", { method: "POST", token, body: { name: "Käse", gramsPerPiece: 2, fromDry: false } });
-    await json(`/api/treat-kinds/${kaese.id}`, { method: "PATCH", token, body: { name: "Käse", gramsPerPiece: 3, fromDry: false } });
-    expect((await json("/api/treat-kinds", { token })).body.treatKinds).toEqual([{ id: kaese.id, name: "Käse", gramsPerPiece: 3, fromDry: false }]);
+    const { body: kaese } = await json("/api/treat-kinds", { method: "POST", token, body: { name: "Käse", gramsPerPiece: 2, fromDry: false, training: true } });
+    await json(`/api/treat-kinds/${kaese.id}`, { method: "PATCH", token, body: { name: "Käse", gramsPerPiece: 3, fromDry: false, training: true } });
+    expect((await json("/api/treat-kinds", { token })).body.treatKinds).toEqual([{ id: kaese.id, name: "Käse", gramsPerPiece: 3, fromDry: false, training: true }]);
     expect((await json("/api/exercises", { method: "POST", token, body: { name: "" } })).status).toBe(400);
   });
 });

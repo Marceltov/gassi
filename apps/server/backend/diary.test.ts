@@ -218,7 +218,7 @@ describe("day filter and week", () => {
     clock = new Date("2026-10-22T12:00:00Z");
     const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), now: () => clock });
     const sitz = await new Catalog(db()).addExercise("Sitz");
-    const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
+    const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false, training: true });
     await s.apply(HIRSCH, [{ id: "1", at: "2026-10-21T08:00:00.000Z", kind: "walk.start", walkKey: "w" }]);
     await s.apply({ id: "bille", name: "Herzii" }, [
       { id: "2", at: "2026-10-21T08:01:00.000Z", kind: "walk.join", walkKey: "w" },
@@ -246,7 +246,7 @@ describe("entries carry their walk and training details", () => {
     clock = new Date("2026-10-20T12:00:00Z");
     const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"], ["bille", "Herzii"]]), now: () => clock });
     const sitz = await new Catalog(db()).addExercise("Sitz");
-    const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
+    const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false, training: true });
     await s.apply(HIRSCH, [
       { id: "1", at: "2026-10-20T08:00:00.000Z", kind: "walk.start", walkKey: "w" },
       { id: "2", at: "2026-10-20T08:10:00.000Z", kind: "walk.pause", walkKey: "w" },
@@ -407,7 +407,7 @@ describe("editing walkers and a training's repetitions afterwards", () => {
     const training = async () => {
       const sitz = await new Catalog(db()).addExercise("Sitz");
       const platz = await new Catalog(db()).addExercise("Platz");
-      const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false });
+      const kaese = await new Catalog(db()).addTreatKind({ name: "Käse", gramsPerPiece: 1, fromDry: false, training: true });
       const s = new Sessions({ db: db(), names: new Map([["marcel", "Hirsch"]]), now: () => clock });
       await s.apply(HIRSCH, [
         { id: "1", at: "2026-10-20T09:00:00.000Z", kind: "training.start", trainingKey: "t" },
@@ -429,7 +429,7 @@ describe("editing walkers and a training's repetitions afterwards", () => {
     test("treats already given keep their logged grams and dry flag; new kinds use the current ones", async () => {
       const { entry, kaese } = await training();
       await db().updateTable("treat_kind").set({ grams_per_piece: 9, from_dry: 1 }).where("id", "=", kaese.id).execute();
-      const wurst = await new Catalog(db()).addTreatKind({ name: "Wurst", gramsPerPiece: 4, fromDry: true });
+      const wurst = await new Catalog(db()).addTreatKind({ name: "Wurst", gramsPerPiece: 4, fromDry: true, training: true });
       await diary().editTraining(entry.id, { reps: [], treats: [{ treatKindId: kaese.id, count: 3 }, { treatKindId: wurst.id, count: 2 }] });
       const rows = await db().selectFrom("training_treat").select(["treat_kind_id", "count", "grams_per_piece", "from_dry"]).where("entry_id", "=", entry.id).orderBy("treat_kind_id").execute();
       expect(rows).toEqual([

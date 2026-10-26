@@ -3,6 +3,7 @@
 import { createClient } from "@gassi/api-client";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { BASE_URL } from "../playwright.config";
+import { expectFits } from "./fit";
 import { asHirsch, onlyOneDog, stopEverything } from "./sessions";
 import { signIn } from "./signed-in";
 
@@ -13,7 +14,7 @@ test.afterEach(stopEverything);
 async function household() {
   const client = asHirsch();
   const exercise = (await client.exercises()).exercises.find((e) => e.name === "Sitz") ?? (await client.addExercise({ name: "Sitz" }));
-  const treat = (await client.treatKinds()).treatKinds[0] ?? (await client.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false }));
+  const treat = (await client.treatKinds()).treatKinds[0] ?? (await client.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false, training: true }));
   return { client, exercise, treat };
 }
 
@@ -186,7 +187,7 @@ test("at 360×640 Fertig stays visible with four exercises and three treat kinds
   const have = (await client.exercises()).exercises.map((e) => e.name);
   for (const n of names) if (!have.includes(n)) await client.addExercise({ name: n });
   const haveKinds = (await client.treatKinds()).treatKinds.map((k) => k.name);
-  for (const n of ["Käse", "Wurst", "Trocken"]) if (haveKinds.length < 3 && !haveKinds.includes(n)) await client.addTreatKind({ name: n, gramsPerPiece: 2, fromDry: false });
+  for (const n of ["Käse", "Wurst", "Trocken"]) if (haveKinds.length < 3 && !haveKinds.includes(n)) await client.addTreatKind({ name: n, gramsPerPiece: 2, fromDry: false, training: true });
   const restore = await onlyOneDog();
   try {
     await page.setViewportSize({ width: 360, height: 640 });
@@ -201,5 +202,56 @@ test("at 360×640 Fertig stays visible with four exercises and three treat kinds
     await page.screenshot({ path: "../../.superpowers/sdd/2026-10-21-gassi-step2b-app/task-7-training-360x640.png" });
   } finally {
     await restore();
+  }
+});
+
+test("the training offers the treats for it, two per row, and long names stay on one line inside their buttons", async ({ page }) => {
+  const { client } = await household();
+  const names = ["Bonnies Mini", "Dentasticks", "Trockenfutter"];
+  const have = (await client.treatKinds()).treatKinds;
+  const kinds = [];
+  for (const n of names) kinds.push(have.find((k) => k.name === n) ?? (await client.addTreatKind({ name: n, gramsPerPiece: 1, fromDry: false, training: true })));
+  const dentasticks = kinds[1]!;
+  const restore = await onlyOneDog();
+  try {
+    // Dentasticks stay at home: not offered, until switched on again
+    await client.updateTreatKind({ ...dentasticks, training: false });
+    await signIn(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Training starten" }).click();
+    await expect(page.getByRole("button", { name: "Trockenfutter +1" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Dentasticks +1" })).toHaveCount(0);
+    // nothing to undo yet, and the hint for the first exercise stands alone
+    await expect(page.getByText("Halten = rückgängig")).toHaveCount(0);
+
+    await client.updateTreatKind({ ...dentasticks, training: true });
+    await expectFits(page, "/training", "Training läuft");
+    await page.setViewportSize({ width: 360, height: 640 });
+    const [a, b] = await Promise.all(["Bonnies Mini +1", "Dentasticks +1"].map(async (n) => (await page.getByRole("button", { name: n }).boundingBox())!));
+    expect(Math.abs(a!.y - b!.y)).toBeLessThan(1); // side by side
+    await page.getByRole("button", { name: "Trockenfutter +1" }).click();
+    await expect(page.getByRole("button", { name: "Trockenfutter +1" })).toContainText("1 · +1");
+  } finally {
+    await client.updateTreatKind({ ...dentasticks, training: true });
+    await restore();
+  }
+});
+
+test("Mehr → Leckerli: a treat is switched off for the training and says so in the list", async ({ page }) => {
+  const client = asHirsch();
+  const name = `Kauknochen ${Date.now()}`;
+  const kind = await client.addTreatKind({ name, gramsPerPiece: 20, fromDry: false, training: true });
+  try {
+    await signIn(page);
+    await page.goto("/mehr/leckerli");
+    await expect(page.getByText("20 g · fürs Training")).toBeVisible();
+    await page.getByText(name).click();
+    await expect(page.getByRole("button", { name: "Fürs Training", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Fürs Training", exact: true }).click();
+    await page.getByRole("button", { name: "Speichern" }).click();
+    await expect.poll(async () => (await client.treatKinds()).treatKinds.find((k) => k.id === kind.id)?.training).toBe(false);
+    await expect(page.getByText("20 g", { exact: true })).toBeVisible();
+  } finally {
+    await client.updateTreatKind({ id: kind.id, archived: true });
   }
 });

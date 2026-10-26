@@ -2,12 +2,16 @@
 // Start's tiles (its kind's diagonal gradient, a soft shadow, a light top edge); a neutral one stays calm (its surface
 // with a faint shadow and edge); a side one is only outlined, a dangerSide one outlined in red; ink and danger are solid
 // (#80). Disabled, it is flat and faded. `stacked` puts the icon above the label, for three side by side (the walk's
-// Pipi, Markiert, Poopoo).
+// Pipi, Markiert, Poopoo). The label and the small line stay one line each, cut with "…" rather than wrapping out of
+// the button; the phone's font size grows them only so far, and a button grows with them instead of cutting them (#126).
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { type ButtonKind, FIELD_HEIGHT, type Palette, radius, useTheme } from "../theme";
 import { Icon, type IconName } from "./Icon";
 import { events } from "../data/events";
 import { tapName } from "../data/usage";
+
+/** How far the phone's font size may grow a button's text: One UI's large sizes would push it out of the button. */
+const MAX_FONT_SCALE = 1.3;
 
 const sizes = { xl: { height: 100, font: 21, icon: 26 }, l: { height: 72, font: 17, icon: 22 }, m: { height: 52, font: 15, icon: 18 }, s: { height: FIELD_HEIGHT, font: 15, icon: 16 } };
 
@@ -44,14 +48,18 @@ export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, 
       disabled={disabled}
       onPress={onPress && (() => (tapped(false), onPress()))}
       onLongPress={onLongPress && (() => (tapped(true), onLongPress()))}
-      style={({ pressed }) => [styles.button, { height, opacity: disabled ? 0.35 : pressed ? 0.8 : 1 }, look.box, stacked && styles.narrow]}
+      style={({ pressed }) => [styles.button, { minHeight: height, opacity: disabled ? 0.35 : pressed ? 0.8 : 1 }, look.box, stacked && styles.narrow]}
     >
       <View style={[styles.line, stacked && styles.stacked]}>
         {icon ? <Icon name={icon} size={iconSize} color={look.ink} /> : null}
-        {label ? <Text style={[styles.label, { fontSize: font, color: look.ink }]}>{label}</Text> : null}
+        {label ? (
+          <Text style={[styles.label, { fontSize: font, color: look.ink }]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+            {label}
+          </Text>
+        ) : null}
       </View>
       {sub ? (
-        <Text style={[styles.sub, { color: look.sub }]} numberOfLines={1}>
+        <Text style={[styles.sub, { color: look.sub }]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
           {sub}
         </Text>
       ) : null}
@@ -82,10 +90,10 @@ function lookOf(kind: ButtonKind, theme: Palette, disabled: boolean): { box: obj
 }
 
 const styles = StyleSheet.create({
-  button: { borderRadius: radius.button, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
-  line: { flexDirection: "row", alignItems: "center", gap: 8 },
+  button: { borderRadius: radius.button, alignItems: "center", justifyContent: "center", paddingHorizontal: 16, paddingVertical: 4 },
+  line: { flexDirection: "row", alignItems: "center", gap: 8, maxWidth: "100%" },
   stacked: { flexDirection: "column", gap: 2 },
   narrow: { paddingHorizontal: 4 },
-  label: { fontWeight: "700" },
+  label: { fontWeight: "700", flexShrink: 1 },
   sub: { fontSize: 12, marginTop: 2, opacity: 0.8 },
 });

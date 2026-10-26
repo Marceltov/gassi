@@ -115,6 +115,7 @@ export interface TreatKindTable {
   name: string;
   grams_per_piece: number;
   from_dry: number;
+  training: Generated<number>;
   archived: Generated<number>;
 }
 
