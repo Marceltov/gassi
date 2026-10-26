@@ -1,5 +1,6 @@
 import "@/src/polyfill";
 import { DarkTheme, DefaultTheme, ErrorBoundary as RouterErrorBoundary, type ErrorBoundaryProps, Stack, ThemeProvider, usePathname } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { AppState, useColorScheme } from "react-native";
 import { events } from "@/src/data/events";
@@ -28,6 +29,8 @@ export default function RootLayout() {
     <GassiProvider>
       <RecordingProvider>
         <ThemeProvider value={colorScheme === "light" ? DefaultTheme : DarkTheme}>
+          {/* the clock and icons dark on the light theme, light on the dark one (#120) */}
+          <StatusBar style="auto" />
           <Screens />
         </ThemeProvider>
       </RecordingProvider>
