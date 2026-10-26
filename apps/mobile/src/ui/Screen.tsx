@@ -4,10 +4,11 @@
 // signed-in app): the tab bar below does that. With `fill` the top doesn't scroll but takes the height that is there,
 // for a screen that scales to it (Gewicht). In the scrolling top a part with `flex: 1` takes the height that is left
 // (Woche's map), and the top scrolls once it is at its least. Above everything the sync error, when there is one
-// (SyncBanner).
+// (SyncBanner). The keyboard pushes the page up and the top gives way, so the fields at the bottom and the main action
+// stay above it: Android draws edge to edge, so the window doesn't shrink for the keyboard (#132).
 import { BottomTabBarHeightContext } from "expo-router/tabs";
 import { type ReactNode, useContext } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { space, useTheme } from "../theme";
 import { useEdges } from "./edges";
@@ -24,7 +25,7 @@ export function Screen({ head, top, bottom, topMin, fill, low }: { head?: ReactN
   const onTab = useContext(BottomTabBarHeightContext) !== undefined;
   const sides = { paddingLeft: edges.left(space.gutter), paddingRight: edges.right(space.gutter) };
   return (
-    <View style={[styles.screen, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+    <KeyboardAvoidingView behavior="padding" style={[styles.screen, { backgroundColor: theme.background, paddingTop: insets.top }]}>
       <SyncBanner style={sides} />
       <VersionBanner style={sides} />
       {head ? (
@@ -42,7 +43,7 @@ export function Screen({ head, top, bottom, topMin, fill, low }: { head?: ReactN
         </ScrollView>
       )}
       {bottom ? <View style={[styles.bottom, sides, { paddingBottom: onTab ? space.gutter : edges.bottom(space.gutter) }]}>{bottom}</View> : null}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
