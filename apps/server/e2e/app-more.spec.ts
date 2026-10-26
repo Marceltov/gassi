@@ -342,6 +342,25 @@ test("Haushalt: an invite shows its link, its code and when it ends; Zurückzieh
   await expect.poll(async () => (await asHirsch().invites()).invites.some((i) => i.id === id)).toBe(false);
 });
 
+test("Haushalt: Teilen hands the link and the code to the browser's share menu, where it has one", async ({ page }) => {
+  await page.addInitScript(() => {
+    const shared: ShareData[] = [];
+    Object.assign(window, { shared });
+    navigator.share = async (data?: ShareData) => void shared.push(data ?? {});
+  });
+  await signIn(page);
+  await page.goto("/mehr/haushalt");
+  const created = page.waitForResponse((r) => r.url().endsWith("/api/invites") && r.request().method() === "POST");
+  await page.getByRole("button", { name: "Person einladen" }).click();
+  const { id, url, code } = (await (await created).json()) as { id: number; url: string; code: string };
+  invites.push(id);
+
+  await page.getByTestId("invite").getByRole("button", { name: "Teilen" }).click();
+  const [{ text }] = await page.evaluate(() => (window as unknown as { shared: ShareData[] }).shared);
+  expect(text).toContain(url);
+  expect(text).toContain(code);
+});
+
 test("Meine Geräte: Abmelden on this device removes it on the server and lands on /anmelden", async ({ page }) => {
   const token = await signIn(page);
   await page.goto("/mehr/geraete");
