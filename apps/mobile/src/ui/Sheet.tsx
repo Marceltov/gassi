@@ -2,7 +2,8 @@
 // where the tab bar begins, so the bar stays visible (a tap there closes the sheet, the modal takes the touches); off a
 // tab it keeps clear of the home indicator itself. It closes when its screen loses the focus. The keyboard pushes it
 // up (Android draws edge to edge, so the window doesn't shrink for it), and it shrinks into what is left: what scrolls
-// inside it (LogSheet's fields) takes the cut.
+// inside it (LogSheet's fields) takes the cut. The keyboard covers the tab bar, so the sheet then ends at the keyboard
+// instead of a tab bar's height above it (#132).
 import { BottomTabBarHeightContext } from "expo-router/tabs";
 import { type ReactNode, useContext } from "react";
 import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, View } from "react-native";
@@ -17,7 +18,7 @@ export function Sheet({ open, onClose, label, children }: { open: boolean; onClo
   useCloseOnBlur(open, onClose);
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior="padding" style={styles.fill}>
+      <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={-(tabBar ?? 0)} style={styles.fill}>
         <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Schließen" />
         <View accessibilityLabel={label} accessibilityViewIsModal style={[styles.sheet, { backgroundColor: theme.background, paddingLeft: edges.left(space.gutter), paddingRight: edges.right(space.gutter), paddingBottom: tabBar === undefined ? edges.bottom(space.gutter) : space.gutter }]}>
           {children}
