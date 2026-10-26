@@ -6,8 +6,10 @@
 // words of a row sit at one height; a stacked button with a small line is a bit taller, so icon, word and line have
 // room (#141). The label and the small line stay one line each, cut with "…" rather than wrapping out of
 // the button; the phone's font size grows them only so far, and a button grows with them instead of cutting them (#126).
+// A colored one (it logs or starts something: Pipi, Poopoo, klappt, Zuhause) gives a short buzz on Android (#121).
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { type ButtonKind, FIELD_HEIGHT, type Palette, radius, useTheme } from "../theme";
+import { feel } from "./haptics";
 import { Icon, type IconName } from "./Icon";
 import { events } from "../data/events";
 import { tapName } from "../data/usage";
@@ -45,7 +47,11 @@ export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, 
   const height = sizes[size].height + (stacked && sub !== undefined ? STACKED_SUB : 0);
   const look = lookOf(kind, theme, !!disabled);
   // the button's name for the app's usage events (#115): what it says, never what was typed
-  const tapped = (hold: boolean) => events.record("tap", tapName({ event, a11y, label }), hold ? { hold } : undefined);
+  const colored = kind in theme.gradients;
+  const tapped = (hold: boolean) => {
+    if (colored) feel(hold);
+    events.record("tap", tapName({ event, a11y, label }), hold ? { hold } : undefined);
+  };
   return (
     <Pressable
       accessibilityRole="button"
