@@ -5,13 +5,15 @@
 // for a screen that scales to it (Gewicht). In the scrolling top a part with `flex: 1` takes the height that is left
 // (Woche's map), and the top scrolls once it is at its least. Above everything the sync error, when there is one
 // (SyncBanner). The keyboard pushes the page up and the top gives way, so the fields at the bottom and the main action
-// stay above it: Android draws edge to edge, so the window doesn't shrink for the keyboard (#132).
+// stay above it: Android draws edge to edge, so the window doesn't shrink for the keyboard (#132). Pulling the top down
+// refreshes (PullScroll, #122).
 import { BottomTabBarHeightContext } from "expo-router/tabs";
 import { type ReactNode, useContext } from "react";
-import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { space, useTheme } from "../theme";
 import { useEdges } from "./edges";
+import { PullScroll } from "./PullScroll";
 import { SyncBanner } from "./SyncBanner";
 import { VersionBanner } from "./VersionBanner";
 
@@ -38,9 +40,9 @@ export function Screen({ head, top, bottom, topMin, fill, low }: { head?: ReactN
           {top}
         </View>
       ) : (
-        <ScrollView testID="screen-scroll" style={[styles.top, { minHeight: topMin }]} contentContainerStyle={[styles.topContent, head ? styles.underHead : null, low ? styles.low : null, sides]}>
+        <PullScroll testID="screen-scroll" style={[styles.top, { minHeight: topMin }]} contentContainerStyle={[styles.topContent, head ? styles.underHead : null, low ? styles.low : null, sides]}>
           {top}
-        </ScrollView>
+        </PullScroll>
       )}
       {bottom ? <View style={[styles.bottom, sides, { paddingBottom: onTab ? space.gutter : edges.bottom(space.gutter) }]}>{bottom}</View> : null}
     </KeyboardAvoidingView>

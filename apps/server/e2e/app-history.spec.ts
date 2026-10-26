@@ -428,3 +428,30 @@ test("a purchase's cans, a count's sizes and an opened can's size can be changed
   await save();
   expect(await client.entry({ id: opened.id })).toMatchObject({ unitG: 800, amountG: 800 });
 });
+
+test.describe("on a touch screen", () => {
+  test.use({ hasTouch: true });
+
+  test("pulling the list down reads it again: an entry made elsewhere shows, the spinner until it has", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/verlauf");
+    await expect(page.getByTestId("screen-scroll")).toBeVisible();
+    const dog = await firstDog();
+    const pee = await asHirsch().logEntry({ type: "pee", dogIds: [dog.id] });
+    made.push(pee.id);
+    await page.waitForTimeout(500); // nothing reads by itself
+    await expect(page.getByTestId(`entry-${pee.id}`)).toHaveCount(0);
+
+    // a finger from the top of the list 200 px down, in steps, through the browser's own touch input
+    const box = (await page.getByTestId("screen-scroll").boundingBox())!;
+    const x = box.x + box.width / 2;
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y: box.y + 20 }] });
+    for (let dy = 20; dy <= 200; dy += 20) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: box.y + 20 + dy }] });
+    await expect(page.getByTestId("pull-spinner")).toBeVisible();
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+
+    await expect(page.getByTestId(`entry-${pee.id}`)).toContainText("Pipi");
+    await expect(page.getByTestId("pull-spinner")).toBeHidden();
+  });
+});

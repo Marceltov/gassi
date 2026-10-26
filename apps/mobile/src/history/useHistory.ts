@@ -1,5 +1,5 @@
 // Verlauf's entries for a filter, from the server, a page at a time. Whenever the screen comes to the front (so an
-// edit or delete shows) the pages it had are read again, as many entries as were shown; a new filter starts at its
+// edit or delete shows) and on a pull (#122) the pages it had are read again, as many entries as were shown; a new filter starts at its
 // first page. `loadMore` adds the next page. A refresh outranks a page being added: that page's answer is dropped,
 // and no page is added while a refresh runs. An answer that came too late for the filter shown is dropped too.
 import type { Client } from "@gassi/api-client";
@@ -7,6 +7,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { errorMessage } from "../data/api";
 import { useGassi } from "../data/GassiProvider";
+import { onPull } from "../ui/pull";
 import { type Entry, type Filter, historyQuery } from "./form";
 
 export type HistoryState = { entries: Entry[] | null; more: boolean; loadingMore: boolean; error: string | null; loadMore(): void };
@@ -42,27 +43,29 @@ export function useHistory(filter: Filter): HistoryState {
   const refreshing = useRef(false);
   const adding = useRef(0); // each added page, dropped when a refresh came after it
 
+  const reread = useCallback(async () => {
+    if (!api) return;
+    const n = ++refreshes.current;
+    const f = JSON.parse(key) as Filter;
+    refreshing.current = true;
+    setLoadingMore(false);
+    try {
+      const page = await readPages(api, f, 0, kept.current?.key === key ? kept.current.entries.length : 1);
+      if (n !== refreshes.current) return;
+      refreshing.current = false;
+      keep({ key, ...page });
+      setError(null);
+    } catch (e) {
+      if (n !== refreshes.current) return;
+      refreshing.current = false;
+      setError(errorMessage(e));
+    }
+  }, [api, key]);
   useFocusEffect(
     useCallback(() => {
-      if (!api) return;
-      const n = ++refreshes.current;
-      const f = JSON.parse(key) as Filter;
-      refreshing.current = true;
-      setLoadingMore(false);
-      readPages(api, f, 0, kept.current?.key === key ? kept.current.entries.length : 1).then(
-        (page) => {
-          if (n !== refreshes.current) return;
-          refreshing.current = false;
-          keep({ key, ...page });
-          setError(null);
-        },
-        (e) => {
-          if (n !== refreshes.current) return;
-          refreshing.current = false;
-          setError(errorMessage(e));
-        },
-      );
-    }, [api, key]),
+      void reread();
+      return onPull(reread);
+    }, [reread]),
   );
 
   const shown = list?.key === key ? list : null;
