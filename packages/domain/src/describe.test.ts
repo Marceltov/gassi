@@ -68,6 +68,7 @@ test("a distance reads in metres under a kilometre, else in km with one decimal"
 
 test("an encounter reads in short", () => {
   expect(text(entry({ type: "dogEncounter", details: { reaction: 2, handling: "wideBerth", distance: "near" } }))).toBe("Hundebegegnung, 2 fiept · großer Bogen · nah von Hirsch");
+  expect(text(entry({ type: "dogEncounter", details: { reaction: 1, handling: "lifted" } }))).toBe("Hundebegegnung, 1 schaut · hochgehoben von Hirsch");
   expect(text(entry({ type: "personEncounter", details: { who: "Oma Inge", rating: 7, place: "home", sounds: ["growls", "whines"] } }))).toBe("Menschenbegegnung, Oma Inge · bei uns · 7/10 · knurrt · fiept von Hirsch");
 });
 

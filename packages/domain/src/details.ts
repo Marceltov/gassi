@@ -42,7 +42,7 @@ export const DETAILS = {
   attention: { label: "Ansprechbar", line: (w: string) => `ansprechbar: ${w}`, ...choice(["good", "partial", "none"], { good: "gut", partial: "teilweise", none: "nicht" }, "segments") },
   handling: {
     label: "Wie seid ihr vorbei?",
-    ...choice(["horizon", "avoided", "wideBerth", "turned", "passed", "through"], { horizon: "am Horizont", avoided: "vermieden", wideBerth: "großer Bogen", turned: "umgedreht", passed: "ausgewichen", through: "mussten durch" }, "chips"),
+    ...choice(["horizon", "avoided", "wideBerth", "turned", "passed", "through", "lifted"], { horizon: "am Horizont", avoided: "vermieden", wideBerth: "großer Bogen", turned: "umgedreht", passed: "ausgewichen", through: "mussten durch", lifted: "hochgehoben" }, "chips"),
   },
   distance: { label: "Abstand", ...choice(["near", "medium", "far"], { near: "nah", medium: "mittel", far: "weit" }, "segments") },
   // a person encounter's (#90)
