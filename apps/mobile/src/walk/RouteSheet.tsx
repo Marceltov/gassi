@@ -2,7 +2,7 @@
 // that records, its own points as they come; on the others, the server's (asked when the sheet opens and every 30 s
 // while it is open), and "Strecke hier aufnehmen" to take recording over (ADR 0014).
 import { formatDistance, formatSpeed, pausedWithin, simplify, type TrackPoint, type WalkView } from "@gassi/domain";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useGassi } from "../data/GassiProvider";
 import { TrackMap } from "../map/TrackMap";
@@ -42,6 +42,8 @@ export function RouteSheet({ walk, open, onClose }: { walk: WalkView; open: bool
   const { points, distanceM } = recording.mine ? recording : (server ?? { points: [], distanceM: 0 });
   const nowIso = new Date(now).toISOString();
   const walkingS = (now - Date.parse(walk.startedAt) - pausedWithin(walk.pauses, walk.startedAt, nowIso)) / 1000;
+  // the same list until the points change, not a new one at every tick of the clock (#139: the map drew itself anew)
+  const routes = useMemo(() => [simplify(points, 500)], [points]);
   const who = recording.mine ? "dieses Gerät" : (recording.recorderName ?? "niemand");
 
   const stat = (label: string, value: string) => (
@@ -53,7 +55,7 @@ export function RouteSheet({ walk, open, onClose }: { walk: WalkView; open: bool
   return (
     <Sheet open={open} onClose={onClose} label="Strecke">
       <View testID="route-sheet" style={styles.sheet}>
-        {points.length > 1 ? <TrackMap routes={[simplify(points, 500)]} height={260} /> : <Text style={[styles.line, { color: theme.muted }]}>Noch keine Strecke</Text>}
+        {points.length > 1 ? <TrackMap routes={routes} height={260} /> : <Text style={[styles.line, { color: theme.muted }]}>Noch keine Strecke</Text>}
         <View style={styles.stats}>
           {stat("Strecke", formatDistance(distanceM))}
           {stat("Dauer", walkClock(walk, now))}

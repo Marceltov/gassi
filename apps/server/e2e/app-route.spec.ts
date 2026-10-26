@@ -50,6 +50,11 @@ test.describe("with location allowed", () => {
       const sheet = page.getByTestId("route-sheet");
       await expect(sheet.getByTestId("track-map")).toBeVisible();
       for (const label of ["Strecke", "Dauer", "Tempo"]) await expect(sheet.getByText(label, { exact: true })).toBeVisible();
+      // the map stays while the clock ticks and the route grows: drawn anew, its tiles would flicker (#139)
+      const pane = sheet.locator(".leaflet-map-pane");
+      await pane.evaluate((e) => e.setAttribute("data-first", "yes"));
+      await page.waitForTimeout(2500);
+      await expect(sheet.locator('.leaflet-map-pane[data-first="yes"]')).toHaveCount(1);
       await page.keyboard.press("Escape");
       await page.getByRole("button", { name: "Zuhause" }).click();
       await expect(page.getByTestId("track-map")).toBeVisible({ timeout: 15_000 });

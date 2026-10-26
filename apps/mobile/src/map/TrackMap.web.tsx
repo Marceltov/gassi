@@ -45,29 +45,44 @@ export function TrackMap({ routes, height, still = false }: TrackMapProps) {
   );
 }
 
-/** The map itself, filling what holds it. */
+// a still map (Verlauf's) keeps a thin margin and a thin line, so the walk fills it instead of the city around it
+function fit(map: L.Map, lines: L.Polyline[], still: boolean) {
+  const pad = still ? 10 : 16;
+  if (lines.length) map.fitBounds(L.featureGroup(lines).getBounds(), { padding: [pad, pad], maxZoom: 17 });
+}
+
+/** The map itself, filling what holds it. The map stays while its routes change (a walk's grows each second, and its
+ * screen hands a new list at every tick): only the lines are drawn anew, so the tiles don't reload and flicker (#139). */
 function MapBox({ routes, still }: { routes: [number, number][][]; still: boolean }) {
   const theme = useTheme();
   const box = useRef<HTMLDivElement>(null);
+  const map = useRef<L.Map | null>(null);
+  const lines = useRef<L.Polyline[]>([]);
   useEffect(() => {
-    const drawn = routes.filter((r) => r.length > 0);
-    if (!box.current || drawn.length === 0) return;
-    const map = L.map(box.current, { zoomSnap: still ? 0.25 : 1, zoomControl: !still, dragging: !still, scrollWheelZoom: false, touchZoom: !still, doubleClickZoom: !still, keyboard: !still, boxZoom: !still, attributionControl: !still });
-    L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map);
-    // a still map (Verlauf's) keeps a thin margin and a thin line, so the walk fills it instead of the city around it
-    const lines = drawn.map((r) => L.polyline(r, { color: theme.walk, weight: still ? 3 : 4, interactive: false }).addTo(map));
-    const pad = still ? 10 : 16;
-    const fit = () => map.fitBounds(L.featureGroup(lines).getBounds(), { padding: [pad, pad], maxZoom: 17 });
-    fit();
+    if (!box.current) return;
+    const m = L.map(box.current, { zoomSnap: still ? 0.25 : 1, zoomControl: !still, dragging: !still, scrollWheelZoom: false, touchZoom: !still, doubleClickZoom: !still, keyboard: !still, boxZoom: !still, attributionControl: !still });
+    L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(m);
+    map.current = m;
     const resized = new ResizeObserver(() => {
-      map.invalidateSize();
-      fit();
+      m.invalidateSize();
+      fit(m, lines.current, still);
     });
     resized.observe(box.current);
     return () => {
       resized.disconnect();
-      map.remove();
+      m.remove();
+      map.current = null;
+      lines.current = [];
     };
-  }, [routes, still, theme.walk]);
+  }, [still]);
+  // the routes by what they hold, not by the list they come in
+  const drawn = JSON.stringify(routes.filter((r) => r.length > 0));
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    for (const l of lines.current) l.remove();
+    lines.current = (JSON.parse(drawn) as [number, number][][]).map((r) => L.polyline(r, { color: theme.walk, weight: still ? 3 : 4, interactive: false }).addTo(m));
+    fit(m, lines.current, still);
+  }, [drawn, still, theme.walk]);
   return <div ref={box} data-testid="track-map" style={{ position: "absolute", inset: 0, borderRadius: 12, overflow: "hidden", background: theme.surface }} />;
 }
