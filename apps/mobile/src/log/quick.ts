@@ -25,11 +25,12 @@ export function quickOf(start: "command" | "treat", usual: Usual, exercises: rea
   return { kind: "quick.command", exerciseId: exercise.id, ok: true, treatKindId: commandTreat ? treatKind?.id : undefined };
 }
 
-/** What the walk's buttons say they give: "Sitz · Käse" and "Käse"; nothing while there is no usual. */
+/** What the walk's buttons say they give: "Sitz" and "Käse" (a command's treat is the one under Leckerli, so its
+ * button names only the exercise, #141); nothing while there is no usual. */
 export function quickLines(usual: Usual, exercises: readonly Named[], kinds: readonly Named[]): { command?: string; treat?: string } {
-  const { exercise, treatKind, commandTreat } = usualOf(usual, exercises, kinds);
+  const { exercise, treatKind } = usualOf(usual, exercises, kinds);
   return {
-    command: exercise ? [exercise.name, commandTreat ? treatKind?.name : undefined].filter(Boolean).join(" · ") : undefined,
+    command: exercise?.name,
     treat: treatKind?.name,
   };
 }

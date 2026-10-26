@@ -30,7 +30,7 @@ type Last = { exerciseId?: number; treatKindId?: number | null; commandTreat?: b
 const lastOf = (): Last => (loadKept(LAST) as Last | null) ?? {};
 const remember = (l: Last) => saveKept(LAST, { ...lastOf(), ...l });
 
-/** What a tap on the walk's Kommando and Leckerli gives: "Sitz · Käse", "Käse". */
+/** What a tap on the walk's Kommando and Leckerli gives: "Sitz", "Käse". */
 export function useQuickLines() {
   const { exercises, treatKinds } = useGassi();
   return quickLines(lastOf(), exercises, treatKinds);

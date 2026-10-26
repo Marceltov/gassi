@@ -9,7 +9,7 @@ test("on a walk a tap logs the usual: the Leckerli on you, the last exercise as 
   expect(quickOf("treat", usual, exercises, kinds, true)).toEqual({ kind: "quick.treat", treatKindId: 8 });
   expect(quickOf("command", usual, exercises, kinds, true)).toEqual({ kind: "quick.command", exerciseId: 2, ok: true, treatKindId: 8 });
   expect(quickOf("command", { ...usual, commandTreat: false }, exercises, kinds, true)).toEqual({ kind: "quick.command", exerciseId: 2, ok: true, treatKindId: undefined });
-  expect(quickLines(usual, exercises, kinds)).toEqual({ command: "Platz · Huhn", treat: "Huhn" });
+  expect(quickLines(usual, exercises, kinds)).toEqual({ command: "Platz", treat: "Huhn" });
   expect(quickLines({ ...usual, commandTreat: false }, exercises, kinds).command).toBe("Platz");
 });
 

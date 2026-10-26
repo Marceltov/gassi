@@ -238,13 +238,13 @@ export function Walk() {
           </View>
           <View style={styles.row}>
             <View style={styles.cell}>
-              <BigButton kind="training" size="l" icon="training" label="Kommando" sub={usual.command} stacked disabled={walkDogs.length === 0} onPress={() => start("command", true)} onLongPress={() => start("command", false)} />
+              <BigButton kind="training" size="l" icon="training" label="Kommando" sub={usual.command ?? ""} stacked disabled={walkDogs.length === 0} onPress={() => start("command", true)} onLongPress={() => start("command", false)} />
             </View>
             <View style={styles.cell}>
-              <BigButton kind="training" size="l" icon="treat" label="Leckerli" sub={usual.treat} stacked disabled={walkDogs.length === 0} onPress={() => start("treat", true)} onLongPress={() => start("treat", false)} />
+              <BigButton kind="training" size="l" icon="treat" label="Leckerli" sub={usual.treat ?? ""} stacked disabled={walkDogs.length === 0} onPress={() => start("treat", true)} onLongPress={() => start("treat", false)} />
             </View>
             <View style={styles.cell}>
-              <BigButton kind="encounter" size="l" icon="people" label="Begegnung" stacked disabled={walkDogs.length === 0} onPress={() => start("encounter", false)} />
+              <BigButton kind="encounter" size="l" icon="people" label="Begegnung" sub="" stacked disabled={walkDogs.length === 0} onPress={() => start("encounter", false)} />
             </View>
           </View>
           <View style={styles.row}>
