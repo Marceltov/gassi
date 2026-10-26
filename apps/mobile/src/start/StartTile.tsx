@@ -1,8 +1,10 @@
 // One of Start's big tiles (Gassi gehen, Futter, Training): the kind's color as a diagonal gradient with a soft shadow
 // and a light top edge, the icon in a light circle at the top left, the title and a line under it (when it was last,
-// or the running clock). Read out as what it does and that line ("Futter geben, zuletzt 80 g nass").
+// or the running clock). Read out as what it does and that line ("Futter geben, zuletzt 80 g nass"). A tap buzzes
+// shortly on Android, as the colored buttons do (#121).
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { radius, type TileKind, useTheme } from "../theme";
+import { feel } from "../ui/haptics";
 import { Icon, type IconName } from "../ui/Icon";
 
 type Props = { kind: TileKind; icon: IconName; title: string; line: string; a11y: string; onPress: () => void; big?: boolean };
@@ -15,7 +17,7 @@ export function StartTile({ kind, icon, title, line, a11y, onPress, big }: Props
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={a11y}
-      onPress={onPress}
+      onPress={() => (feel(false), onPress())}
       style={({ pressed }) => [
         styles.tile,
         { height: big ? 150 : 126, backgroundColor: theme[kind], backgroundImage: `linear-gradient(135deg, ${light}, ${dark})`, boxShadow: theme.raised, opacity: pressed ? 0.85 : 1 },
