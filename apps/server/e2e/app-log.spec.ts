@@ -103,9 +103,9 @@ test("Kommando and Leckerli on a walk: a tap logs the usual one the button names
   const restore = await onlyOneDog();
   const api = asHirsch();
   const warten = await api.addExercise({ name: `Warten ${Date.now()}` });
-  const kaese = await api.addTreatKind({ name: `Käse ${Date.now()}`, gramsPerPiece: 2, fromDry: false });
+  const kaese = await api.addTreatKind({ name: `Käse ${Date.now()}`, gramsPerPiece: 2, fromDry: false, training: true });
   // a second kind, so that Leckerli asks which (with one kind it just logs it)
-  const huhn = await api.addTreatKind({ name: `Huhn ${Date.now()}`, gramsPerPiece: 1, fromDry: false });
+  const huhn = await api.addTreatKind({ name: `Huhn ${Date.now()}`, gramsPerPiece: 1, fromDry: false, training: true });
   try {
     const token = await signIn(page);
     await page.goto("/");

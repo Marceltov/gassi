@@ -194,6 +194,13 @@ const migrations: Record<string, Migration> = {
       await db.schema.createIndex("client_event_received").on("client_event").column("received_at").execute();
     },
   },
+  // Which treats the training offers (#126: some stay at home): a new column, on for every kind, so the training
+  // offers what it offered before.
+  "0.7_treat_training": {
+    async up(db: Kysely<any>) {
+      await db.schema.alterTable("treat_kind").addColumn("training", "integer", (c) => c.notNull().defaultTo(1)).execute();
+    },
+  },
 };
 
 const provider: MigrationProvider = { getMigrations: async () => migrations };

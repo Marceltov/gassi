@@ -1,6 +1,6 @@
 // Übungen or Leckerli: one of the household's lists for training, each its own screen in Mehr. A tap opens one to rename
-// it (a treat also its grams per piece and whether it comes out of the dry food) or remove it; removed ones keep their
-// name in past trainings.
+// it (a treat also its grams per piece, whether it comes out of the dry food and whether the training offers it, #126)
+// or remove it; removed ones keep their name in past trainings.
 import type { Client } from "@gassi/api-client";
 import { parseDecimal } from "@gassi/domain";
 import { useState } from "react";
@@ -18,7 +18,7 @@ import { Group, Row } from "../ui/List";
 import { useServer } from "./useServer";
 import { useWrite } from "./useWrite";
 
-type Editing = { what: "exercise"; item: Exercise | null; name: string } | { what: "treat"; item: TreatKind | null; name: string; grams: string; fromDry: boolean };
+type Editing = { what: "exercise"; item: Exercise | null; name: string } | { what: "treat"; item: TreatKind | null; name: string; grams: string; fromDry: boolean; training: boolean };
 
 const grams = (n: number) => n.toLocaleString("de-DE", { maximumFractionDigits: 1 });
 
@@ -45,7 +45,7 @@ export function Catalog({ what }: { what: Editing["what"] }) {
     void change(async (api) => {
       if (e.what === "exercise") await (e.item ? api.updateExercise({ id: e.item.id, name: e.name }) : api.addExercise({ name: e.name }));
       else {
-        const t = { name: e.name, gramsPerPiece: parseDecimal(e.grams), fromDry: e.fromDry };
+        const t = { name: e.name, gramsPerPiece: parseDecimal(e.grams), fromDry: e.fromDry, training: e.training };
         await (e.item ? api.updateTreatKind({ id: e.item.id, ...t }) : api.addTreatKind(t));
       }
     });
@@ -55,7 +55,7 @@ export function Catalog({ what }: { what: Editing["what"] }) {
       await (e.what === "exercise" ? api.updateExercise({ id: e.item.id, archived: true }) : api.updateTreatKind({ id: e.item.id, archived: true }));
     });
 
-  const newTreat: Editing = { what: "treat", item: null, name: "", grams: "", fromDry: false };
+  const newTreat: Editing = { what: "treat", item: null, name: "", grams: "", fromDry: false, training: true };
   return (
     <Screen
       head={
@@ -81,8 +81,8 @@ export function Catalog({ what }: { what: Editing["what"] }) {
                 <Row
                   key={t.id}
                   label={t.name}
-                  value={`${grams(t.gramsPerPiece)} g${t.fromDry ? " · aus dem Trockenfutter" : ""}`}
-                  onPress={() => open({ what: "treat", item: t, name: t.name, grams: grams(t.gramsPerPiece), fromDry: t.fromDry })}
+                  value={`${grams(t.gramsPerPiece)} g${t.fromDry ? " · aus dem Trockenfutter" : ""}${t.training ? " · fürs Training" : ""}`}
+                  onPress={() => open({ what: "treat", item: t, name: t.name, grams: grams(t.gramsPerPiece), fromDry: t.fromDry, training: t.training })}
                 />
               ))}
             </Group>
@@ -97,6 +97,7 @@ export function Catalog({ what }: { what: Editing["what"] }) {
                     <Field label="Gramm pro Stück" value={editing.grams} onChangeText={(g) => setEditing({ ...editing, grams: g })} inputMode="decimal" keyboardType="decimal-pad" />
                     <View style={styles.chips}>
                       <Chip label="Aus dem Trockenfutter" on={editing.fromDry} onPress={() => setEditing({ ...editing, fromDry: !editing.fromDry })} />
+                      <Chip label="Fürs Training" on={editing.training} onPress={() => setEditing({ ...editing, training: !editing.training })} />
                     </View>
                   </>
                 ) : null}

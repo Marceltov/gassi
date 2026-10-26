@@ -1,18 +1,20 @@
 // The household's own lists: the exercises it trains and the kinds of treats it gives. Removing one archives it, so
-// past trainings keep their names; adding an archived name again brings it back.
+// past trainings keep their names; adding an archived name again brings it back. A treat kind with `training` off stays
+// at home: the training doesn't offer it (#126).
 import { z } from "zod";
 import type { DB } from "./db/open";
 import { InputError } from "./errors";
 
 export type Exercise = { id: number; name: string };
-export type TreatKind = { id: number; name: string; gramsPerPiece: number; fromDry: boolean };
-export type TreatKindInput = { name: string; gramsPerPiece: number; fromDry: boolean };
+export type TreatKind = { id: number; name: string; gramsPerPiece: number; fromDry: boolean; training: boolean };
+export type TreatKindInput = { name: string; gramsPerPiece: number; fromDry: boolean; training: boolean };
 
 const nameSchema = z.string().trim().min(1).max(40);
 const treatSchema = z.object({
   name: nameSchema,
   gramsPerPiece: z.coerce.number().min(0.1).max(100),
   fromDry: z.boolean(),
+  training: z.boolean(),
 });
 
 function name(raw: unknown): string {
@@ -70,13 +72,13 @@ export class Catalog {
   }
 
   async treatKinds(): Promise<TreatKind[]> {
-    const rows = await this.db.selectFrom("treat_kind").select(["id", "name", "grams_per_piece", "from_dry"]).where("archived", "=", 0).orderBy("name").execute();
-    return rows.map((r) => ({ id: r.id, name: r.name, gramsPerPiece: r.grams_per_piece, fromDry: r.from_dry === 1 }));
+    const rows = await this.db.selectFrom("treat_kind").select(["id", "name", "grams_per_piece", "from_dry", "training"]).where("archived", "=", 0).orderBy("name").execute();
+    return rows.map((r) => ({ id: r.id, name: r.name, gramsPerPiece: r.grams_per_piece, fromDry: r.from_dry === 1, training: r.training === 1 }));
   }
 
   async addTreatKind(raw: unknown): Promise<TreatKind> {
     const t = treat(raw);
-    const columns = { grams_per_piece: t.gramsPerPiece, from_dry: t.fromDry ? 1 : 0 };
+    const columns = { grams_per_piece: t.gramsPerPiece, from_dry: t.fromDry ? 1 : 0, training: t.training ? 1 : 0 };
     const old = await this.db.selectFrom("treat_kind").select(["id", "archived"]).where("name", "=", t.name).executeTakeFirst();
     if (old && !old.archived) throw new InputError(DUPLICATE_TREAT);
     if (old) await this.db.updateTable("treat_kind").set({ ...columns, archived: 0 }).where("id", "=", old.id).execute();
@@ -87,7 +89,7 @@ export class Catalog {
   async updateTreatKind(id: number, raw: unknown): Promise<void> {
     const t = treat(raw);
     await unique(DUPLICATE_TREAT, () =>
-      this.db.updateTable("treat_kind").set({ name: t.name, grams_per_piece: t.gramsPerPiece, from_dry: t.fromDry ? 1 : 0 }).where("id", "=", id).execute(),
+      this.db.updateTable("treat_kind").set({ name: t.name, grams_per_piece: t.gramsPerPiece, from_dry: t.fromDry ? 1 : 0, training: t.training ? 1 : 0 }).where("id", "=", id).execute(),
     );
   }
 

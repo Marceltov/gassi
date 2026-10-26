@@ -1,7 +1,8 @@
 // Pages fit the screen (#71): at a small and a big phone a page's title (`head`) and its buttons below (`bottom`) stay
 // on screen; only the content between them (`top`) may scroll, nothing else does, and a page that fills the height
 // (`fill`) cuts nothing off. Text
-// fields are at least 16 px: an iPhone zooms into a smaller one when it gets the focus.
+// fields are at least 16 px: an iPhone zooms into a smaller one when it gets the focus. A button's words stay inside it
+// (#126: long Leckerli names wrapped out of theirs).
 import { expect, type Page } from "@playwright/test";
 
 export const PHONES = [
@@ -35,10 +36,20 @@ export async function expectFits(page: Page, path: string, ready: string | RegEx
         // text fields only: a switch's checkbox takes no typing, so the iPhone doesn't zoom into it
         .filter((e) => (e.tagName === "TEXTAREA" || (e.tagName === "INPUT" && !["checkbox", "radio"].includes((e as HTMLInputElement).type))) && e.offsetParent !== null && parseFloat(getComputedStyle(e).fontSize) < 16)
         .map((e) => e.getAttribute("aria-label") ?? e.tagName);
+      const spilled = all
+        .filter((e) => e.getAttribute("role") === "button" && e.offsetParent !== null)
+        .filter((b) => {
+          const r = b.getBoundingClientRect();
+          return [...b.querySelectorAll("*")].some((t) => {
+            const q = t.getBoundingClientRect();
+            return q.height > 0 && (q.top < r.top - 1 || q.bottom > r.bottom + 1 || q.left < r.left - 1 || q.right > r.right + 1);
+          });
+        })
+        .map((e) => e.getAttribute("aria-label") ?? e.textContent);
       const heads = [...document.querySelectorAll<HTMLElement>('[data-testid="screen-head"]')].filter((e) => e.offsetParent !== null);
       for (const h of heads) if (h.getBoundingClientRect().top < 0) off.push(h.textContent);
-      return { scrolling, cut, off, small };
+      return { scrolling, cut, off, small, spilled };
     });
-    expect(found, `${path} at ${width}×${height}`).toEqual({ scrolling: [], cut: 0, off: [], small: [] });
+    expect(found, `${path} at ${width}×${height}`).toEqual({ scrolling: [], cut: 0, off: [], small: [], spilled: [] });
   }
 }

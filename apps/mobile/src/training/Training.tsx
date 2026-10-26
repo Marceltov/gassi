@@ -1,7 +1,9 @@
 // The running training: on top the clock and the summary line, at the bottom each shown exercise with "klappt" /
 // "klappt nicht" per repetition, "+ Übung" (one of the household's exercises not shown yet, or a new one: "Neue Übung
-// …"), the treats with +1, and Fertig. A long press on a button undoes its last tap. With several dogs a tap asks for
-// the dog (like Pipi on the walk). Every tap goes through the queue; only a new exercise needs the server.
+// …"), the treats with +1 (two per row: those for the training, and any this training counted already, #126), and
+// Fertig. A long press on a button undoes its last tap ("Halten = rückgängig" once there is one to undo, and never
+// under another hint). With several dogs a tap asks for the dog (like Pipi on the walk). Every tap goes through the
+// queue; only a new exercise needs the server.
 import { newId, trainingSummaryLine } from "@gassi/domain";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
@@ -97,6 +99,7 @@ export function Training() {
   const more = exercises.filter((e) => !shownIds.has(e.id));
   const rows = training.reps.map((r) => ({ name: exerciseName(r.exerciseId), ok: r.ok, fail: r.fail }));
   const treats = Object.values(training.treats).reduce((n, c) => n + c, 0);
+  const offered = treatKinds.filter((k) => k.training || training.treats[k.id]);
   const choosingExercise = choosing ? exerciseName(choosing.exerciseId) : "";
   const openPicker = () => {
     setNaming(null);
@@ -159,13 +162,13 @@ export function Training() {
             })}
             {shown.length === 0 ? <Text style={[styles.hint, { color: theme.muted }]}>Noch keine Übung – „+ Übung“ wählt eine aus oder legt eine an.</Text> : null}
           </ScrollView>
-          {shown.length || treatKinds.length ? <Text style={[styles.hint, { color: theme.muted }]}>Halten = rückgängig</Text> : null}
+          {shown.length > 0 && (training.reps.some((r) => r.ok + r.fail > 0) || treats > 0) ? <Text style={[styles.hint, { color: theme.muted }]}>Halten = rückgängig</Text> : null}
           <BigButton kind="neutral" size="m" label="+ Übung" a11y="Übung hinzufügen" onPress={openPicker} />
-          {treatKinds.length ? (
+          {offered.length ? (
             <View style={[styles.row, styles.wrap]}>
-              {treatKinds.map((k) => (
+              {offered.map((k) => (
                 <View key={k.id} style={[styles.cell, styles.treat]}>
-                  <BigButton kind="food" size="m" icon="treat" label={`${k.name} · ${training.treats[k.id] ?? 0}`} sub="+1" a11y={`${k.name} +1`} event="Leckerli +1" onPress={() => treat(k.id, 1)} onLongPress={() => treat(k.id, -1)} />
+                  <BigButton kind="food" size="m" label={k.name} sub={`${training.treats[k.id] ?? 0} · +1`} a11y={`${k.name} +1`} event="Leckerli +1" onPress={() => treat(k.id, 1)} onLongPress={() => treat(k.id, -1)} />
                 </View>
               ))}
             </View>
@@ -221,7 +224,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 8 },
   cell: { flex: 1 },
   wrap: { flexWrap: "wrap" },
-  treat: { flexBasis: 100 },
+  // two per row, a last one alone takes the row
+  treat: { flexBasis: "40%" },
   gap: { gap: 8 },
   title: { fontSize: 17, fontWeight: "700" },
 });

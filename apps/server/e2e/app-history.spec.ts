@@ -222,7 +222,7 @@ test("from a walk's summary: its pee is deleted, its start moved, then the walk 
 test("a training reads Sitz 2/3 in the list; its repetitions are changed in its detail", async ({ page }) => {
   const client = asHirsch();
   const sitz = (await client.exercises()).exercises.find((e) => e.name === "Sitz") ?? (await client.addExercise({ name: "Sitz" }));
-  if (!(await client.treatKinds()).treatKinds.length) await client.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false });
+  if (!(await client.treatKinds()).treatKinds.length) await client.addTreatKind({ name: "Käse", gramsPerPiece: 2, fromDry: false, training: true });
   const dog = await firstDog();
   const key = `history-training-${Date.now()}`;
   const rep = (n: number, ok: boolean) => ({ id: `${key}-${n}`, at: minutesAgo(10 - n), kind: "training.rep" as const, trainingKey: key, exerciseId: sitz.id, dogId: dog.id, ok, delta: 1 as const });
