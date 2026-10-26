@@ -99,7 +99,7 @@ test("with two dogs, Begegnung asks the dog first, like Pipi, and the form is ab
   expect((await newest(token, "dogEncounter")).dogIds).toEqual([dogs[1].id]);
 });
 
-test("Kommando and Leckerli on a walk: a tap logs the usual one the button names, a hold chooses (#36, #98)", async ({ page }) => {
+test("Kommando and Leckerli on a walk: a tap gives the usual Leckerli and asks only klappt or klappt nicht for the usual command, a hold chooses (#36, #98, #114)", async ({ page }) => {
   const restore = await onlyOneDog();
   const api = asHirsch();
   const warten = await api.addExercise({ name: `Warten ${Date.now()}` });
@@ -124,13 +124,23 @@ test("Kommando and Leckerli on a walk: a tap logs the usual one the button names
     const entry = await newest(token, "command");
     expect(entry).toMatchObject({ exercises: [{ name: warten.name, ok: 1, fail: 0 }], treats: 1 });
 
-    // now a tap logs the usual at once, as the buttons say
+    // now a tap on Kommando asks only whether the usual worked, saying what ✓ gives (#114); nothing is logged before
     // Kommando names only the exercise: its treat is the one under Leckerli (#141)
     const kommando = page.getByRole("button", { name: `Kommando, ${warten.name}`, exact: true });
     const leckerli = page.getByRole("button", { name: `Leckerli, ${kaese.name}` });
+    const ask = page.getByTestId("command-ask");
     await kommando.click();
     await expect(command).toBeHidden();
+    await expect(ask).toContainText(warten.name);
+    await expect(ask).toContainText(`bei ✓ mit ${kaese.name}`);
+    await expect(taps.getByText(`Kommando · ${warten.name} ✓ · 1 Leckerli`)).toHaveCount(1);
+    await ask.getByRole("button", { name: "klappt", exact: true }).click();
+    await expect(ask).toBeHidden();
     await expect(taps.getByText(`Kommando · ${warten.name} ✓ · 1 Leckerli`)).toHaveCount(2);
+    // ✗ logs it without the Leckerli
+    await kommando.click();
+    await ask.getByRole("button", { name: "klappt nicht" }).click();
+    await expect(taps.getByText(`Kommando · ${warten.name} ✗`, { exact: true })).toHaveCount(1);
     await leckerli.click();
     await expect(taps).toContainText(`Leckerli · ${kaese.name}`);
     await expect(page.getByTestId("treat-sheet")).toBeHidden();
@@ -139,7 +149,7 @@ test("Kommando and Leckerli on a walk: a tap logs the usual one the button names
     // a hold chooses: a command that didn't work, another Leckerli that is then the one on you, for both buttons
     await kommando.click({ delay: 800 });
     await command.getByRole("button", { name: "klappt nicht" }).click();
-    await expect(taps).toContainText(`Kommando · ${warten.name} ✗`);
+    await expect(taps.getByText(`Kommando · ${warten.name} ✗`, { exact: true })).toHaveCount(2);
     await leckerli.click({ delay: 800 });
     await page.getByTestId("treat-sheet").getByRole("button", { name: huhn.name }).click();
     await expect(taps).toContainText(`Leckerli · ${huhn.name}`);
@@ -163,5 +173,37 @@ test("Kommando and Leckerli on a walk: a tap logs the usual one the button names
     await api.updateTreatKind({ id: kaese.id, archived: true });
     await api.updateTreatKind({ id: huhn.id, archived: true });
     await restore();
+  }
+});
+
+test("with two dogs on a walk, a tap on Kommando asks klappt or klappt nicht in a row per dog (#114)", async ({ page }) => {
+  const api = asHirsch();
+  const dogs = (await api.dogs()).dogs.filter((d) => !d.archived);
+  expect(dogs.length).toBeGreaterThan(1);
+  const warten = await api.addExercise({ name: `Warten ${Date.now()}` });
+  try {
+    const token = await signIn(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Gassi gehen" }).click();
+    // nothing usual yet: the dog, then the form
+    await page.getByRole("button", { name: "Kommando", exact: true }).click();
+    await page.getByTestId("dog-choice").getByRole("button", { name: dogs[0].name }).click();
+    const command = page.getByTestId("command-sheet");
+    await command.getByRole("button", { name: warten.name }).click();
+    await command.getByRole("button", { name: "klappt", exact: true }).click();
+    await expect(command).toBeHidden();
+
+    await page.getByRole("button", { name: `Kommando, ${warten.name}`, exact: true }).click();
+    await expect(page.getByTestId("dog-choice")).toBeHidden();
+    const ask = page.getByTestId("command-ask");
+    await expect(ask.getByRole("button", { name: `${dogs[0].name} klappt`, exact: true })).toBeVisible();
+    await ask.getByRole("button", { name: `${dogs[1].name} klappt nicht` }).click();
+    await expect(ask).toBeHidden();
+    await expect.poll(async () => (await newest(token, "command")).dogIds).toEqual([dogs[1].id]);
+    expect(await newest(token, "command")).toMatchObject({ exercises: [{ name: warten.name, ok: 0, fail: 1 }], treats: 0 });
+    const client = createClient({ baseUrl: BASE_URL, token });
+    made.push(...(await client.entries({ type: "command" })).entries.filter((e) => e.exercises?.some((x) => x.name === warten.name)).map((e) => e.id));
+  } finally {
+    await api.updateExercise({ id: warten.id, archived: true });
   }
 });
