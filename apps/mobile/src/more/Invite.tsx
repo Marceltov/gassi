@@ -1,18 +1,24 @@
 // An invitation as Haushalt (a new person) and Meine Geräte (another device of mine) make it: the link, the code to
-// type into the app's sign-in (shown only now: the server keeps just its hash) and until when it holds; copy buttons
-// where the platform can copy, and Zurückziehen. Below, the invitations still open, each to take back.
+// type into the app's sign-in (shown only now: the server keeps just its hash) and until when it holds; Teilen (the
+// system's share menu) and copy buttons where the platform has them, and Zurückziehen. Below, the invitations still
+// open, each to take back.
 import type { Output } from "@gassi/api-client";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { radius, useTheme } from "../theme";
 import { dayTime } from "../time";
 import { canCopy, copyText } from "../ui/copy";
+import { canShare, shareText } from "../ui/share";
 import { Group, Row, Small } from "../ui/List";
 import { useServer } from "./useServer";
 import { useWrite } from "./useWrite";
 
 export type InviteKind = "person" | "device";
 type Created = Output<"createInvite">;
+
+/** What Teilen sends: the link to open and the code for typing in, with until when they hold. */
+const inviteText = (invite: Pick<Created, "url" | "code" | "expiresAt">): string =>
+  `Komm zu Gassi: ${invite.url}\nOder in der App mit dem Code ${invite.code} anmelden (gilt bis ${dayTime(invite.expiresAt)}, nur einmal).`;
 
 const KIND_LABEL: Record<string, string> = { person: "Person", device: "Gerät", watch: "Uhr" };
 
@@ -40,6 +46,7 @@ export function InviteCard({ invite, onRevoke }: { invite: Created; onRevoke: ()
   const theme = useTheme();
   const [copied, setCopied] = useState<string | null>(null);
   const copy = async (what: string, text: string) => setCopied((await copyText(text)) ? `${what} kopiert.` : "Kopieren ging nicht – bitte von Hand.");
+  const share = async () => setCopied((await shareText(inviteText(invite))) ? null : "Teilen ging nicht – bitte kopieren.");
   return (
     <View testID="invite" style={[styles.card, { backgroundColor: theme.surface }]}>
       <Text style={[styles.small, { color: theme.muted }]}>Code für die Anmeldung in der App</Text>
@@ -52,6 +59,7 @@ export function InviteCard({ invite, onRevoke }: { invite: Created; onRevoke: ()
       </Text>
       <Text style={[styles.small, { color: theme.muted }]}>{`gilt bis ${dayTime(invite.expiresAt)} · nur einmal`}</Text>
       <View style={styles.actions}>
+        {canShare() ? <Small label="Teilen" onPress={() => void share()} /> : null}
         {canCopy() ? (
           <>
             <Small label="Link kopieren" onPress={() => void copy("Link", invite.url)} />
