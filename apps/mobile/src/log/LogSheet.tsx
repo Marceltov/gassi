@@ -3,8 +3,9 @@
 // Poopoo do, only when several could be meant), then its sheet: an encounter's details and a note; a note's text; a
 // command's exercise and treat with ✓ klappt / ✗ klappt nicht; a treat's kind (with one kind there is nothing to ask).
 // Everything is sent as a tap, so it works without reception and lands on a walk by its time (ADR 0002); the last
-// exercise and treat kind are preset next time. On a walk a tap on Kommando or Leckerli logs the usual at once and only a
-// hold opens the sheet (#98, quick.ts).
+// exercise and treat kind are preset next time. On a walk a tap on Leckerli gives the usual at once, a tap on Kommando
+// asks only klappt or klappt nicht for the usual (with several dogs a row each, #114), and a hold opens the sheet to
+// choose (#98, quick.ts).
 import { checkDetails, type Command, type EntryDetails, newId, TYPE_LABEL } from "@gassi/domain";
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
@@ -19,7 +20,7 @@ import { loadKept, saveKept } from "../data/kept";
 import { Chip } from "../ui/Chip";
 import { ChoiceList } from "../ui/ChoiceList";
 import { DetailFields } from "./DetailFields";
-import { quickLines, quickOf, usualOf } from "./quick";
+import { type Asked, commandOf, quickLines, quickOf, usualOf } from "./quick";
 
 type Place = NonNullable<EntryDetails["place"]>;
 export type LogKind = "note" | "dogEncounter" | "personEncounter" | "command" | "treat";
@@ -50,8 +51,8 @@ export function EncounterChoice({ open, onPick, onClose }: { open: boolean; onPi
 export type LogStart = "encounter" | "note" | "command" | "treat";
 
 /** The steps from `start` to the entry: Mensch or Hund, which dog of `dogIds` (the walk's, else the active ones), the
- * form. `place`: where a person is met by default. `quick`: a command or treat logs the usual without the form. Closing
- * any step ends it (`onDone`). */
+ * form. `place`: where a person is met by default. `quick`: a treat logs the usual without the form, a command asks only
+ * klappt or klappt nicht for each dog. Closing any step ends it (`onDone`). */
 export function Logging({ start, quick = false, dogIds, place, onDone }: { start: LogStart | null; quick?: boolean; dogIds: readonly number[]; place: Place; onDone: () => void }) {
   const { dogs, exercises, treatKinds, send } = useGassi();
   const [shown, setShown] = useState<LogStart | null>(null);
@@ -62,18 +63,19 @@ export function Logging({ start, quick = false, dogIds, place, onDone }: { start
     setKind(start === "encounter" ? null : start);
     setDogId(dogIds.length === 1 ? dogIds[0] : null);
   }
-  const needsDog = kind !== null && kind !== "note";
+  const usual = kind === "command" || kind === "treat" ? quickOf(kind, lastOf(), exercises, treatKinds, quick) : null;
+  // a command's usual is asked with the dogs in its sheet
+  const asked = usual?.kind === "ask" ? usual : null;
+  const needsDog = kind !== null && kind !== "note" && !asked;
   const ready = kind !== null && (!needsDog || dogId !== null);
-  // nothing to ask: logged at once
-  const now = ready && dogId !== null && (kind === "command" || kind === "treat") ? quickOf(kind, lastOf(), exercises, treatKinds, quick) : null;
-  const [nowKind, exerciseId, treatKindId] = [now?.kind, now?.kind === "quick.command" ? now.exerciseId : undefined, now?.treatKindId];
+  // nothing to ask: a treat logged at once
+  const treatKindId = ready && dogId !== null && usual?.kind === "quick.treat" ? usual.treatKindId : undefined;
   useEffect(() => {
-    if (dogId === null || nowKind === undefined) return;
-    const at = new Date().toISOString();
-    if (nowKind === "quick.treat" && treatKindId !== undefined) send({ id: newId(), at, kind: nowKind, dogId, treatKindId });
-    if (nowKind === "quick.command" && exerciseId !== undefined) send({ id: newId(), at, kind: nowKind, dogId, exerciseId, ok: true, treatKindId });
+    if (dogId === null || treatKindId === undefined) return;
+    send({ id: newId(), at: new Date().toISOString(), kind: "quick.treat", dogId, treatKindId });
     onDone();
-  }, [nowKind, exerciseId, treatKindId, dogId, send, onDone]);
+  }, [treatKindId, dogId, send, onDone]);
+  const form = ready && usual === null;
   const tap = (c: Command) => {
     send(c);
     onDone();
@@ -82,12 +84,54 @@ export function Logging({ start, quick = false, dogIds, place, onDone }: { start
     <>
       <EncounterChoice open={start === "encounter" && kind === null} onPick={setKind} onClose={onDone} />
       <ChoiceSheet testID="dog-choice" open={needsDog && dogId === null} title={kind ? `${TYPE_LABEL[kind]} – welcher Hund?` : ""} choices={dogChoices(dogIds, dogs, setDogId)} onClose={onDone} />
-      <Sheet open={ready && now === null} onClose={onDone} label={kind ? TYPE_LABEL[kind] : undefined}>
-        {ready && kind === "command" && dogId !== null && now === null ? <CommandForm dogId={dogId} onTap={tap} /> : null}
-        {ready && kind === "treat" && dogId !== null && now === null ? <TreatForm dogId={dogId} onTap={tap} /> : null}
+      <Sheet open={form || !!asked} onClose={onDone} label={kind ? TYPE_LABEL[kind] : undefined}>
+        {asked ? <CommandAsk asked={asked} dogIds={dogIds} onTap={tap} /> : null}
+        {form && kind === "command" && dogId !== null ? <CommandForm dogId={dogId} onTap={tap} /> : null}
+        {form && kind === "treat" && dogId !== null ? <TreatForm dogId={dogId} onTap={tap} /> : null}
         {ready && kind !== null && kind !== "command" && kind !== "treat" ? <LogForm key={kind} kind={kind} dogId={dogId} place={place} onClose={onDone} /> : null}
       </Sheet>
     </>
+  );
+}
+
+/** A tap on the walk's Kommando (#114): the usual exercise and the Leckerli ✓ gives, then ✗ klappt nicht or ✓ klappt
+ * logs it; with several dogs a row each, and a tap in a row logs it for that dog. */
+function CommandAsk({ asked, dogIds, onTap }: { asked: Asked; dogIds: readonly number[]; onTap: (c: Command) => void }) {
+  const theme = useTheme();
+  const { dogs, exercises, treatKinds } = useGassi();
+  const exercise = exercises.find((e) => e.id === asked.exerciseId);
+  const treat = treatKinds.find((k) => k.id === asked.treatKindId);
+  const log = (dogId: number, ok: boolean) => onTap(commandOf(asked, dogId, ok, newId(), new Date().toISOString()));
+  const named = dogIds.map((id) => ({ id, name: dogs.find((d) => d.id === id)?.name ?? "" }));
+  return (
+    <View testID="command-ask" style={styles.form}>
+      <Text style={[styles.title, { color: theme.ink }]}>{exercise?.name}</Text>
+      <Text style={[styles.small, { color: theme.muted }]}>{treat ? `bei ✓ mit ${treat.name}` : "ohne Leckerli"}</Text>
+      {named.length === 1 ? (
+        <View style={styles.row}>
+          <View style={styles.cell}>
+            <BigButton kind="neutral" size="l" icon="cross" label="klappt nicht" onPress={() => log(named[0].id, false)} />
+          </View>
+          <View style={styles.cell}>
+            <BigButton kind="walk" size="l" icon="check" label="klappt" onPress={() => log(named[0].id, true)} />
+          </View>
+        </View>
+      ) : (
+        named.map((d) => (
+          <View key={d.id} style={styles.dogRow}>
+            <Text style={[styles.dog, { color: theme.ink }]} numberOfLines={1}>
+              {d.name}
+            </Text>
+            <View style={styles.answer}>
+              <BigButton kind="neutral" size="l" icon="cross" label="" a11y={`${d.name} klappt nicht`} onPress={() => log(d.id, false)} />
+            </View>
+            <View style={styles.answer}>
+              <BigButton kind="walk" size="l" icon="check" label="" a11y={`${d.name} klappt`} onPress={() => log(d.id, true)} />
+            </View>
+          </View>
+        ))
+      )}
+    </View>
   );
 }
 
@@ -102,7 +146,7 @@ function CommandForm({ dogId, onTap }: { dogId: number; onTap: (c: Command) => v
   const log = (ok: boolean) => {
     if (exerciseId === null) return;
     remember({ exerciseId, commandTreat: treatKindId !== null, ...(treatKindId !== null ? { treatKindId } : {}) });
-    onTap({ id: newId(), at: new Date().toISOString(), kind: "quick.command", dogId, exerciseId, ok, treatKindId: ok && treatKindId !== null ? treatKindId : undefined });
+    onTap(commandOf({ exerciseId, treatKindId: treatKindId ?? undefined }, dogId, ok, newId(), new Date().toISOString()));
   };
   return (
     <View testID="command-sheet" style={styles.form}>
@@ -205,6 +249,9 @@ const styles = StyleSheet.create({
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   row: { flexDirection: "row", gap: 8 },
   cell: { flex: 1 },
+  dogRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  dog: { flex: 1, fontSize: 17, fontWeight: "600" },
+  answer: { width: 88 },
   small: { fontSize: 13 },
   note: { minHeight: 64, borderRadius: 12, borderWidth: 1, padding: 10, fontSize: 16, textAlignVertical: "top" },
   tall: { minHeight: 140 },

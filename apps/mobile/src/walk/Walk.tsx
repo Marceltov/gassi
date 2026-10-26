@@ -2,7 +2,7 @@
 // (a chip taps them off, "+" adds), the route in one line (the distance on the phone that records it, a tap shows it,
 // #104), and what happened so far; at the bottom Pipi, Markiert (for dogs that mark, #38) and
 // Poopoo, Kommando, Leckerli and Begegnung (#36, #90, #37), Pause/Weiter and Training, Zuhause; with several dogs on the walk
-// each asks which one. Only what happened scrolls, newest first; a tap on one opens it to change or delete (#99). A tap on Kommando or Leckerli logs the usual one they name, a hold chooses (#98). A poop is logged at the tap and then asks how it was (#86), in a sheet like the dog's; closed,
+// each asks which one. Only what happened scrolls, newest first; a tap on one opens it to change or delete (#99). A tap on Leckerli gives the one it names, a tap on Kommando asks klappt or klappt nicht for the exercise it names (#114), a hold chooses (#98). A poop is logged at the tap and then asks how it was (#86), in a sheet like the dog's; closed,
 // it has none; one still in the queue asks again from the list. Every tap goes through the queue and shows at once. When the walk is over
 // (ended here or on another phone), the screen leaves: to the summary after Zuhause, else to Start. On Android, the first
 // walk this phone records opens Akku once (#108).
