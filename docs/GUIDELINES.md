@@ -82,7 +82,8 @@ here in the same PR that follows it.
 - **The server goes first.** The Android app's code reaches the phones as an update from their server (#107, ADR
   0015), so a JS change needs no APK: merge, let the image reach the homelab (Watchtower pulls once a day at 11:54;
   `docker compose pull && docker compose up -d` in `/root/services/gassi` does it at once). An APK is only for new native
-  parts: bump `runtimeVersion` in `apps/mobile/app.json` and `npm run runtime:record` (CI's runtime check fails
+  parts: bump `runtimeVersion` in `apps/mobile/app.json` (and `android.versionCode` to the same number, so Android
+  sees the APK as newer; the release is `apk-<runtime>`) and `npm run runtime:record` (CI's runtime check fails
   otherwise); after the merge CI builds it once Marcel approves the `apk` environment. An app whose contract is newer
   than its server rejects the server's answers (#106); no tolerance for an older server in the client.
 - Every change has a GitHub issue. Branch `gassi-<issue>-<slug>`, commit and PR title `GASSI #<issue>: …`, and the
