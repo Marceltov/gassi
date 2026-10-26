@@ -398,10 +398,10 @@ test.describe("without the service worker, so the removals can be answered (or h
   });
 });
 
-test("Abmelden, the last row in Mehr, asks and then signs this device out", async ({ page }) => {
+test("Abmelden, the last row in Mehr, names the server, asks and then signs this device out", async ({ page }) => {
   const token = await signIn(page);
   await page.goto("/mehr");
-  await expect(page.getByTestId("more-Abmelden")).toContainText("auf diesem Gerät");
+  await expect(page.getByTestId("more-Abmelden")).toContainText(`auf ${new URL(BASE_URL).host}`);
   await page.getByTestId("more-Abmelden").click();
   await page.getByTestId("signout-sheet").getByRole("button", { name: "Abbrechen" }).click();
   await expect(page).toHaveURL(`${BASE_URL}/mehr`);

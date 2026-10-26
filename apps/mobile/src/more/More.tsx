@@ -2,13 +2,16 @@
 // the Garmin watch, which comes later; then this device's "Bildschirm auf der Runde anlassen" (#104), where the browser
 // can keep the screen on, or on Android the two settings recording in the pocket needs (Standort, Akku; #108). Each row says in short what is behind it; without reception the rows that need
 // the server stay without that line. Then Wünsche und Fehler (when the server has GitHub set up) and the link to the
-// source code, which the AGPL asks a server to offer its users, and last Abmelden on this device (asked first). Its
+// source code, which the AGPL asks a server to offer its users, and last Abmelden on this device (asked first), which
+// names the server it is signed in to (#133). Its
 // screens have no Zurück: the tab bar stays, and the Mehr tab leads back here.
 import { formatAgo, formatKg, stockSummary } from "@gassi/domain";
 import { type Href, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Linking, StyleSheet, Switch, Text } from "react-native";
+import { loadDevice } from "../data/device";
 import { useGassi } from "../data/GassiProvider";
+import { serverHost } from "../data/signin";
 import { useNow } from "../start/useNow";
 import { useTheme } from "../theme";
 import { Screen } from "../ui/Screen";
@@ -91,7 +94,7 @@ export function More() {
             <Row testID="more-Quellcode" icon="code" label="Quellcode" value="AGPL-3.0 · GitHub" onPress={() => void Linking.openURL(SOURCE)} />
           </Group>
           <Group>
-            <Row testID="more-Abmelden" icon="signOut" label="Abmelden" value={me ? `${me.name} auf diesem Gerät` : undefined} onPress={() => setSigningOut(true)} />
+            <Row testID="more-Abmelden" icon="signOut" label="Abmelden" value={me ? `${me.name} auf ${serverHost(loadDevice()?.serverUrl ?? "") ?? "diesem Gerät"}` : undefined} onPress={() => setSigningOut(true)} />
           </Group>
           <SignOutSheet open={signingOut} onClose={() => setSigningOut(false)} />
         </>
