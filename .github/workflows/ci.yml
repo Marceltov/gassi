@@ -178,5 +178,6 @@ jobs:
         run: |
           url=$(node -p 'require(process.env.RUNNER_TEMP + "/build.json")[0].artifacts.buildUrl')
           curl -fsSL -o "gassi-$RUNTIME.apk" "$url"
-          gh release create "apk-$RUNTIME" "gassi-$RUNTIME.apk" --target "$GITHUB_SHA" --title "Android app, runtime $RUNTIME" \
+          version=$(node -p 'require("./apps/mobile/app.json").expo.version')
+          gh release create "apk-$RUNTIME" "gassi-$RUNTIME.apk" --target "$GITHUB_SHA" --title "Gassi $version for Android (runtime $RUNTIME)" \
             --notes "The Gassi APK for runtime $RUNTIME, built from $GITHUB_SHA. Install it over the old one; the app links here when its server needs it."

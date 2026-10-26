@@ -9,6 +9,7 @@
     "web": "expo start --web --port 8081",
     "android": "expo start --android",
     "export": "expo export --platform web --platform android --output-dir dist",
+    "eas-build-post-install": "node ../../scripts/patches.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
