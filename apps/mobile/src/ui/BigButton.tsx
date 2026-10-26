@@ -2,7 +2,9 @@
 // Start's tiles (its kind's diagonal gradient, a soft shadow, a light top edge); a neutral one stays calm (its surface
 // with a faint shadow and edge); a side one is only outlined, a dangerSide one outlined in red; ink and danger are solid
 // (#80). Disabled, it is flat and faded. `stacked` puts the icon above the label, for three side by side (the walk's
-// Pipi, Markiert, Poopoo). The label and the small line stay one line each, cut with "…" rather than wrapping out of
+// Pipi, Markiert, Poopoo; Kommando, Leckerli, Begegnung), and then an empty `sub` keeps a small line's room, so the
+// words of a row sit at one height; a stacked button with a small line is a bit taller, so icon, word and line have
+// room (#141). The label and the small line stay one line each, cut with "…" rather than wrapping out of
 // the button; the phone's font size grows them only so far, and a button grows with them instead of cutting them (#126).
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { type ButtonKind, FIELD_HEIGHT, type Palette, radius, useTheme } from "../theme";
@@ -12,6 +14,9 @@ import { tapName } from "../data/usage";
 
 /** How far the phone's font size may grow a button's text: One UI's large sizes would push it out of the button. */
 const MAX_FONT_SCALE = 1.3;
+
+/** How much taller a stacked button with a small line is. */
+const STACKED_SUB = 12;
 
 const sizes = { xl: { height: 100, font: 21, icon: 26 }, l: { height: 72, font: 17, icon: 22 }, m: { height: 52, font: 15, icon: 18 }, s: { height: FIELD_HEIGHT, font: 15, icon: 16 } };
 
@@ -36,7 +41,8 @@ type Props = {
 
 export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, event, disabled, stacked, size = "xl" }: Props) {
   const theme = useTheme();
-  const { height, font, icon: iconSize } = sizes[size];
+  const { font, icon: iconSize } = sizes[size];
+  const height = sizes[size].height + (stacked && sub !== undefined ? STACKED_SUB : 0);
   const look = lookOf(kind, theme, !!disabled);
   // the button's name for the app's usage events (#115): what it says, never what was typed
   const tapped = (hold: boolean) => events.record("tap", tapName({ event, a11y, label }), hold ? { hold } : undefined);
@@ -58,9 +64,9 @@ export function BigButton({ kind, label, icon, sub, onPress, onLongPress, a11y, 
           </Text>
         ) : null}
       </View>
-      {sub ? (
+      {sub !== undefined ? (
         <Text style={[styles.sub, { color: look.sub }]} numberOfLines={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
-          {sub}
+          {sub || "\u00a0" /* a plain space would collapse on the web and take no line */}
         </Text>
       ) : null}
     </Pressable>
@@ -93,7 +99,7 @@ const styles = StyleSheet.create({
   button: { borderRadius: radius.button, alignItems: "center", justifyContent: "center", paddingHorizontal: 16, paddingVertical: 4 },
   line: { flexDirection: "row", alignItems: "center", gap: 8, maxWidth: "100%" },
   stacked: { flexDirection: "column", gap: 2 },
-  narrow: { paddingHorizontal: 4 },
+  narrow: { paddingHorizontal: 10 },
   label: { fontWeight: "700", flexShrink: 1 },
   sub: { fontSize: 12, marginTop: 2, opacity: 0.8 },
 });

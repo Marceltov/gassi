@@ -125,7 +125,8 @@ test("Kommando and Leckerli on a walk: a tap logs the usual one the button names
     expect(entry).toMatchObject({ exercises: [{ name: warten.name, ok: 1, fail: 0 }], treats: 1 });
 
     // now a tap logs the usual at once, as the buttons say
-    const kommando = page.getByRole("button", { name: `Kommando, ${warten.name} · ${kaese.name}` });
+    // Kommando names only the exercise: its treat is the one under Leckerli (#141)
+    const kommando = page.getByRole("button", { name: `Kommando, ${warten.name}`, exact: true });
     const leckerli = page.getByRole("button", { name: `Leckerli, ${kaese.name}` });
     await kommando.click();
     await expect(command).toBeHidden();
@@ -143,7 +144,10 @@ test("Kommando and Leckerli on a walk: a tap logs the usual one the button names
     await page.getByTestId("treat-sheet").getByRole("button", { name: huhn.name }).click();
     await expect(taps).toContainText(`Leckerli · ${huhn.name}`);
     await expect(page.getByRole("button", { name: `Leckerli, ${huhn.name}` })).toBeVisible();
-    await expect(page.getByRole("button", { name: `Kommando, ${warten.name} · ${huhn.name}` })).toBeVisible();
+    await expect(kommando).toBeVisible();
+    // the three words of the row sit at one height, Begegnung's too, though it has no small line
+    const tops = await Promise.all(["Kommando", "Leckerli", "Begegnung"].map(async (w) => (await page.getByText(w, { exact: true }).last().boundingBox())!.y));
+    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(1);
     // every one of them goes again afterwards
     const client = createClient({ baseUrl: BASE_URL, token });
     for (const type of ["command", "treat"]) made.push(...(await client.entries({ type })).entries.filter((e) => e.at >= entry.at).map((e) => e.id));
