@@ -1,0 +1,46 @@
+diff --git a/node_modules/expo-updates/android/src/main/java/expo/modules/updates/db/dao/UpdateDao.kt b/node_modules/expo-updates/android/src/main/java/expo/modules/updates/db/dao/UpdateDao.kt
+--- a/node_modules/expo-updates/android/src/main/java/expo/modules/updates/db/dao/UpdateDao.kt
++++ b/node_modules/expo-updates/android/src/main/java/expo/modules/updates/db/dao/UpdateDao.kt
+@@ -1,5 +1,6 @@
+ package expo.modules.updates.db.dao
+ 
++import android.net.Uri
+ import androidx.room.*
+ import expo.modules.updates.db.entity.AssetEntity
+ import expo.modules.updates.db.entity.UpdateEntity
+@@ -82,6 +83,15 @@ abstract class UpdateDao {
+   @Query("UPDATE updates SET scope_key = :newScopeKey WHERE id = :id;")
+   abstract fun _setUpdateScopeKeyInternal(id: UUID, newScopeKey: String)
+ 
++  fun setUpdateUrlAndRequestHeaders(update: UpdateEntity, url: Uri?, requestHeaders: Map<String, String>?) {
++    update.url = url
++    update.requestHeaders = requestHeaders
++    _setUpdateUrlAndRequestHeadersInternal(update.id, url, requestHeaders)
++  }
++
++  @Query("UPDATE updates SET url = :url, headers = :requestHeaders WHERE id = :id;")
++  abstract fun _setUpdateUrlAndRequestHeadersInternal(id: UUID, url: Uri?, requestHeaders: Map<String, String>?)
++
+   fun setUpdateCommitTime(update: UpdateEntity, commitTime: Date) {
+     update.commitTime = commitTime
+     setUpdateCommitTimeInternal(update.id, commitTime)
+diff --git a/node_modules/expo-updates/android/src/main/java/expo/modules/updates/loader/Loader.kt b/node_modules/expo-updates/android/src/main/java/expo/modules/updates/loader/Loader.kt
+--- a/node_modules/expo-updates/android/src/main/java/expo/modules/updates/loader/Loader.kt
++++ b/node_modules/expo-updates/android/src/main/java/expo/modules/updates/loader/Loader.kt
+@@ -166,6 +166,16 @@ abstract class Loader protected constructor(
+       database.updateDao().setUpdateScopeKey(existingUpdateEntity, newUpdateEntity.scopeKey)
+     }
+ 
++    // The same update from another update URL (an override set since it was loaded): take over that URL and its
++    // headers like the scopeKey, or the launcher's selection policy, which matches them against the configuration,
++    // never picks this update again.
++    if (existingUpdateEntity != null &&
++      (existingUpdateEntity.url != newUpdateEntity.url || existingUpdateEntity.requestHeaders != newUpdateEntity.requestHeaders)
++    ) {
++      logger.warn("Loaded an update with the same ID from a different URL or request headers than one we already have on disk. Overwriting them and loading the existing update.")
++      database.updateDao().setUpdateUrlAndRequestHeaders(existingUpdateEntity, newUpdateEntity.url, newUpdateEntity.requestHeaders)
++    }
++
+     // A READY update with no launch asset is not actually ready. Fall through to
+     // downloadAllAssets so its assets are re-registered instead of staying broken forever.
+     if (existingUpdateEntity != null && existingUpdateEntity.status == UpdateStatus.READY &&

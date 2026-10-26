@@ -34,6 +34,8 @@ here in the same PR that follows it.
 - Screens in `apps/mobile/app` stay thin and render from `src/`. Platform differences sit behind a `.web.ts(x)` file
   next to the shared one (ADR 0006).
 - Taps are idempotent commands with client ids (ADR 0001); "during a walk" is decided by time (ADR 0002).
+- A fix to an installed package is a patch in `apps/mobile/patches/`, applied by the APK's EAS build, until upstream
+  has it (ADR 0017); a new or changed patch bumps the runtime version.
 - A route is stored as the raw points the phone sent and filtered once, in `packages/domain/src/trackFilter.ts`,
   wherever distance or a map is made (ADR 0014).
 
